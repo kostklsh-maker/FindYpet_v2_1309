@@ -1,0 +1,197 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: #f7f9fa;
+    color: #333;
+    line-height: 1.6;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    background: white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+header img {
+    height: 40px;
+}
+
+.hero {
+    text-align: center;
+    padding: 60px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.hero h1 {
+    font-size: 2.5em;
+    margin-bottom: 20px;
+}
+
+.hero p {
+    font-size: 1.1em;
+    max-width: 600px;
+    margin: 0 auto 20px;
+}
+
+.price {
+    font-size: 1.8em;
+    font-weight: bold;
+}
+
+.how-it-works {
+    padding: 60px 20px;
+    background: white;
+}
+
+.how-it-works h2 {
+    text-align: center;
+    margin-bottom: 40px;
+    font-size: 2em;
+    color: #667eea;
+}
+
+.steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.step {
+    padding: 20px;
+    background: #f7f9fa;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.step .icon {
+    font-size: 3em;
+    margin-bottom: 15px;
+}
+
+.step h3 {
+    color: #ff9500;
+    margin-bottom: 10px;
+}
+
+.registration {
+    padding: 60px 20px;
+}
+
+.registration h2 {
+    text-align: center;
+    margin-bottom: 40px;
+    color: #667eea;
+}
+
+form {
+    max-width: 500px;
+    margin: 0 auto;
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+form input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 1em;
+}
+
+form button {
+    width: 100%;
+    padding: 15px;
+    background: #ff9500;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 1.1em;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+form button:hover {
+    background: #e68a00;
+}
+
+form button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+#telegramStep {
+    max-width: 500px;
+    margin: 0 auto;
+    background: #d4f1d4;
+    padding: 30px;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.btn-telegram {
+    display: inline-block;
+    padding: 15px 30px;
+    background: #0088cc;
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: bold;
+    margin: 20px 0;
+}
+
+.btn-telegram:hover {
+    background: #006ba3;
+}
+
+.card {
+    max-width: 400px;
+    margin: 50px auto;
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    text-align: center;
+}
+
+.card h1 {
+    color: #667eea;
+    margin-bottom: 20px;
+}
+
+#status {
+    margin-top: 20px;
+    font-size: 0.9em;
+    color: #666;
+}
+
+footer {
+    text-align: center;
+    padding: 20px;
+    background: #333;
+    color: white;
+    margin-top: 60px;
+}
+
+@media (max-width: 768px) {
+    .hero h1 {
+        font-size: 1.8em;
+    }
+    
+    .steps {
+        grid-template-columns: 1fr;
+    }
+}

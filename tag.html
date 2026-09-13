@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pet Found!</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="card">
+        <h1>🐾 Hi! I am lost</h1>
+        <p>My name is <b id="petName">...</b>. Please help me get back home!</p>
+        <div id="status">Loading tag info...</div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script>
+        // Данные API берём из общего config.js
+        const params = new URLSearchParams(window.location.search);
+        const idTag = params.get("id");
+
+        const petNameEl = document.getElementById("petName");
+        const statusDiv = document.getElementById("status");
+
+        async function loadTagInfo() {
+            if (!idTag) {
+                statusDiv.innerText = "Invalid tag link.";
+                return;
+            }
+            try {
+                const res = await fetch(`${API_URL}?action=getTag&id=${idTag}`);
+                const data = await res.json();
+
+                if (!data.found) {
+                    petNameEl.innerText = "this pet";
+                    statusDiv.innerText = "Tag not found in the system.";
+                    return;
+                }
+
+                petNameEl.innerText = data.pet_name;
+
+                if (!data.active) {
+                    statusDiv.innerText = "Owner hasn't finished setup yet. Please try again later.";
+                    return;
+                }
+
+                statusDiv.innerText = "Requesting location to send to the owner...";
+                requestLocation();
+            } catch (err) {
+                statusDiv.innerText = "Could not load tag info. Please check your connection.";
+            }
+        }
+
+        function requestLocation() {
+            if (!("geolocation" in navigator)) {
+                statusDiv.innerText = "Geolocation is not supported by your browser.";
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    sendLocationToBackend(position.coords.latitude, position.coords.longitude);
+                },
+                () => {
+                    statusDiv.innerText = "Location was not sent (access denied).";
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+
+        async function sendLocationToBackend(lat, lon) {
+            try {
+                await fetch(API_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "text/plain" },
+                    body: JSON.stringify({
+                        action: "reportFound",
+                        id_tag: idTag,
+                        lat: lat,
+                        lon: lon
+                    })
+                });
+                statusDiv.innerText = "Your location has been successfully sent to the owner!";
+            } catch (err) {
+                statusDiv.innerText = "Could not reach the server. Please try calling the owner directly.";
+            }
+        }
+
+        window.onload = loadTagInfo;
+    </script>
+</body>
+</html>
