@@ -1,3 +1,7 @@
+// ============================================================
+// Обработчик формы регистрации FindYpet
+// ============================================================
+
 document.getElementById("registerForm").addEventListener("submit", async function (e) {
     e.preventDefault();
 
@@ -14,13 +18,12 @@ document.getElementById("registerForm").addEventListener("submit", async functio
     };
 
     try {
-        // Запрос отправляется как text/plain, чтобы обойти CORS-блокировку Google Apps Script
         const res = await fetch(API_URL, {
             method: "POST",
             headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify(payload)
         });
-        
+
         const data = await res.json();
 
         if (data.success) {
@@ -33,15 +36,6 @@ document.getElementById("registerForm").addEventListener("submit", async functio
         }
     } catch (err) {
         alert("Could not reach the server. Check browser console (F12).");
-        console.error(err);
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.innerText = "Order Now — 100 ₪";
-    }
-});
-        }
-    } catch (err) {
-        alert("Could not reach the server. Please try again later.");
         console.error(err);
     } finally {
         submitBtn.disabled = false;
