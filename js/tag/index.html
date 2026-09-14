@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pet Finder</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
+    .card { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
+    h1 { color: #e63946; margin-bottom: 5px; }
+    p { font-size: 16px; color: #555; }
+    .btn-call { display: block; width: 100%; padding: 15px 0; background: #2a9d8f; color: white; font-size: 18px; font-weight: bold; text-decoration: none; border-radius: 8px; margin-top: 20px; }
+    .status { margin-top: 15px; font-size: 14px; color: #888; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1 id="petName">Loading...</h1>
+  <p id="petStatus">Pet found! Please contact the owner.</p>
+  
+  <a id="callBtn" href="#" class="btn-call" style="display:none;">📞 Call Owner</a>
+  <div id="statusMsg" class="status">Detecting geolocation...</div>
+</div>
+<script>
+  const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbw7YtH3ZyIW09kejhkvimx2IPMhOLpZL7bl60P0pLfpwUd2CtMpXQScUp2D2ciAGJ1Z/exec';
+  const urlParams = new URLSearchParams(window.location.search);
+  const idTag = urlParams.get('id');
+  if (!idTag) {
+    document.getElementById('petName').innerText = 'Error: Tag not found';
+  } else {
+    // 1. Получаем данные о собаке для отображения на экране
+    fetch(`${BACKEND_URL}?action=getTag&id=${idTag}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.found) {
+          document.getElementById('petName').innerText = `Pet: ${data.pet_name}`;
+          // Формируем кнопку звонка (данные берутся из базы)
+          if (data.phone) {
+            const callBtn = document.getElementById('callBtn');
+            callBtn.href = `tel:${data.phone}`;
+            callBtn.style.display = 'block';
+          }
+        }
+      });
+    // 2. Запрашиваем геопозицию и сразу отправляем хозяину
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          sendLocation(position.coords.latitude, position.coords.longitude);
+        },
+        (error) => {
+          document.getElementById('statusMsg').innerText = 'Geolocation not shared.';
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+  }
+  function sendLocation(lat, lon) {
+    fetch(BACKEND_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'reportFound',
+        id_tag: idTag,
+        lat: lat,
+        lon: lon
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        document.getElementById('statusMsg').innerText = '✅ Owner notified with your location!';
+      }
+    });
+  }
+</script>
+</body>
+  </html>
+  
