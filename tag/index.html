@@ -33,35 +33,35 @@
 <script>
   const BACKEND_URL = 'https://findypet-app.kostikklsh.workers.dev'; 
   const urlParams = new URLSearchParams(window.location.search);
-  const idTag = urlParams.get('id');
+const tagId = urlParams.get('id') || urlParams.get('id_tag');
 
-  if (!idTag) {
-    document.getElementById('petName').innerText = 'Error';
-    document.getElementById('petText').innerText = 'Invalid or missing Tag ID.';
-    document.getElementById('statusMsg').innerText = '';
-  } else {
-    // 1. Динамическая загрузка данных питомца и телефона из Google Таблицы
-    fetch(`${BACKEND_URL}?action=getTag&id=${idTag}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.found) {
-          document.getElementById('petName').innerText = `My name is ${data.pet_name}`;
-          document.getElementById('petText').innerText = `I'm lost! Please help me get back to my owner.`;
-          
-          if (data.phone) {
-            const callBtn = document.getElementById('callBtn');
+const API_URL = 'https://findypet-app.kostikklsh.workers.dev/'; // Ваша ссылка на Cloudflare Worker
+
+if (tagId) {
+  // Загружаем данные питомца и владельца
+  fetch(`${API_URL}?action=getTag&id=${tagId}`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.found) {
+        // Заполняем имя питомца
+        document.getElementById('pet-name').innerText = data.pet_name || 'Lost Pet';
+        
+        // Показываем кнопку звонка, если есть телефон
+        if (data.phone) {
+          const callBtn = document.getElementById('call-btn'); // Укажите ID вашей кнопки
+          if (callBtn) {
             callBtn.href = `tel:${data.phone}`;
-            callBtn.style.display = 'flex';
+            callBtn.style.display = 'block';
           }
-        } else {
-          document.getElementById('petName').innerText = 'Pet Found';
-          document.getElementById('petText').innerText = 'Tag is not registered in system.';
         }
-      })
-      .catch(err => {
-        console.error('Error fetching tag data:', err);
-        document.getElementById('petText').innerText = 'Could not load owner details. Please try again.';
-      });
+      } else {
+        document.getElementById('pet-name').innerText = 'Pet not found';
+      }
+    })
+    .catch(err => {
+      console.error('Error fetching tag data:', err);
+    });
+}
 
     // 2. Определение и отправка геопозиции хозяину в Telegram
     if ("geolocation" in navigator) {
