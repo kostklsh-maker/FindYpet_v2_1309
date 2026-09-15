@@ -1,19 +1,17 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pet Finder — Help Sam Get Home</title>
+  <title>Pet Finder</title>
   <style>
     * { box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; text-align: center; padding: 20px; background: #f0f2f5; margin: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding: 20px; background: #f0f2f5; margin: 0; }
     .card { background: white; padding: 30px 20px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); max-width: 380px; margin: 40px auto 0; }
-    .badge { background: #ffe3e3; color: #d6336c; font-weight: bold; padding: 6px 12px; border-radius: 20px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; display: inline-block; margin-bottom: 12px; }
+    .badge { background: #ffe3e3; color: #d6336c; font-weight: bold; padding: 6px 12px; border-radius: 20px; font-size: 13px; text-transform: uppercase; display: inline-block; margin-bottom: 12px; }
     h1 { color: #1c1e21; margin: 0 0 10px; font-size: 26px; }
     p.description { font-size: 16px; color: #606770; line-height: 1.5; margin-bottom: 25px; }
-    .btn-call { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 16px; background: #2b8a3e; color: white; font-size: 18px; font-weight: bold; text-decoration: none; border-radius: 12px; box-shadow: 0 4px 12px rgba(43, 138, 62, 0.3); transition: transform 0.1s; }
-    .btn-call:active { transform: scale(0.98); }
+    .btn-call { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 16px; background: #2b8a3e; color: white; font-size: 18px; font-weight: bold; text-decoration: none; border-radius: 12px; box-shadow: 0 4px 12px rgba(43, 138, 62, 0.3); }
     .status { margin-top: 20px; font-size: 13px; color: #868e96; }
   </style>
 </head>
@@ -21,68 +19,78 @@
 
 <div class="card">
   <div class="badge">Lost Pet</div>
-  <h1 id="petName">My name is Sam</h1>
-  <p class="description" id="petText">I'm lost! Please help me get back to my owner.</p>
+  <h1 id="petName">Loading...</h1>
+  <p class="description" id="petText">Please wait, loading pet information...</p>
   
-  <!-- Кнопка вызова -->
-  <a id="callBtn" href="tel:+123456789" class="btn-call">
+  <!-- Динамическая кнопка звонка -->
+  <a id="callBtn" href="#" class="btn-call" style="display: none;">
     <span>📞</span> Call Owner
   </a>
   
-  <div id="statusMsg" class="status">Sharing location with owner...</div>
+  <div id="statusMsg" class="status">Requesting location...</div>
 </div>
 
 <script>
-  // ЗАМЕНИТЕ НА ВАШ АКТУАЛЬНЫЙ URL ИЗ GOOGLE APPS SCRIPT ИЛИ CLOUDFLARE PROXY
   const BACKEND_URL = 'https://findypet-app.kostikklsh.workers.dev'; 
-  
   const urlParams = new URLSearchParams(window.location.search);
-  const idTag = urlParams.get('id') || '1'; // По умолчанию id=1
+  const idTag = urlParams.get('id');
 
-  // 1. Попытка загрузить динамические данные из вашей базы
-  fetch(`${BACKEND_URL}?action=getTag&id=${idTag}`)
-    .then(res => res.json())
-    .then(data => {
-      if (data && data.found) {
-        if (data.pet_name) {
+  if (!idTag) {
+    document.getElementById('petName').innerText = 'Error';
+    document.getElementById('petText').innerText = 'Invalid or missing Tag ID.';
+    document.getElementById('statusMsg').innerText = '';
+  } else {
+    // 1. Динамическая загрузка данных питомца и телефона из Google Таблицы
+    fetch(`${BACKEND_URL}?action=getTag&id=${idTag}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.found) {
           document.getElementById('petName').innerText = `My name is ${data.pet_name}`;
+          document.getElementById('petText').innerText = `I'm lost! Please help me get back to my owner.`;
+          
+          if (data.phone) {
+            const callBtn = document.getElementById('callBtn');
+            callBtn.href = `tel:${data.phone}`;
+            callBtn.style.display = 'flex';
+          }
+        } else {
+          document.getElementById('petName').innerText = 'Pet Found';
+          document.getElementById('petText').innerText = 'Tag is not registered in system.';
         }
-        if (data.phone) {
-          document.getElementById('callBtn').href = `tel:${data.phone}`;
-        }
-      }
-    })
-    .catch(err => {
-      console.log('Using default text due to network or CORS fallback.');
-    });
+      })
+      .catch(err => {
+        console.error('Error fetching tag data:', err);
+        document.getElementById('petText').innerText = 'Could not load owner details. Please try again.';
+      });
 
-  // 2. Отправка геолокации в Telegram хозяину
-  if ("geolocation" in navigator) {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        fetch(BACKEND_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'reportFound',
-            id_tag: idTag,
-            lat: position.coords.latitude,
-            lon: position.coords.longitude
+    // 2. Определение и отправка геопозиции хозяину в Telegram
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          fetch(BACKEND_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'reportFound',
+              id_tag: idTag,
+              lat: position.coords.latitude,
+              lon: position.coords.longitude
+            })
           })
-        })
-        .then(res => res.json())
-        .then(data => {
-          document.getElementById('statusMsg').innerText = '✅ Location sent to owner!';
-        })
-        .catch(() => {
-          document.getElementById('statusMsg').innerText = 'Location service active.';
-        });
-      },
-      (error) => {
-        document.getElementById('statusMsg').innerText = 'Location access denied.';
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
+          .then(res => res.json())
+          .then(data => {
+            document.getElementById('statusMsg').innerText = '✅ Owner notified with your location!';
+          })
+          .catch(() => {
+            document.getElementById('statusMsg').innerText = 'Error sending location.';
+          });
+        },
+        (error) => {
+          document.getElementById('statusMsg').innerText = 'Location access denied by user.';
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
   }
 </script>
 
