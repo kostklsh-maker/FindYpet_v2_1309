@@ -259,7 +259,7 @@
     // ------------------------------------------------------------
     const I18N = {
       en: {
-        badge: 'Lost pet', hi: 'Hi! My name is', lost: "I'm lost 😢",
+        badge: 'Lost pet', hi: 'Hi! My name is', lost: "I'm lost 😢", foundMe: 'Found me? 👋',
         missing: 'My family is looking for me', since: 'since', area: 'last seen',
         msg: 'Please help me get home — contact my owner in any way below.',
         owner: 'My owner:', notesTitle: 'Important',
@@ -280,7 +280,7 @@
         retry: 'Try again', about: 'what is this tag?', privacy: 'privacy'
       },
       he: {
-        badge: 'חיית מחמד אבודה', hi: 'היי! קוראים לי', lost: 'הלכתי לאיבוד 😢',
+        badge: 'חיית מחמד אבודה', hi: 'היי! קוראים לי', lost: 'הלכתי לאיבוד 😢', foundMe: 'מצאתם אותי? 👋',
         missing: 'המשפחה שלי מחפשת אותי', since: 'מאז', area: 'נראיתי לאחרונה',
         msg: 'עזרו לי לחזור הביתה — צרו קשר עם הבעלים שלי בכל דרך שלמטה.',
         owner: 'הבעלים שלי:', notesTitle: 'חשוב',
@@ -301,7 +301,7 @@
         retry: 'נסו שוב', about: 'מה זה התג הזה?', privacy: 'פרטיות'
       },
       ru: {
-        badge: 'Потерялся питомец', hi: 'Привет! Меня зовут', lost: 'Я потерялся 😢',
+        badge: 'Потерялся питомец', hi: 'Привет! Меня зовут', lost: 'Я потерялся 😢', foundMe: 'Нашли меня? 👋',
         missing: 'Меня ищет семья', since: 'с', area: 'последний раз видели',
         msg: 'Помогите мне вернуться домой — свяжитесь с хозяином любым способом ниже.',
         owner: 'Мой хозяин:', notesTitle: 'Важно',
@@ -360,6 +360,10 @@
       $('petName').textContent = pet.pet_name;
       document.title = `${pet.pet_name} · FindYpet`;
       document.body.classList.toggle('is-lost', !!pet.lost);
+      // «Я потерялся» — только в режиме «Потерялся»; иначе нейтральное «Нашли меня?»
+      const badgeText = $('badge').firstElementChild;
+      badgeText.dataset.t = pet.lost ? 'lost' : 'foundMe';
+      badgeText.textContent = t(badgeText.dataset.t);
       document.querySelector('meta[name="theme-color"]').content = pet.lost ? '#e5383b' : '#667eea';
       $('missing').classList.toggle('hidden', !pet.lost);
       if (pet.lost) {
@@ -418,7 +422,7 @@
     const SCREENS = ['loading', 'pet', 'notFound', 'tempError'];
     function show(id) {
       SCREENS.forEach((s) => $(s).classList.toggle('hidden', s !== id));
-      // Имя и «Я потерялся» в шапке — только когда питомец найден в базе
+      // Имя и плашка в шапке — только когда питомец найден в базе
       const hasPet = id === 'pet';
       $('badge').classList.toggle('hidden', !hasPet);
       document.querySelector('.hi').classList.toggle('hidden', !hasPet);
