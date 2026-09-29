@@ -3,128 +3,473 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FindYpet - Never Lose Your Best Friend</title>
-    <link rel="stylesheet" href="css/style.css">
+    <title>FindYpet — the fastest way home for a lost pet</title>
+    <meta name="description" content="Smart pet ID tag: your phone number, a QR code and NFC. Anyone who finds your pet can call you, message you on WhatsApp or send their location — from any phone, no app, no subscription.">
+    <meta name="theme-color" content="#667eea">
+    <meta property="og:title" content="FindYpet — the fastest way home for a lost pet">
+    <meta property="og:description" content="A tag with your number, a QR code and NFC. Whoever finds your pet reaches you in seconds — from any phone, no app needed.">
+    <meta property="og:image" content="assets/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=6">
+    <link rel="icon" href="assets/logo.png">
 </head>
 <body>
-    <header>
-        <div class="logo-container">
-    <img src="assets/logo.png" alt="FindYpet Logo" class="logo">
-</div>
-        <button class="lang-btn">עברית</button>
+    <!-- Icon sprite -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs>
+            <symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
+            <symbol id="i-qr" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM21 14v.01M14 21h.01M17.5 17.5H21V21h-3.5z"/></symbol>
+            <symbol id="i-nfc" viewBox="0 0 24 24"><rect x="2" y="6" width="7" height="12" rx="1"/><path d="M13 8.32a7.43 7.43 0 0 1 0 7.36"/><path d="M16.46 6.21a11.76 11.76 0 0 1 0 11.58"/><path d="M19.91 4.1a15.91 15.91 0 0 1 .01 15.8"/></symbol>
+            <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+            <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></symbol>
+            <symbol id="i-siren" viewBox="0 0 24 24"><path d="M7 18v-6a5 5 0 1 1 10 0v6"/><path d="M5 21a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2z"/><path d="M21 12h1M18.5 4.5 18 5M2 12h1M12 2v1M4.93 4.93l.71.71"/></symbol>
+            <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+            <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+            <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+            <symbol id="i-msg" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
+            <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
+            <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+            <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></symbol>
+            <symbol id="i-mobile" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></symbol>
+            <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20"/></symbol>
+            <symbol id="i-chip" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></symbol>
+            <symbol id="i-note" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M10 9H8M16 13H8M16 17H8"/></symbol>
+            <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18M7 6h1v4M16.71 13.88l.7.71-2.82 2.82"/></symbol>
+            <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
+            <symbol id="i-paw" viewBox="0 0 24 24"><circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></symbol>
+            <symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+        </defs>
+    </svg>
+
+    <header class="site-header" id="siteHeader">
+        <a class="brand" href="#top" aria-label="FindYpet"><img src="assets/logo.png" alt="FindYpet" class="logo"><span class="brand-name">FindYpet</span></a>
+        <nav class="nav" aria-label="Main">
+            <a href="#how" data-t="navHow">How it works</a>
+            <a href="#finder" data-t="navFinder">Found a pet?</a>
+            <a href="#features" data-t="navFeatures">Features</a>
+            <a href="#plans" data-t="navPlans">Pricing</a>
+            <a href="#faq" data-t="navFaq">FAQ</a>
+        </nav>
+        <div class="langs" role="group" aria-label="Language">
+            <button type="button" data-lang="en">EN</button>
+            <button type="button" data-lang="he">עב</button>
+            <button type="button" data-lang="ru">RU</button>
+        </div>
+        <a class="btn btn-primary btn-sm header-cta" href="#plans" data-t="navCta">Get a tag</a>
     </header>
 
-    <section class="hero">
-        <h1>Never Lose Track of Your Best Friend</h1>
-        <p>Every second counts when a pet is missing. Microchips require special scanners 
-           at vets, but FindYpet allows anyone with a smartphone to connect with you instantly 
-           and share your pet's precise location.</p>
-        <a href="#plans" class="hero-cta">Choose your tag</a>
+    <main>
+    <!-- HERO -->
+    <section class="hero" id="top">
+        <div class="hero-bg" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
+        <div class="hero-inner">
+            <div class="hero-text reveal">
+                <span class="pill"><svg class="ic"><use href="#i-paw"/></svg><span data-t="heroPill">Smart pet ID tag · made for Israel</span></span>
+                <h1 data-t="heroTitle">The fastest way home for a lost pet</h1>
+                <p class="hero-sub" data-t="heroText">A tag with your number, a QR code and NFC. Whoever finds your pet reaches you in seconds — from any phone, no app needed.</p>
+                <div class="hero-cta">
+                    <a class="btn btn-primary btn-lg" href="#plans"><span data-t="heroCta">Choose your tag</span><svg class="ic flip-rtl"><use href="#i-arrow"/></svg></a>
+                    <a class="btn btn-ghost btn-lg" href="#how" data-t="heroCta2">See how it works</a>
+                </div>
+                <p class="hero-price"><span data-t="from">from</span> <b class="ltr" data-price-min></b> <span data-t="heroPriceNote">· pay once, no subscription</span></p>
+            </div>
+
+            <div class="hero-visual reveal" aria-hidden="false">
+                <div class="orbit" aria-hidden="true"></div>
+                <button type="button" class="flip-tag" id="flipTag" aria-label="Flip the tag">
+                    <span class="flip-inner">
+                        <span class="face front">
+                            <span class="tag-ring"></span>
+                            <span class="tag-paw"><svg class="ic"><use href="#i-paw"/></svg></span>
+                            <span class="tag-name">BELLA</span>
+                            <span class="tag-phone ltr">050-123-4567</span>
+                            <span class="tag-small" data-t="tagCallMe">Call me</span>
+                        </span>
+                        <span class="face back">
+                            <span class="tag-ring"></span>
+                            <svg class="tag-qr" viewBox="0 0 21 21" shape-rendering="crispEdges"><rect width="21" height="21" fill="#fff"/><g fill="#1c1c1e"><rect x="0" y="0" width="7" height="7"/><rect x="14" y="0" width="7" height="7"/><rect x="0" y="14" width="7" height="7"/></g><g fill="#fff"><rect x="1" y="1" width="5" height="5"/><rect x="15" y="1" width="5" height="5"/><rect x="1" y="15" width="5" height="5"/></g><g fill="#1c1c1e"><rect x="2" y="2" width="3" height="3"/><rect x="16" y="2" width="3" height="3"/><rect x="2" y="16" width="3" height="3"/><rect x="9" y="1" width="2" height="1"/><rect x="8" y="3" width="1" height="3"/><rect x="10" y="4" width="2" height="2"/><rect x="9" y="8" width="3" height="1"/><rect x="1" y="9" width="2" height="1"/><rect x="4" y="8" width="1" height="3"/><rect x="13" y="9" width="2" height="2"/><rect x="17" y="8" width="2" height="1"/><rect x="19" y="10" width="1" height="3"/><rect x="8" y="11" width="1" height="2"/><rect x="10" y="12" width="3" height="1"/><rect x="15" y="13" width="2" height="1"/><rect x="9" y="15" width="1" height="3"/><rect x="11" y="16" width="2" height="2"/><rect x="14" y="16" width="1" height="1"/><rect x="16" y="15" width="3" height="1"/><rect x="18" y="17" width="2" height="3"/><rect x="12" y="19" width="3" height="1"/><rect x="15" y="18" width="1" height="2"/></g></svg>
+                            <span class="tag-scan" data-t="tagScan">SCAN or TAP PHONE</span>
+                        </span>
+                    </span>
+                </button>
+                <span class="flip-hint" data-t="tagFlip">Tap the tag to flip it</span>
+
+                <div class="toast toast-1" aria-hidden="true">
+                    <span class="toast-ic tg"><svg class="ic"><use href="#i-bell"/></svg></span>
+                    <span><b data-t="toast1Title">Bella's page was opened</b><small data-t="toast1Sub">Someone found her · just now</small></span>
+                </div>
+                <div class="toast toast-2" aria-hidden="true">
+                    <span class="toast-ic pin"><svg class="ic"><use href="#i-pin"/></svg></span>
+                    <span><b data-t="toast2Title">Location received</b><small data-t="toast2Sub">Haifa, Carmel · open in Waze</small></span>
+                </div>
+            </div>
+        </div>
+
+        <ul class="trust reveal">
+            <li><svg class="ic"><use href="#i-mobile"/></svg><span><b data-t="t1Title">No app for the finder</b><small data-t="t1Text">Camera, tap or a simple call</small></span></li>
+            <li><svg class="ic"><use href="#i-coin"/></svg><span><b data-t="t2Title">Pay once</b><small data-t="t2Text">No monthly fees</small></span></li>
+            <li><svg class="ic"><use href="#i-phone"/></svg><span><b data-t="t3Title">Works offline</b><small data-t="t3Text">Your number is engraved on the tag</small></span></li>
+            <li><svg class="ic"><use href="#i-globe"/></svg><span><b data-t="t4Title">3 languages</b><small>English · עברית · Русский</small></span></li>
+        </ul>
     </section>
 
-    <section class="how-it-works">
-        <h2>How It Works</h2>
-        <div class="steps">
-            <div class="step">
-                <div class="icon">🐾💨</div>
-                <h3>Step 1</h3>
-                <p>Pet gets lost on an unexpected adventure.</p>
+    <!-- HOW IT WORKS: interactive demo -->
+    <section class="section" id="how">
+        <div class="wrap">
+            <div class="head reveal">
+                <span class="kicker" data-t="howKicker">How it works</span>
+                <h2 data-t="howTitle">From “lost” to “home” in 4 steps</h2>
             </div>
-            <div class="step">
-                <div class="icon">📱</div>
-                <h3>Step 2</h3>
-                <p>A passerby taps their phone to the FindYpet tag.</p>
-            </div>
-            <div class="step">
-                <div class="icon">📍</div>
-                <h3>Step 3</h3>
-                <p>You instantly get a Telegram map alert with location.</p>
-            </div>
-            <div class="step">
-                <div class="icon">❤️🏠</div>
-                <h3>Step 4</h3>
-                <p>Reunited together in just a few minutes!</p>
+            <div class="demo reveal">
+                <ol class="demo-steps" role="tablist">
+                    <li><button type="button" class="demo-step on" data-step="0" role="tab"><span class="num">1</span><span><b data-t="s1Title">Someone finds your pet</b><small data-t="s1Text">They see the tag on the collar — your number and a QR code.</small></span><i class="bar"></i></button></li>
+                    <li><button type="button" class="demo-step" data-step="1" role="tab"><span class="num">2</span><span><b data-t="s2Title">They scan, tap or call</b><small data-t="s2Text">Your pet's page opens in the camera or browser. No app, no sign-up.</small></span><i class="bar"></i></button></li>
+                    <li><button type="button" class="demo-step" data-step="2" role="tab"><span class="num">3</span><span><b data-t="s3Title">You get an alert</b><small data-t="s3Text">Telegram tells you right away — and the finder can share where they are.</small></span><i class="bar"></i></button></li>
+                    <li><button type="button" class="demo-step" data-step="3" role="tab"><span class="num">4</span><span><b data-t="s4Title">On the way home</b><small data-t="s4Text">You call back, meet up — and that's it.</small></span><i class="bar"></i></button></li>
+                </ol>
+
+                <div class="device" aria-live="polite">
+                    <div class="device-notch"></div>
+                    <!-- screen 1 -->
+                    <div class="scr on" data-scr="0">
+                        <div class="scr-dog">🐕</div>
+                        <div class="mini-tag"><span class="tag-name">BELLA</span><span class="tag-phone ltr">050-123-4567</span></div>
+                        <div class="scr-ways">
+                            <span><svg class="ic"><use href="#i-phone"/></svg><span data-t="fCall">Call</span></span>
+                            <span><svg class="ic"><use href="#i-qr"/></svg><span data-t="fQr">Scan QR</span></span>
+                            <span><svg class="ic"><use href="#i-nfc"/></svg><span data-t="fTap">Tap phone</span></span>
+                        </div>
+                    </div>
+                    <!-- screen 2: pet page -->
+                    <div class="scr" data-scr="1">
+                        <div class="pp-head"><div class="pp-avatar">🐶</div><b data-t="scrHi">Hi! I'm Bella</b><small data-t="scrHiSub">Please help me get home</small></div>
+                        <span class="pp-btn call"><svg class="ic"><use href="#i-phone"/></svg><span data-t="scrCall">Call my family</span></span>
+                        <span class="pp-btn wa"><svg class="ic"><use href="#i-msg"/></svg><span>WhatsApp</span></span>
+                        <span class="pp-btn loc"><svg class="ic"><use href="#i-pin"/></svg><span data-t="scrLoc">Send my location</span></span>
+                        <div class="pp-note"><svg class="ic"><use href="#i-note"/></svg><span data-t="scrNote">Scared of people — please don't chase me</span></div>
+                    </div>
+                    <!-- screen 3: telegram -->
+                    <div class="scr chat" data-scr="2">
+                        <div class="chat-top"><span class="chat-av"><svg class="ic"><use href="#i-paw"/></svg></span><b>FindYpet bot</b></div>
+                        <div class="bubble b-1">🔔 <span data-t="scrAlert">Bella's page was just opened</span></div>
+                        <div class="bubble b-2">📍 <span data-t="scrShared">The finder shared a location</span>
+                            <span class="map"><span class="map-pin"><svg class="ic"><use href="#i-pin"/></svg></span></span>
+                            <span class="map-btn" data-t="scrWaze">Open in Waze</span>
+                        </div>
+                    </div>
+                    <!-- screen 4 -->
+                    <div class="scr home" data-scr="3">
+                        <div class="home-heart"><svg class="ic"><use href="#i-heart"/></svg></div>
+                        <b data-t="scrHome">Bella is home!</b>
+                        <small data-t="scrHomeSub">Lost mode off ✓</small>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
 
-    <section class="plans-section" id="plans">
-        <h2>Choose your plan</h2>
-        <p class="plans-sub">One-time payment. No subscription.</p>
-        <div class="plans">
-            <div class="plan">
-                <h3>Basic</h3>
-                <div class="plan-price" data-price="basic"></div>
-                <div class="plan-per">one-time</div>
-                <ul>
-                    <li>Engraved tag: pet name + your phone</li>
-                    <li>QR code on the back</li>
-                    <li>Pet page with a “Call owner” button</li>
-                    <li>WhatsApp message from the finder</li>
-                </ul>
-                <button type="button" class="choose" data-plan="basic">Choose</button>
+    <!-- FINDER -->
+    <section class="section alt" id="finder">
+        <div class="wrap">
+            <div class="head reveal">
+                <span class="kicker" data-t="finderKicker">Found a pet with a FindYpet tag?</span>
+                <h2 data-t="finderTitle">Pick any way — each one reaches the owner</h2>
             </div>
-            <div class="plan featured">
-                <span class="plan-badge">Most popular</span>
-                <h3>Smart</h3>
-                <div class="plan-price" data-price="smart"></div>
-                <div class="plan-per">one-time</div>
-                <ul>
-                    <li>Everything in Basic + NFC chip</li>
-                    <li>Instant Telegram alert on every scan</li>
-                    <li>Finder can send you the location</li>
-                    <li>“Lost mode”, second contact and notes</li>
-                </ul>
-                <button type="button" class="choose" data-plan="smart">Choose</button>
-            </div>
-            <div class="plan">
-                <h3>Family</h3>
-                <div class="plan-price" data-price="family"></div>
-                <div class="plan-per">3 Smart tags</div>
-                <ul>
-                    <li>3 Smart tags for your pets</li>
-                    <li>All Smart features for each tag</li>
-                    <li>Best price per tag</li>
-                </ul>
-                <button type="button" class="choose" data-plan="family">Choose</button>
+
+            <div class="finder reveal">
+                <div class="seg" role="tablist" id="finderTabs">
+                    <button type="button" class="on" data-way="call" role="tab"><svg class="ic"><use href="#i-phone"/></svg><span data-t="fCall">Call</span></button>
+                    <button type="button" data-way="qr" role="tab"><svg class="ic"><use href="#i-qr"/></svg><span data-t="fQr">Scan QR</span></button>
+                    <button type="button" data-way="tap" role="tab"><svg class="ic"><use href="#i-nfc"/></svg><span data-t="fTap">Tap phone</span></button>
+                </div>
+
+                <div class="way-panel on" data-panel="call">
+                    <div class="way-art art-call"><span class="ring r1"></span><span class="ring r2"></span><svg class="ic"><use href="#i-phone"/></svg></div>
+                    <div><h3 data-t="fCallTitle">Call the number on the tag</h3><p data-t="fCallText">The fastest way. Works without internet, from any phone — even a basic one.</p></div>
+                </div>
+                <div class="way-panel" data-panel="qr">
+                    <div class="way-art art-qr"><svg class="ic"><use href="#i-qr"/></svg><span class="scanline"></span></div>
+                    <div><h3 data-t="fQrTitle">Point your camera at the QR code</h3><p data-t="fQrText">Just the regular camera app. Tap the link that pops up — the pet's page opens.</p></div>
+                </div>
+                <div class="way-panel" data-panel="tap">
+                    <div class="way-art art-tap">
+                        <div class="phone-sil" id="phoneSil"><span class="nfc-spot"></span></div>
+                    </div>
+                    <div>
+                        <h3 data-t="fTapTitle">Hold your phone to the tag</h3>
+                        <p data-t="fTapText">Like paying by phone or topping up a Rav-Kav. The same page opens.</p>
+                        <div class="where">
+                            <span class="where-q" data-t="nfcWhereTitle">Where's NFC on my phone?</span>
+                            <div class="seg seg-sm" id="osTabs">
+                                <button type="button" class="on" data-os="iphone">iPhone</button>
+                                <button type="button" data-os="android">Android</button>
+                            </div>
+                            <p class="os-text" data-os-text="iphone" data-t="nfcIphone">Top edge, near the camera. iPhone XS or newer — the screen just needs to be on.</p>
+                            <p class="os-text" data-os-text="android" data-t="nfcAndroid" hidden>Middle of the back. NFC must be on — it usually is if you pay by phone.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="finder-then">
+                    <span class="then-title" data-t="finderThenTitle">On the pet's page you can:</span>
+                    <ul class="pills">
+                        <li><svg class="ic"><use href="#i-phone"/></svg><span data-t="finderThen1">Call in one tap</span></li>
+                        <li><svg class="ic"><use href="#i-msg"/></svg><span data-t="finderThen2">WhatsApp with a ready message</span></li>
+                        <li><svg class="ic"><use href="#i-pin"/></svg><span data-t="finderThen3">Share location — only if you want</span></li>
+                        <li><svg class="ic"><use href="#i-note"/></svg><span data-t="finderThen4">See notes: allergies, “don't chase”</span></li>
+                    </ul>
+                    <p class="muted-note" data-t="nfcNote">Tap didn't work? No problem — call or scan the QR.</p>
+                </div>
             </div>
         </div>
     </section>
 
-    <section class="registration" id="order">
-        <h2>Order & Register Your Tag</h2>
-        <form id="registerForm">
-            <input type="text" id="ownerName" placeholder="Owner Full Name" required>
-            <input type="tel" id="ownerPhone" placeholder="Phone Number (Israel)" required>
-            <input type="text" id="petName" placeholder="Pet's Name" required>
-            <input type="text" id="shippingAddress" placeholder="City, Street, Apartment" required>
-            <fieldset class="plan-pick">
-                <legend>Plan</legend>
-                <label><input type="radio" name="plan" value="basic"> Basic <span data-price="basic"></span></label>
-                <label><input type="radio" name="plan" value="smart" checked> Smart <span data-price="smart"></span></label>
-                <label><input type="radio" name="plan" value="family"> Family <span data-price="family"></span></label>
-            </fieldset>
-            <button type="submit">Order Now</button>
-        </form>
-
-        <!-- Показывается ПОСЛЕ успешной регистрации -->
-        <div id="telegramStep" style="display: none;">
-            <h3>✅ Tag #<span id="tagIdDisplay">---</span> created!</h3>
-            <p>Now connect your Telegram account to activate your tag:</p>
-            <a id="telegramLinkBtn" href="#" class="btn-telegram" target="_blank">
-                Open Telegram & Activate
-            </a>
-            <p style="font-size: 12px; color: #999;">
-                After clicking, you'll see a chat with our bot. Press the Start button.
-            </p>
+    <!-- FEATURES -->
+    <section class="section" id="features">
+        <div class="wrap">
+            <div class="head reveal">
+                <span class="kicker" data-t="featKicker">For owners</span>
+                <h2 data-t="featTitle">You hear first — not from the neighbours</h2>
+            </div>
+            <div class="bento">
+                <div class="card card-lost reveal">
+                    <div class="lost-copy">
+                        <span class="f-ic red"><svg class="ic"><use href="#i-siren"/></svg></span>
+                        <h3 data-t="f3Title">“Lost” mode in one command</h3>
+                        <p data-t="f3Text">Send /lost to the bot — the tag page turns into an alert: “I'm lost, my family is looking for me”. Send /found when your pet is home.</p>
+                        <label class="switch">
+                            <input type="checkbox" id="lostToggle">
+                            <span class="track"><span class="knob"></span></span>
+                            <span data-t="tryIt">Try it</span>
+                        </label>
+                    </div>
+                    <div class="mini-page" id="miniPage">
+                        <div class="mp-banner"><svg class="ic"><use href="#i-siren"/></svg><span data-t="prevLost">I'm lost — my family is looking for me</span></div>
+                        <div class="mp-body">
+                            <div class="pp-avatar">🐶</div>
+                            <b data-t="bella">Bella</b>
+                            <small class="mp-normal" data-t="prevNormal">Hi! Please call my family.</small>
+                            <small class="mp-seen" data-t="prevSeen">Last seen: Haifa, Carmel · 2 h ago</small>
+                            <span class="pp-btn call"><svg class="ic"><use href="#i-phone"/></svg><span data-t="scrCall">Call my family</span></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card reveal"><span class="f-ic"><svg class="ic"><use href="#i-bell"/></svg></span><h3 data-t="f1Title">Instant scan alert</h3><p data-t="f1Text">The moment someone opens the page, Telegram tells you.</p></div>
+                <div class="card reveal"><span class="f-ic"><svg class="ic"><use href="#i-pin"/></svg></span><h3 data-t="f2Title">Location — only with consent</h3><p data-t="f2Text">The finder shares their spot in one tap. Open it in Google Maps or Waze. No tracking.</p></div>
+                <div class="card reveal"><span class="f-ic"><svg class="ic"><use href="#i-users"/></svg></span><h3 data-t="f4Title">Second contact & notes</h3><p data-t="f4Text">A backup phone in case you don't answer, plus allergies, meds, “scared — don't chase”.</p></div>
+                <div class="card reveal"><span class="f-ic"><svg class="ic"><use href="#i-lock"/></svg></span><h3 data-t="f5Title">Your address stays private</h3><p data-t="f5Text">Used only for delivery — never shown on the page.</p></div>
+                <div class="card reveal"><span class="f-ic"><svg class="ic"><use href="#i-refresh"/></svg></span><h3 data-t="f6Title">Reminders to stay reachable</h3><p data-t="f6Text">Every 6 months the bot asks you to check your contacts.</p></div>
+            </div>
         </div>
     </section>
 
-    <footer>
-        <p>&copy; 2026 FindYpet. All rights reserved.</p>
+    <!-- LAYERS -->
+    <section class="section alt" id="layers">
+        <div class="wrap">
+            <div class="head reveal">
+                <span class="kicker" data-t="layersKicker">Always a backup plan</span>
+                <h2 data-t="layersTitle">If one way fails, the next one works</h2>
+            </div>
+            <ol class="chain reveal">
+                <li><span class="c-ic"><svg class="ic"><use href="#i-phone"/></svg></span><b data-t="l1Title">Phone number</b><small data-t="l1Text">on the tag — no internet or smartphone needed</small></li>
+                <li><span class="c-ic"><svg class="ic"><use href="#i-qr"/></svg></span><b data-t="l2Title">QR code</b><small data-t="l2Text">any phone camera opens the page</small></li>
+                <li><span class="c-ic"><svg class="ic"><use href="#i-nfc"/></svg></span><b data-t="l3Title">NFC</b><small data-t="l3Text">tap the phone — a quick extra way in</small></li>
+                <li><span class="c-ic"><svg class="ic"><use href="#i-chip"/></svg></span><b data-t="l4Title">Microchip</b><small data-t="l4Text">the legal backup — scanned by a vet or the city</small></li>
+            </ol>
+            <p class="muted-note center reveal" data-t="layersNote">FindYpet doesn't replace the microchip required by law — it adds a fast way for any passer-by to reach you, no vet visit needed.</p>
+        </div>
+    </section>
+
+    <!-- PLANS -->
+    <section class="section" id="plans">
+        <div class="wrap">
+            <div class="head reveal">
+                <span class="kicker" data-t="plansKicker">Pricing</span>
+                <h2 data-t="plansTitle">Choose your tag</h2>
+                <p class="sub" data-t="plansSub">Pay once — no subscription, no monthly or yearly fees.</p>
+            </div>
+
+            <div class="pets reveal">
+                <span data-t="petsQ">How many pets?</span>
+                <div class="seg seg-sm" id="petsSeg">
+                    <button type="button" class="on" data-pets="1">1</button>
+                    <button type="button" data-pets="2">2</button>
+                    <button type="button" data-pets="3">3</button>
+                </div>
+                <p class="pets-rec" id="petsRec" aria-live="polite"></p>
+            </div>
+
+            <div class="plans">
+                <div class="plan reveal" data-plan="basic">
+                    <h3 data-t="planBasic">Basic</h3>
+                    <p class="plan-for" data-t="basicFor">A tag anyone can use</p>
+                    <div class="plan-price ltr" data-price="basic"></div>
+                    <div class="plan-per" data-t="oneTime">one-time payment</div>
+                    <ul class="checks">
+                        <li data-t="pb1">Tag with your phone number, QR and NFC</li>
+                        <li data-t="pb2">Pet page in English, Hebrew and Russian</li>
+                        <li data-t="pb3">Call and WhatsApp straight from the page</li>
+                        <li data-t="pb4">Location — only with the finder's consent</li>
+                    </ul>
+                    <button type="button" class="btn btn-outline btn-block choose" data-plan="basic" data-t="choose">Choose</button>
+                </div>
+                <div class="plan featured reveal" data-plan="smart">
+                    <span class="plan-badge" data-t="popular">Most popular</span>
+                    <h3 data-t="planSmart">Smart</h3>
+                    <p class="plan-for" data-t="smartFor">You hear the moment they're found</p>
+                    <div class="plan-price ltr" data-price="smart"></div>
+                    <div class="plan-per" data-t="oneTime">one-time payment</div>
+                    <ul class="checks">
+                        <li data-t="ps1">Everything in Basic</li>
+                        <li data-t="ps2">Instant scan and location alerts</li>
+                        <li data-t="ps3">“Lost” mode in one command</li>
+                        <li data-t="ps4">Second contact and important notes</li>
+                    </ul>
+                    <button type="button" class="btn btn-primary btn-block choose" data-plan="smart" data-t="choose">Choose</button>
+                </div>
+                <div class="plan reveal" data-plan="family">
+                    <span class="plan-save" id="familySave"></span>
+                    <h3 data-t="planFamily">Family</h3>
+                    <p class="plan-for" data-t="familyFor">For a home with several pets</p>
+                    <div class="plan-price ltr" data-price="family"></div>
+                    <div class="plan-per" data-t="familyPer">3 Smart tags</div>
+                    <ul class="checks">
+                        <li data-t="pf1">3 tags with all Smart features</li>
+                        <li data-t="pf2">For several pets — or a spare tag</li>
+                        <li data-t="pf3">Lowest price per tag</li>
+                    </ul>
+                    <button type="button" class="btn btn-outline btn-block choose" data-plan="family" data-t="choose">Choose</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ORDER -->
+    <section class="section alt registration" id="order">
+        <div class="wrap">
+            <div class="head reveal">
+                <span class="kicker" data-t="orderKicker">Order</span>
+                <h2 data-t="regTitle">Make it yours — order in a minute</h2>
+            </div>
+            <div class="order-grid">
+                <aside class="preview reveal" aria-label="Preview">
+                    <span class="preview-label" data-t="previewTitle">Your tag</span>
+                    <div class="big-tag">
+                        <span class="tag-ring"></span>
+                        <span class="tag-paw"><svg class="ic"><use href="#i-paw"/></svg></span>
+                        <span class="tag-name" id="pvName">BELLA</span>
+                        <span class="tag-phone ltr" id="pvPhone">050-123-4567</span>
+                        <span class="tag-small" data-t="tagCallMe">Call me</span>
+                    </div>
+                    <p class="preview-hint" data-t="previewHint">Updates as you type</p>
+                    <div class="summary">
+                        <div><span data-t="lblPlan">Plan</span><b id="sumPlan"></b></div>
+                        <div class="total"><span data-t="sumTotal">Total</span><b class="ltr" id="sumPrice"></b></div>
+                        <p data-t="payNote">We'll message you to confirm the order and payment.</p>
+                    </div>
+                </aside>
+
+                <div class="form-wrap reveal">
+                    <ol class="steps-line">
+                        <li class="on"><span>1</span><span data-t="st1">Plan</span></li>
+                        <li class="on"><span>2</span><span data-t="st2">Details</span></li>
+                        <li id="stTg"><span>3</span><span data-t="st3">Telegram</span></li>
+                    </ol>
+                    <form id="registerForm" novalidate>
+                        <fieldset class="plan-pick">
+                            <legend data-t="lblPlan">Plan</legend>
+                            <label><input type="radio" name="plan" value="basic"><span class="pp-name" data-t="planBasic">Basic</span><span class="ltr pp" data-price="basic"></span></label>
+                            <label><input type="radio" name="plan" value="smart" checked><span class="pp-name" data-t="planSmart">Smart</span><span class="ltr pp" data-price="smart"></span></label>
+                            <label><input type="radio" name="plan" value="family"><span class="pp-name" data-t="planFamily">Family</span><span class="ltr pp" data-price="family"></span></label>
+                        </fieldset>
+                        <div class="row2">
+                            <label><span data-t="lblPet">Pet's name</span>
+                                <input type="text" id="petName" data-t-ph="phPet" placeholder="Pet's name" maxlength="16" required></label>
+                            <label><span data-t="lblOwner">Your name</span>
+                                <input type="text" id="ownerName" data-t-ph="phOwner" placeholder="Owner full name" autocomplete="name" required></label>
+                        </div>
+                        <label><span data-t="lblPhone">Your phone — the finder will call it</span>
+                            <input type="tel" id="ownerPhone" data-t-ph="phPhone" placeholder="050-123-4567" autocomplete="tel" required></label>
+                        <label><span data-t="lblAddress">Delivery address</span>
+                            <input type="text" id="shippingAddress" data-t-ph="phAddress" placeholder="City, street, apartment" autocomplete="street-address" required></label>
+                        <details class="more">
+                            <summary data-t="moreFields">+ Second contact and notes (optional)</summary>
+                            <label><span data-t="lblPhone2">Second phone (family member)</span>
+                                <input type="tel" id="phone2" data-t-ph="phPhone2" placeholder="052-765-4321"></label>
+                            <label><span data-t="lblNotes">Important notes for the finder</span>
+                                <textarea id="notes" rows="2" maxlength="200" data-t-ph="phNotes" placeholder="E.g.: allergic to chicken; scared of people — don't chase"></textarea></label>
+                            <p class="small-note" data-t="notesPublic">These details are shown on the public pet page.</p>
+                        </details>
+                        <label class="consent"><input type="checkbox" id="consent" required>
+                            <span><span data-t="consent1">I agree that my first name, phone number and the details above will be shown on my pet's page to whoever scans the tag, as described in the</span> <a href="privacy/" target="_blank" data-t="privacyLink">privacy policy</a>.</span></label>
+                        <p class="form-error" id="formError" role="alert"></p>
+                        <button type="submit" class="btn btn-primary btn-block btn-lg" id="orderBtn"><span data-t="orderBtn">Order now</span></button>
+                        <p class="alt-bot">
+                            <span data-t="preferTg">Prefer Telegram?</span>
+                            <a href="https://t.me/YourPetLocatorBot" target="_blank" rel="noopener" data-t="regWithBot">Register with our bot</a>
+                        </p>
+                    </form>
+
+                    <div id="telegramStep" hidden>
+                        <div class="done-ic"><svg class="ic"><use href="#i-check"/></svg></div>
+                        <h3><span data-t="tagWord">Tag</span> <span class="ltr">#<span id="tagIdDisplay">---</span></span> <span data-t="created">created!</span></h3>
+                        <p data-t="connectTg">Last step: connect Telegram to receive scan alerts and the finder's location.</p>
+                        <a id="telegramLinkBtn" href="#" class="btn btn-telegram btn-lg" target="_blank" rel="noopener"><svg class="ic"><use href="#i-send"/></svg><span data-t="openTg">Open Telegram & activate</span></a>
+                        <p class="small-note" data-t="afterClick">A chat with our bot @YourPetLocatorBot will open. Press Start.</p>
+                        <p class="small-note" data-t="noTgNote">No Telegram? The finder can still call you and write to you on WhatsApp straight from the pet's page.</p>
+                        <p class="tag-page"><span data-t="yourTagPage">Your pet's page:</span><br>
+                            <a id="tagUrlDisplay" href="#" target="_blank" rel="noopener" class="ltr"></a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section" id="faq">
+        <div class="wrap narrow">
+            <div class="head reveal"><span class="kicker" data-t="navFaq">FAQ</span><h2 data-t="faqTitle">Questions</h2></div>
+            <div class="faqs reveal">
+                <details class="faq"><summary data-t="q1">Does the finder need an app?</summary><p data-t="a1">No. The number on the tag works without anything; QR opens in the regular camera; tapping works on iPhone XS and newer and on Android phones with NFC.</p></details>
+                <details class="faq"><summary data-t="q2">Is there a subscription?</summary><p data-t="a2">No. You pay once for the tag and the service keeps working.</p></details>
+                <details class="faq"><summary data-t="q3">What if the finder doesn't know what NFC is?</summary><p data-t="a3">They don't need to. The phone number and the QR code are the main ways; NFC is just an extra shortcut for those who know it.</p></details>
+                <details class="faq"><summary data-t="q4">Where do I get alerts?</summary><p data-t="a4">Today — in Telegram, via our bot @YourPetLocatorBot. We're adding WhatsApp and SMS. Even without Telegram, the finder can call you or write to you on WhatsApp.</p></details>
+                <details class="faq"><summary data-t="q5">Who sees my details?</summary><p data-t="a5">Whoever scans the tag sees your pet's name, your first name, your phone and the notes you chose to add. Your address is used only for delivery and is never shown. The finder's location is sent only if they press the button.</p></details>
+                <details class="faq"><summary data-t="q6">Does it replace the microchip?</summary><p data-t="a6">No. The microchip is required by law and remains the last backup. FindYpet adds a fast way to reach you without a vet's scanner.</p></details>
+                <details class="faq"><summary data-t="q7">How do I update my phone or notes?</summary><p data-t="a7">In the Telegram bot: /settings. Keep your contacts up to date — outdated contacts are a common reason a found pet doesn't get home.</p></details>
+            </div>
+        </div>
+    </section>
+
+    <!-- FINAL CTA -->
+    <section class="final">
+        <div class="final-inner reveal">
+            <h2 data-t="ctaTitle">Give them a way home — today</h2>
+            <p data-t="ctaText">One tag, one payment, three ways to reach you.</p>
+            <a class="btn btn-primary btn-lg" href="#plans"><span data-t="heroCta">Choose your tag</span><svg class="ic flip-rtl"><use href="#i-arrow"/></svg></a>
+        </div>
+    </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="foot-brand"><img src="assets/logo.png" alt="" width="32" height="32"><b>FindYpet</b></div>
+        <p>&copy; 2026 FindYpet · <a href="privacy/" data-t="privacyLink">privacy policy</a> · <a href="https://t.me/YourPetLocatorBot" target="_blank" rel="noopener" class="ltr">@YourPetLocatorBot</a></p>
+        <p class="small-note" data-t="rights">All rights reserved.</p>
     </footer>
 
-    <script src="js/config.js"></script>
-    <script src="js/register-form.js"></script>
+    <!-- Mobile sticky order bar -->
+    <div class="sticky-bar" id="stickyBar" aria-hidden="true">
+        <span><small data-t="barText">Smart tag from</small> <b class="ltr" data-price-min></b></span>
+        <a class="btn btn-primary btn-sm" href="#plans" data-t="navCta">Get a tag</a>
+    </div>
+
+    <script src="js/config.js?v=6"></script>
+    <script src="js/plans.js?v=6"></script>
+    <script src="js/i18n.js?v=6"></script>
+    <script src="js/register-form.js?v=6"></script>
+    <script src="js/app.js?v=6"></script>
 </body>
 </html>

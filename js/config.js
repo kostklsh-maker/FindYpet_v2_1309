@@ -1,15 +1,6 @@
 // ============================================================
-// Единое место для хранения API_URL для всего проекта
+// FindYpet — настройки сайта (версия для GitHub Pages)
 // ============================================================
-const API_URL = "https://script.google.com/macros/s/AKfycbw7YtH3ZyIW09kejhkvimx2IPMhOLpZL7bl60P0pLfpwUd2CtMpXQScUp2D2ciAGJ1Z/exec";
-// Замените YOUR_DEPLOYMENT_ID на ваш реальный ID из Apps Script
-
-// ============================================================
-// Тарифы — единое место для цен на сайте.
-// Держите в синхроне с const PLANS в worker.js (бот и админ-уведомления).
-// ============================================================
-const PLANS = {
-    basic:  { price: "49 ₪",  name: "Basic" },
-    smart:  { price: "79 ₪",  name: "Smart" },
-    family: { price: "199 ₪", name: "Family (3 Smart tags)" }
-};
+// Сайт лежит отдельно от Worker'а, поэтому заказы отправляются на адрес Worker'а.
+// Если сайт отдаёт сам Worker — здесь должна быть пустая строка.
+const API_URL = "https://findypet-app.kostikklsh.workers.dev";
