@@ -1,0 +1,17 @@
+# Выкладка Worker'а findypet-app. Запускается автоматически из GitHub Actions
+# (.github/workflows/deploy-worker.yml) после сборки: python3 worker/build.py
+name = "findypet-app"
+main = "dist/worker.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+# Не трогать переменные, заданные в панели Cloudflare (BOT_USERNAME, TIMEZONE, SITE_URL, LOST_CHANNEL_ID…).
+# Секреты (BOT_TOKEN, GAS_URL, GAS_KEY, WEBHOOK_SECRET, ADMIN_CHAT_ID, TWILIO_*) выкладка тоже не меняет.
+keep_vars = true
+
+[[kv_namespaces]]
+binding = "FYP_KV"
+id = "d0564acb6cc546f5b82f0a8f6b78508b"   # findypet-data
+
+[triggers]
+crons = ["0 7 * * *"]                     # ежедневно 10:00 по Израилю — напоминания раз в 180 дней

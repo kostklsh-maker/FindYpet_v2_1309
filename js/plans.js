@@ -1,5 +1,5 @@
-// Тарифы — копия const PLANS из worker.js (сайт на GitHub Pages не может взять их у воркера).
-// Меняете цены — поменяйте и здесь, и в worker.js.
+// Сгенерировано worker/build.py из const PLANS в worker/src/worker.js — не редактируйте вручную.
+// На основном сайте этот файл отдаёт сам Worker; здесь — копия для GitHub Pages.
 const PLANS = {
     "basic": {
         "price": "49 ₪",

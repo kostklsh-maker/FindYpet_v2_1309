@@ -1,0 +1,57 @@
+# Сборка, тесты и выкладка Worker'а findypet-app в Cloudflare.
+# Нужны секреты репозитория: CLOUDFLARE_API_TOKEN (шаблон «Edit Cloudflare Workers») и CLOUDFLARE_ACCOUNT_ID.
+name: Deploy worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'css/**'
+      - 'js/**'
+      - 'tag/**'
+      - 'privacy/**'
+      - 'assets/logo.png'
+      - 'worker/**'
+      - '.github/workflows/deploy-worker.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build worker/dist/worker.js
+        run: python3 worker/build.py
+
+      - name: Tests (mocked Sheets, Telegram, KV, SMS)
+        run: node worker/test/run.mjs
+
+      - name: Deploy to Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          command: deploy
+
+      - name: Smoke test
+        run: |
+          set -e
+          base="https://findypet-app.kostikklsh.workers.dev"
+          sleep 5
+          curl -fsS "$base/" | grep -q 'fastest way home'
+          curl -fsS "$base/js/plans.js" | grep -q 'PLANS'
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$base/t/1")
+          test "$code" = "200"
+          echo "Site is up ✅"

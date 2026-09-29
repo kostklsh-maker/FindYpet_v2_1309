@@ -2,125 +2,385 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FindYpet - Lost Pet</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#667eea">
+  <title>FindYpet · Lost pet</title>
+  <link rel="icon" href="../assets/logo.png">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: #f4f6f8; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
-    .card { background: #ffffff; border-radius: 20px; padding: 30px 24px; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; }
-    .badge { display: inline-block; background-color: #ffe8ec; color: #ff3b30; font-weight: 700; font-size: 12px; padding: 6px 16px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 20px; }
-    h1 { font-size: 28px; color: #1c1c1e; margin-bottom: 12px; font-weight: 700; }
-    p { color: #8e8e93; font-size: 15px; margin-bottom: 24px; line-height: 1.4; }
-    .btn-call { display: none; background-color: #34c759; color: white; font-size: 18px; font-weight: 600; text-decoration: none; padding: 16px 24px; border-radius: 14px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(52,199,89,0.3); transition: transform 0.1s ease; }
-    .btn-call:active { transform: scale(0.98); }
-    .status { font-size: 13px; color: #8e8e93; min-height: 20px; margin-top: 10px; }
-    .status.success { color: #34c759; }
-    .status.error { color: #ff9500; }
+    :root {
+      --bg: #f4f6fb; --card: #ffffff; --text: #1c1c1e; --muted: #6b6f7b;
+      --brand: #667eea; --brand2: #764ba2; --call: #34c759; --wa: #25d366; --loc: #0088cc;
+      --warn: #ff9500; --danger: #ff3b30;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Hebrew", Arial, sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .top {
+      width: 100%; background: linear-gradient(135deg, var(--brand), var(--brand2));
+      padding: 18px 16px 70px; text-align: center; color: #fff;
+    }
+    body.is-lost .top { background: linear-gradient(135deg, #ff5e57, #c0392b); }
+    .top img { width: 64px; height: 64px; border-radius: 50%; background: #fff; object-fit: cover; }
+    .langs { margin-top: 10px; display: flex; gap: 6px; justify-content: center; }
+    .langs button {
+      background: rgba(255,255,255,.18); color: #fff; border: 1px solid rgba(255,255,255,.35);
+      border-radius: 14px; padding: 4px 12px; font-size: 13px; cursor: pointer; font-family: inherit;
+    }
+    .langs button.on { background: #fff; color: var(--brand2); font-weight: 700; }
+    .card {
+      background: var(--card); border-radius: 22px; width: calc(100% - 32px); max-width: 420px;
+      margin-top: -52px; padding: 24px 20px 20px; text-align: center;
+      box-shadow: 0 12px 30px rgba(40, 40, 90, .12);
+    }
+    .badge {
+      display: inline-block; background: #ffe8ec; color: var(--danger); font-weight: 800; font-size: 12px;
+      padding: 6px 16px; border-radius: 20px; letter-spacing: .6px; margin-bottom: 14px; text-transform: uppercase;
+    }
+    .missing {
+      background: var(--danger); color: #fff; border-radius: 14px; padding: 10px 14px; margin-bottom: 16px;
+      font-weight: 700; font-size: 15px; line-height: 1.35;
+    }
+    .missing small { display: block; font-weight: 500; opacity: .95; margin-top: 2px; }
+    h1 { font-size: 26px; line-height: 1.25; margin-bottom: 8px; }
+    h1 .name { color: var(--brand2); }
+    .lost { font-size: 19px; font-weight: 700; margin-bottom: 8px; }
+    .msg { color: var(--muted); font-size: 16px; line-height: 1.45; margin-bottom: 16px; }
+    .owner { font-size: 14px; color: var(--muted); margin-bottom: 10px; }
+    .notes {
+      background: #fff5e6; border: 1px solid #ffd79a; color: #7a4a00; border-radius: 14px; padding: 10px 14px;
+      font-size: 15px; line-height: 1.4; margin-bottom: 16px; text-align: start; white-space: pre-wrap; word-break: break-word;
+    }
+    .notes b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 2px; }
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+      border: 0; border-radius: 16px; padding: 15px 18px; margin-bottom: 10px;
+      font-size: 18px; font-weight: 700; color: #fff; text-decoration: none; cursor: pointer; font-family: inherit;
+      transition: transform .08s ease, opacity .2s;
+    }
+    .btn:active { transform: scale(.98); }
+    .btn[disabled] { opacity: .65; cursor: default; }
+    .btn small { display: block; font-weight: 600; font-size: 15px; opacity: .95; direction: ltr; unicode-bidi: embed; }
+    .btn .col { display: flex; flex-direction: column; align-items: center; }
+    .btn-call { background: var(--call); box-shadow: 0 6px 16px rgba(52,199,89,.3); }
+    .btn-wa { background: var(--wa); }
+    .btn-loc { background: var(--loc); box-shadow: 0 6px 16px rgba(0,136,204,.28); }
+    .btn-loc.done { background: var(--call); box-shadow: none; }
+    .btn-outline { background: #fff; color: var(--text); border: 2px solid #e4e6f0; font-size: 16px; }
+    .btn-outline small { color: var(--muted); }
+    .status { font-size: 14px; min-height: 18px; margin: 0 0 8px; color: var(--muted); line-height: 1.4; }
+    .status.ok { color: #1f9d46; } .status.err { color: #c47700; }
+    .hint { font-size: 12px; color: #9a9ea8; margin-top: 6px; line-height: 1.4; }
+    .chip { font-size: 13px; color: var(--muted); margin-top: 14px; padding-top: 12px; border-top: 1px solid #eef0f6; line-height: 1.45; }
+    .stale { font-size: 12px; color: #c47700; margin-bottom: 10px; }
+    .hidden { display: none !important; }
+    .spinner {
+      width: 34px; height: 34px; border-radius: 50%; margin: 20px auto;
+      border: 4px solid #e4e6f0; border-top-color: var(--brand); animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    footer { font-size: 12px; color: #9a9ea8; padding: 22px 16px 30px; text-align: center; }
+    footer a { color: inherit; }
+    [dir="rtl"] .card, [dir="rtl"] .top { text-align: center; }
   </style>
 </head>
 <body>
-
-  <div class="card">
-    <span class="badge">LOST PET</span>
-    <h1 id="pet-name">Loading...</h1>
-    <p id="sub-text">Please wait, loading pet information...</p>
-
-    <!-- Кнопка вызова владельца -->
-    <a id="call-btn" href="#" class="btn-call">📞 Call Owner</a>
-
-    <!-- Статус отправки геолокации -->
-    <div id="location-status" class="status">Requesting location...</div>
+  <div class="top">
+    <img src="../assets/logo.png" alt="FindYpet">
+    <div class="langs">
+      <button data-lang="en">EN</button>
+      <button data-lang="he">עב</button>
+      <button data-lang="ru">RU</button>
+    </div>
   </div>
 
+  <main class="card">
+    <div id="loading"><div class="spinner"></div></div>
+
+    <!-- Питомец найден в базе -->
+    <div id="pet" class="hidden">
+      <div class="missing hidden" id="missing"><span data-t="missing">My family has reported me missing</span><small id="missingInfo"></small></div>
+      <span class="badge" id="badge" data-t="badge">Lost pet</span>
+      <h1><span data-t="hi">Hi! My name is</span> <span class="name" id="petName"></span> 🐾</h1>
+      <p class="lost" data-t="lost">I'm lost 😢</p>
+      <p class="msg" data-t="msg">Please help me get home — contact my owner in any way below.</p>
+      <p class="owner hidden" id="ownerLine"><span data-t="owner">My owner:</span> <b id="ownerName"></b></p>
+      <div class="notes hidden" id="notesBox"><b data-t="notesTitle">Important</b><span id="notesText"></span></div>
+      <p class="stale hidden" id="staleLine" data-t="stale">Showing saved info — our server is slow right now, but the contacts work.</p>
+
+      <a class="btn btn-call hidden" id="callBtn" href="#">
+        <span>📞</span>
+        <span class="col"><span data-t="call">Call my owner</span><small id="phoneText"></small></span>
+      </a>
+      <a class="btn btn-wa hidden" id="waBtn" href="#" target="_blank" rel="noopener">
+        <span>💬</span><span data-t="wa">Write on WhatsApp</span>
+      </a>
+      <button class="btn btn-loc" id="locBtn" type="button">
+        <span>📍</span><span data-t="sendLoc">Send my location to my owner</span>
+      </button>
+      <div class="status" id="locStatus"></div>
+      <a class="btn btn-outline hidden" id="call2Btn" href="#">
+        <span>📞</span>
+        <span class="col"><span data-t="call2">Call second contact</span><small id="phone2Text"></small></span>
+      </a>
+
+      <p class="hint" data-t="hint">Sharing your location is optional. It goes only to my owner, and only when you tap the button.</p>
+      <p class="chip" data-t="chipNote">Can't reach anyone? Any vet or the municipal veterinary service can scan my microchip.</p>
+    </div>
+
+    <!-- Метка действительно не найдена / не активирована -->
+    <div id="notFound" class="hidden">
+      <span class="badge" data-t="badge">Lost pet</span>
+      <h1 data-t="nfTitle">This tag is not activated yet</h1>
+      <p class="msg" data-t="nfMsg">If there is a phone number on the tag, please call it. If not, take the pet to the nearest vet — they can scan its microchip.</p>
+    </div>
+
+    <!-- Временный сбой сети/сервера — НЕ "метка не найдена" -->
+    <div id="tempError" class="hidden">
+      <span class="badge" data-t="badge">Lost pet</span>
+      <h1 data-t="errTitle">Temporary problem</h1>
+      <p class="msg" data-t="errMsg">Could not load the pet's information right now. Please call the phone number printed on the tag, or try again.</p>
+      <button class="btn btn-loc" id="retryBtn" type="button" data-t="retry">Try again</button>
+    </div>
+  </main>
+
+  <footer>FindYpet · <a href="../" data-t="about">what is this tag?</a> · <a href="../privacy/" data-t="privacy">privacy</a></footer>
+
+  <script src="../js/config.js?v=4"></script>
   <script>
-    const WORKER_URL = 'https://findypet-app.kostikklsh.workers.dev/';
+    // ------------------------------------------------------------
+    // Тексты страницы (EN / עברית / RU)
+    // ------------------------------------------------------------
+    const I18N = {
+      en: {
+        badge: 'Lost pet', hi: 'Hi! My name is', lost: "I'm lost 😢",
+        missing: 'My family has reported me missing', since: 'since', area: 'last seen',
+        msg: 'Please help me get home — contact my owner in any way below.',
+        owner: 'My owner:', notesTitle: 'Important',
+        stale: 'Showing saved info — our server is slow right now, but the contacts work.',
+        call: 'Call my owner', wa: 'Write on WhatsApp', call2: 'Call second contact',
+        sendLoc: 'Send my location to my owner', sendLocWa: 'Send my location via WhatsApp',
+        hint: 'Sharing your location is optional. It goes only to my owner, and only when you tap the button.',
+        chipNote: "Can't reach anyone? Any vet or the municipal veterinary service can scan my microchip.",
+        waText: 'Hi! I found {pet} (FindYpet tag #{id}).', waHere: "I'm here:",
+        sending: 'Getting your location…', sent: '✅ Location sent to my owner. Thank you ❤️',
+        sentBtn: 'Location sent', denied: 'Location access was blocked. Allow location for this site in your browser settings — or just call my owner.',
+        unavailable: 'Could not get your location. Please try again or call my owner.',
+        netErr: 'Network error. Please try again or call my owner.',
+        nfTitle: 'This tag is not activated yet',
+        nfMsg: 'If there is a phone number on the tag, please call it. If not, take the pet to the nearest vet — they can scan its microchip.',
+        errTitle: 'Temporary problem',
+        errMsg: "Could not load the pet's information right now. Please call the phone number printed on the tag, or try again.",
+        retry: 'Try again', about: 'what is this tag?', privacy: 'privacy'
+      },
+      he: {
+        badge: 'חיית מחמד אבודה', hi: 'היי! קוראים לי', lost: 'הלכתי לאיבוד 😢',
+        missing: 'המשפחה שלי דיווחה שנעלמתי', since: 'מאז', area: 'נראיתי לאחרונה',
+        msg: 'עזרו לי לחזור הביתה — צרו קשר עם הבעלים שלי בכל דרך שלמטה.',
+        owner: 'הבעלים שלי:', notesTitle: 'חשוב',
+        stale: 'מוצגים פרטים שמורים — השרת איטי כרגע, אבל פרטי הקשר עובדים.',
+        call: 'התקשרו לבעלים שלי', wa: 'כתבו בוואטסאפ', call2: 'התקשרו לאיש קשר נוסף',
+        sendLoc: 'שלחו את המיקום שלי לבעלים', sendLocWa: 'שלחו את המיקום בוואטסאפ',
+        hint: 'שיתוף המיקום הוא לא חובה. הוא נשלח רק לבעלים שלי, ורק כשלוחצים על הכפתור.',
+        chipNote: 'לא מצליחים ליצור קשר? כל וטרינר או השירות הווטרינרי העירוני יכולים לסרוק את השבב שלי.',
+        waText: 'היי! מצאתי את {pet} (תג FindYpet מס׳ {id}).', waHere: 'אני כאן:',
+        sending: 'מאתרים את המיקום…', sent: '✅ המיקום נשלח לבעלים שלי. תודה ❤️',
+        sentBtn: 'המיקום נשלח', denied: 'הגישה למיקום נחסמה. אפשרו מיקום לאתר הזה בהגדרות הדפדפן — או פשוט התקשרו לבעלים.',
+        unavailable: 'לא הצלחנו לאתר את המיקום. נסו שוב או התקשרו לבעלים.',
+        netErr: 'שגיאת רשת. נסו שוב או התקשרו לבעלים.',
+        nfTitle: 'התג הזה עדיין לא הופעל',
+        nfMsg: 'אם יש מספר טלפון על התג — התקשרו אליו. אם לא, קחו את החיה לווטרינר הקרוב — הוא יכול לסרוק את השבב.',
+        errTitle: 'תקלה זמנית',
+        errMsg: 'לא הצלחנו לטעון כרגע את פרטי החיה. התקשרו למספר שמודפס על התג, או נסו שוב.',
+        retry: 'נסו שוב', about: 'מה זה התג הזה?', privacy: 'פרטיות'
+      },
+      ru: {
+        badge: 'Потерялся питомец', hi: 'Привет! Меня зовут', lost: 'Я потерялся 😢',
+        missing: 'Моя семья сообщила, что я пропал', since: 'с', area: 'последний раз видели',
+        msg: 'Помогите мне вернуться домой — свяжитесь с хозяином любым способом ниже.',
+        owner: 'Мой хозяин:', notesTitle: 'Важно',
+        stale: 'Показаны сохранённые данные — сервер сейчас медленный, но контакты работают.',
+        call: 'Позвонить хозяину', wa: 'Написать в WhatsApp', call2: 'Позвонить второму контакту',
+        sendLoc: 'Отправить хозяину, где я', sendLocWa: 'Отправить, где я, в WhatsApp',
+        hint: 'Делиться геолокацией не обязательно. Она уходит только моему хозяину и только после нажатия кнопки.',
+        chipNote: 'Не получается связаться? Любой ветеринар или муниципальная ветслужба могут считать мой микрочип.',
+        waText: 'Здравствуйте! Я нашёл(ла) {pet} (жетон FindYpet №{id}).', waHere: 'Я здесь:',
+        sending: 'Определяем местоположение…', sent: '✅ Геолокация отправлена хозяину. Спасибо ❤️',
+        sentBtn: 'Геолокация отправлена', denied: 'Доступ к геолокации запрещён. Разрешите его для этого сайта в настройках браузера — или просто позвоните хозяину.',
+        unavailable: 'Не удалось определить местоположение. Попробуйте ещё раз или позвоните хозяину.',
+        netErr: 'Ошибка сети. Попробуйте ещё раз или позвоните хозяину.',
+        nfTitle: 'Эта метка ещё не активирована',
+        nfMsg: 'Если на жетоне есть номер телефона — позвоните по нему. Если нет — отнесите питомца в ближайшую ветклинику: там считают микрочип.',
+        errTitle: 'Временная проблема',
+        errMsg: 'Не удалось загрузить данные питомца. Позвоните по номеру на жетоне или попробуйте ещё раз.',
+        retry: 'Попробовать снова', about: 'что это за жетон?', privacy: 'конфиденциальность'
+      }
+    };
 
-    // 1. Извлекаем ID из параметров URL (?id=101 или ?id_tag=101)
-    const urlParams = new URLSearchParams(window.location.search);
-    const tagId = urlParams.get('id') || urlParams.get('id_tag');
+    let lang = (() => {
+      try { const s = localStorage.getItem('fyp_lang'); if (s && I18N[s]) return s; } catch (e) {}
+      const n = (navigator.language || 'en').slice(0, 2).toLowerCase();
+      return n === 'he' || n === 'iw' ? 'he' : n === 'ru' ? 'ru' : 'en';
+    })();
+    let lastStatus = { key: '', cls: '' };
+    let pet = null;          // данные питомца с сервера
+    let coords = null;       // координаты нашедшего, если он поделился
 
-    const petNameEl = document.getElementById('pet-name');
-    const subTextEl = document.getElementById('sub-text');
-    const callBtnEl = document.getElementById('call-btn');
-    const locStatusEl = document.getElementById('location-status');
+    const $ = id => document.getElementById(id);
+    const locBtn = $('locBtn'), statusEl = $('locStatus');
 
-    if (!tagId) {
-      petNameEl.innerText = 'Invalid Tag';
-      subTextEl.innerText = 'No pet ID provided in the link.';
-      locStatusEl.innerText = '';
-    } else {
-      // -------------------------------------------------------------
-      // ШАГ A: Загрузка информации о питомце (имя и телефон)
-      // -------------------------------------------------------------
-      fetch(`${WORKER_URL}?action=getTag&id=${tagId}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.found) {
-            petNameEl.innerText = data.pet_name || 'Pet Found';
-            
-            if (data.phone && data.phone.trim() !== '') {
-              subTextEl.innerText = 'If you found this pet, please call the owner directly:';
-              callBtnEl.href = `tel:${data.phone.trim()}`;
-              callBtnEl.style.display = 'block'; // Показываем кнопку
-            } else {
-              subTextEl.innerText = 'Owner details retrieved. Use Telegram notification below.';
-            }
-          } else {
-            petNameEl.innerText = 'Pet Not Found';
-            subTextEl.innerText = 'This tag is not registered in our system.';
-          }
-        })
-        .catch(err => {
-          console.error('Error fetching tag:', err);
-          petNameEl.innerText = 'Error Loading';
-          subTextEl.innerText = 'Could not load owner details. Please try refreshing.';
-        });
+    function t(k) { return (I18N[lang] && I18N[lang][k]) || I18N.en[k] || k; }
 
-      // -------------------------------------------------------------
-      // ШАГ Б: Запрос и отправка геолокации в Telegram
-      // -------------------------------------------------------------
-      if ('geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
+    function setStatus(key, cls) {
+      lastStatus = { key, cls: cls || '' };
+      statusEl.className = 'status' + (cls ? ' ' + cls : '');
+      statusEl.textContent = key ? t(key) : '';
+    }
 
-            fetch(WORKER_URL, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                action: 'reportFound',
-                id_tag: tagId,
-                lat: lat,
-                lon: lon
-              })
-            })
-            .then(res => res.json())
-            .then(resData => {
-              if (resData.success) {
-                locStatusEl.className = 'status success';
-                locStatusEl.innerText = '✅ Owner notified with your location!';
-              } else {
-                locStatusEl.className = 'status error';
-                locStatusEl.innerText = '⚠️ Owner not linked to Telegram yet.';
-              }
-            })
-            .catch(() => {
-              locStatusEl.className = 'status error';
-              locStatusEl.innerText = 'Error sending location to server.';
-            });
-          },
-          (error) => {
-            console.warn('Geolocation error:', error);
-            locStatusEl.className = 'status error';
-            locStatusEl.innerText = 'Location access denied or unavailable.';
-          },
-          { enableHighAccuracy: true, timeout: 10000 }
-        );
-      } else {
-        locStatusEl.innerText = 'Geolocation is not supported by this browser.';
+    function fmtDate(iso) {
+      try { return new Date(iso).toLocaleString(lang === 'he' ? 'he-IL' : lang === 'ru' ? 'ru-RU' : 'en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); }
+      catch (e) { return ''; }
+    }
+
+    function waLink() {
+      if (!pet || !pet.phone) return '#';
+      let text = t('waText').replace('{pet}', pet.pet_name).replace('{id}', pet.tag_id);
+      if (coords) text += ' ' + t('waHere') + ' https://maps.google.com/?q=' + coords.lat.toFixed(6) + ',' + coords.lon.toFixed(6);
+      return 'https://wa.me/' + pet.phone.replace(/\D/g, '') + '?text=' + encodeURIComponent(text);
+    }
+
+    function render() {
+      if (!pet) return;
+      $('petName').textContent = pet.pet_name;
+      document.title = `${pet.pet_name} · FindYpet`;
+      document.body.classList.toggle('is-lost', !!pet.lost);
+      $('missing').classList.toggle('hidden', !pet.lost);
+      $('badge').classList.toggle('hidden', !!pet.lost);
+      if (pet.lost) {
+        const parts = [];
+        if (pet.lost_since) parts.push(t('since') + ' ' + fmtDate(pet.lost_since));
+        if (pet.lost_area) parts.push(t('area') + ': ' + pet.lost_area);
+        $('missingInfo').textContent = parts.join(' · ');
+      }
+      if (pet.owner_name) { $('ownerName').textContent = pet.owner_name; $('ownerLine').classList.remove('hidden'); }
+      $('notesBox').classList.toggle('hidden', !pet.notes);
+      $('notesText').textContent = pet.notes || '';
+      $('staleLine').classList.toggle('hidden', !pet.stale);
+      if (pet.phone) {
+        $('callBtn').href = 'tel:' + pet.phone;
+        $('phoneText').textContent = pet.phone_display || pet.phone;
+        $('callBtn').classList.remove('hidden');
+        $('waBtn').href = waLink();
+        $('waBtn').classList.remove('hidden');
+      }
+      if (pet.phone2) {
+        $('call2Btn').href = 'tel:' + pet.phone2;
+        $('phone2Text').textContent = pet.phone2_display || pet.phone2;
+        $('call2Btn').classList.remove('hidden');
+      }
+      // Если владелец не подключил уведомления, отправляем геолокацию через WhatsApp
+      const label = locBtn.querySelector('[data-t]');
+      if (!locBtn.classList.contains('done')) label.textContent = t(pet.can_notify ? 'sendLoc' : 'sendLocWa');
+      locBtn.classList.toggle('hidden', !pet.can_notify && !pet.phone);
+    }
+
+    function applyLang() {
+      document.documentElement.lang = lang;
+      document.documentElement.dir = lang === 'he' ? 'rtl' : 'ltr';
+      document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.dataset.t); });
+      document.querySelectorAll('.langs button').forEach(b => b.classList.toggle('on', b.dataset.lang === lang));
+      if (lastStatus.key) setStatus(lastStatus.key, lastStatus.cls);
+      if (locBtn.classList.contains('done')) locBtn.querySelector('[data-t]').textContent = t('sentBtn');
+      render();
+    }
+    document.querySelectorAll('.langs button').forEach(b => b.addEventListener('click', () => {
+      lang = b.dataset.lang;
+      try { localStorage.setItem('fyp_lang', lang); } catch (e) {}
+      applyLang();
+    }));
+
+    // ------------------------------------------------------------
+    // Логика страницы
+    // ------------------------------------------------------------
+    const API = (typeof API_URL !== 'undefined' ? API_URL : '').replace(/\/+$/, '');
+    const params = new URLSearchParams(location.search);
+    const pathId = (location.pathname.match(/\/t\/(\d{1,9})\/?$/) || [])[1];
+    const tagId = (params.get('id') || params.get('id_tag') || pathId || '').trim();
+
+    const SCREENS = ['loading', 'pet', 'notFound', 'tempError'];
+    function show(id) { SCREENS.forEach((s) => $(s).classList.toggle('hidden', s !== id)); }
+
+    applyLang();
+
+    async function load() {
+      show('loading');
+      if (!/^\d{1,9}$/.test(tagId)) return show('notFound');
+      try {
+        const res = await fetch(`${API}/api/tag?id=${encodeURIComponent(tagId)}`);
+        const d = await res.json();
+        // Временный сбой базы ≠ "метка не зарегистрирована"
+        if (!d.found) return show(d.error === 'temp_error' ? 'tempError' : 'notFound');
+        pet = d;
+        render();
+        setStatus('');
+        show('pet');
+        // Уведомляем владельца, что метку отсканировали (без геолокации)
+        fetch(`${API}/api/scan`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id_tag: tagId })
+        }).catch(() => {});
+      } catch (e) {
+        console.error(e);
+        show('tempError');
       }
     }
+    $('retryBtn').addEventListener('click', load);
+
+    function markSent() {
+      setStatus('sent', 'ok');
+      locBtn.classList.add('done');
+      locBtn.querySelector('span').textContent = '✅';
+      locBtn.querySelector('[data-t]').textContent = t('sentBtn');
+      setTimeout(() => { locBtn.disabled = false; }, 15000);
+    }
+
+    locBtn.addEventListener('click', () => {
+      if (!('geolocation' in navigator)) return setStatus('unavailable', 'err');
+      locBtn.disabled = true;
+      setStatus('sending');
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        $('waBtn').href = waLink();
+        if (!pet.can_notify) {
+          // Нет Telegram у владельца → открываем WhatsApp с точкой на карте
+          setStatus('');
+          locBtn.disabled = false;
+          window.location.href = waLink();
+          return;
+        }
+        try {
+          const res = await fetch(`${API}/api/location`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id_tag: tagId, lat: coords.lat, lon: coords.lon, accuracy: pos.coords.accuracy })
+          });
+          const d = await res.json();
+          if (d.success) markSent();
+          else if (d.error === 'not_linked') { locBtn.disabled = false; window.location.href = waLink(); }
+          else { setStatus('netErr', 'err'); locBtn.disabled = false; }
+        } catch (e) {
+          setStatus('netErr', 'err');
+          locBtn.disabled = false;
+        }
+      }, (err) => {
+        setStatus(err.code === 1 ? 'denied' : 'unavailable', 'err');
+        locBtn.disabled = false;
+      }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+    });
+
+    load();
   </script>
 </body>
 </html>

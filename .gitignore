@@ -1,0 +1,4 @@
+worker/dist/
+worker/node_modules/
+worker/test/shots/
+__pycache__/
