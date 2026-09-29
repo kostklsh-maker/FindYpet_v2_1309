@@ -2,6 +2,21 @@
 // Обработчик формы регистрации FindYpet
 // ============================================================
 
+// Цены из config.js → в карточки тарифов и в выбор в форме
+document.querySelectorAll("[data-price]").forEach(function (el) {
+    const p = PLANS[el.dataset.price];
+    el.textContent = p ? p.price : "";
+});
+
+// Кнопка «Choose» на карточке → выбирает тариф в форме и прокручивает к ней
+document.querySelectorAll(".choose").forEach(function (b) {
+    b.addEventListener("click", function () {
+        const r = document.querySelector('input[name="plan"][value="' + b.dataset.plan + '"]');
+        if (r) r.checked = true;
+        document.getElementById("order").scrollIntoView({ behavior: "smooth" });
+    });
+});
+
 document.getElementById("registerForm").addEventListener("submit", async function (e) {
     e.preventDefault();
 
@@ -14,7 +29,8 @@ document.getElementById("registerForm").addEventListener("submit", async functio
         owner_name: document.getElementById("ownerName").value,
         phone: document.getElementById("ownerPhone").value,
         pet_name: document.getElementById("petName").value,
-        address: document.getElementById("shippingAddress").value
+        address: document.getElementById("shippingAddress").value,
+        plan: (document.querySelector('input[name="plan"]:checked') || {}).value || "smart"
     };
 
     try {
@@ -39,6 +55,6 @@ document.getElementById("registerForm").addEventListener("submit", async functio
         console.error(err);
     } finally {
         submitBtn.disabled = false;
-        submitBtn.innerText = "Order Now — 100 ₪";
+        submitBtn.innerText = "Order Now";
     }
 });

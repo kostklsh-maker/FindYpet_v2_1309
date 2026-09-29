@@ -19,7 +19,7 @@
         <p>Every second counts when a pet is missing. Microchips require special scanners 
            at vets, but FindYpet allows anyone with a smartphone to connect with you instantly 
            and share your pet's precise location.</p>
-        <p class="price">Only 100 ₪</p>
+        <a href="#plans" class="hero-cta">Choose your tag</a>
     </section>
 
     <section class="how-it-works">
@@ -48,14 +48,63 @@
         </div>
     </section>
 
-    <section class="registration">
+    <section class="plans-section" id="plans">
+        <h2>Choose your plan</h2>
+        <p class="plans-sub">One-time payment. No subscription.</p>
+        <div class="plans">
+            <div class="plan">
+                <h3>Basic</h3>
+                <div class="plan-price" data-price="basic"></div>
+                <div class="plan-per">one-time</div>
+                <ul>
+                    <li>Engraved tag: pet name + your phone</li>
+                    <li>QR code on the back</li>
+                    <li>Pet page with a “Call owner” button</li>
+                    <li>WhatsApp message from the finder</li>
+                </ul>
+                <button type="button" class="choose" data-plan="basic">Choose</button>
+            </div>
+            <div class="plan featured">
+                <span class="plan-badge">Most popular</span>
+                <h3>Smart</h3>
+                <div class="plan-price" data-price="smart"></div>
+                <div class="plan-per">one-time</div>
+                <ul>
+                    <li>Everything in Basic + NFC chip</li>
+                    <li>Instant Telegram alert on every scan</li>
+                    <li>Finder can send you the location</li>
+                    <li>“Lost mode”, second contact and notes</li>
+                </ul>
+                <button type="button" class="choose" data-plan="smart">Choose</button>
+            </div>
+            <div class="plan">
+                <h3>Family</h3>
+                <div class="plan-price" data-price="family"></div>
+                <div class="plan-per">3 Smart tags</div>
+                <ul>
+                    <li>3 Smart tags for your pets</li>
+                    <li>All Smart features for each tag</li>
+                    <li>Best price per tag</li>
+                </ul>
+                <button type="button" class="choose" data-plan="family">Choose</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="registration" id="order">
         <h2>Order & Register Your Tag</h2>
         <form id="registerForm">
             <input type="text" id="ownerName" placeholder="Owner Full Name" required>
             <input type="tel" id="ownerPhone" placeholder="Phone Number (Israel)" required>
             <input type="text" id="petName" placeholder="Pet's Name" required>
             <input type="text" id="shippingAddress" placeholder="City, Street, Apartment" required>
-            <button type="submit">Order Now — 100 ₪</button>
+            <fieldset class="plan-pick">
+                <legend>Plan</legend>
+                <label><input type="radio" name="plan" value="basic"> Basic <span data-price="basic"></span></label>
+                <label><input type="radio" name="plan" value="smart" checked> Smart <span data-price="smart"></span></label>
+                <label><input type="radio" name="plan" value="family"> Family <span data-price="family"></span></label>
+            </fieldset>
+            <button type="submit">Order Now</button>
         </form>
 
         <!-- Показывается ПОСЛЕ успешной регистрации -->

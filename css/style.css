@@ -42,9 +42,163 @@ header img {
     margin: 0 auto 20px;
 }
 
-.price {
-    font-size: 1.8em;
+.hero-cta {
+    display: inline-block;
+    padding: 14px 32px;
+    background: #ff9500;
+    color: white;
+    text-decoration: none;
+    border-radius: 30px;
     font-weight: bold;
+    font-size: 1.1em;
+}
+
+.hero-cta:hover {
+    background: #e68a00;
+}
+
+.plans-section {
+    padding: 60px 20px;
+    background: #f7f9fa;
+}
+
+.plans-section h2 {
+    text-align: center;
+    font-size: 2em;
+    color: #667eea;
+}
+
+.plans-sub {
+    text-align: center;
+    color: #666;
+    margin-bottom: 40px;
+}
+
+.plans {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    max-width: 1000px;
+    margin: 0 auto;
+    align-items: stretch;
+}
+
+.plan {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border: 2px solid #eee;
+    border-radius: 16px;
+    padding: 28px 24px;
+    text-align: center;
+}
+
+.plan.featured {
+    border-color: #667eea;
+    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.25);
+}
+
+.plan-badge {
+    position: absolute;
+    top: -13px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-size: 0.8em;
+    font-weight: bold;
+    padding: 4px 14px;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+
+.plan h3 {
+    color: #764ba2;
+    font-size: 1.3em;
+}
+
+.plan-price {
+    font-size: 2.2em;
+    font-weight: bold;
+    color: #333;
+    margin-top: 8px;
+}
+
+.plan-per {
+    color: #999;
+    font-size: 0.9em;
+    margin-bottom: 16px;
+}
+
+.plan ul {
+    list-style: none;
+    text-align: left;
+    margin-bottom: 20px;
+    flex: 1;
+}
+
+.plan li {
+    padding: 6px 0 6px 22px;
+    position: relative;
+    font-size: 0.95em;
+}
+
+.plan li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: #667eea;
+    font-weight: bold;
+}
+
+.plan .choose {
+    padding: 12px;
+    border: 2px solid #667eea;
+    background: white;
+    color: #667eea;
+    border-radius: 8px;
+    font-size: 1em;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.plan.featured .choose,
+.plan .choose:hover {
+    background: #667eea;
+    color: white;
+}
+
+.plan-pick {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 15px;
+}
+
+.plan-pick legend {
+    padding: 0 6px;
+    color: #666;
+    font-size: 0.9em;
+}
+
+.plan-pick label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    cursor: pointer;
+}
+
+.plan-pick input {
+    width: auto;
+    margin: 0;
+}
+
+.plan-pick span {
+    margin-left: auto;
+    font-weight: bold;
+    color: #764ba2;
 }
 
 .how-it-works {
@@ -191,7 +345,12 @@ footer {
         font-size: 1.8em;
     }
     
-    .steps {
+    .steps,
+    .plans {
         grid-template-columns: 1fr;
     }
-}
+
+    .plan.featured {
+        margin-top: 10px;
+    }
+}
