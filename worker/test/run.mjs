@@ -38,7 +38,7 @@ let tagId, token;
 await test('register with phone2 + notes stores extras in KV and returns short link', async () => {
   const r = await call(env, '/api/register', { method: 'POST', body: {
     owner_name: 'Kostya K', phone: '050-123-4567', pet_name: 'Bella', address: 'Haifa, Herzl 1',
-    phone2: '052-765-4321', notes: 'Allergic to chicken. Scared of people.', consent: true, lang: 'ru', plan: 'basic' } });
+    phone2: '052-765-4321', notes: 'Allergic to chicken. Scared of people.', consent: true, lang: 'ru', plan: 'smart' } });
   const d = await r.json();
   assert.equal(d.success, true);
   tagId = d.id_tag; token = d.telegram_link.split('start=')[1];
@@ -46,11 +46,16 @@ await test('register with phone2 + notes stores extras in KV and returns short l
   const x = await KV.get(`x:${tagId}`, 'json');
   assert.equal(x.phone2, '+972527654321');
   assert.ok(x.consent_at);
-  assert.equal(x.plan, 'basic');
+  assert.equal(x.plan, 'smart');
+  assert.equal(d.order_id, `FY${tagId}`);
+  assert.equal(d.tags.length, 1);
   const admin = lastTg('sendMessage');
   assert.equal(admin.payload.chat_id, 'admin');
   assert.match(admin.payload.text, /QR/);
-  assert.match(admin.payload.text, /Plan: <b>Basic · 49 ₪/);
+  assert.match(admin.payload.text, /New order FY\d+/);
+  assert.match(admin.payload.text, /Smart · 79 ₪ — <b>1 physical tag<\/b>/);
+  assert.match(admin.payload.text, /Engrave front: <b>BELLA<\/b> · 050-123-4567/);
+  assert.equal(admin.payload.reply_markup.inline_keyboard[0][2].callback_data, `ord:FY${tagId}:shipped`);
 });
 
 await test('/api/tag returns extras; address never exposed', async () => {
@@ -151,7 +156,7 @@ await test('cannot control someone else\'s tag', async () => {
   assert.match(lastTg('sendMessage').payload.text, /not linked to your Telegram/);
 });
 
-await test('bot registration flow still works (with privacy note) ', async () => {
+await test('bot registration: Family plan → 2 pets + 1 spare, one order, production sheet', async () => {
   const C = '7007';
   await tgUpdate(env, msg(C, '/register'));
   await tgUpdate(env, msg(C, 'Anna'));
@@ -162,13 +167,38 @@ await test('bot registration flow still works (with privacy note) ', async () =>
   assert.match(planMsg.text, /Choose your plan/);
   assert.equal(planMsg.reply_markup.inline_keyboard.length, 3);
   await tgUpdate(env, cb(C, 'plan_family'));
-  assert.match(lastTg('sendMessage').payload.text, /Plan: Family/);
-  assert.match(lastTg('sendMessage').payload.text, /Privacy policy/);
+  const q = lastTg('sendMessage').payload;
+  assert.match(q.text, /has 3 tags/);
+  assert.equal(q.reply_markup.inline_keyboard.length, 3);
+  await tgUpdate(env, cb(C, 'fam_n_2'));
+  assert.match(lastTg('sendMessage').payload.text, /Name of pet #2/);
+  await tgUpdate(env, msg(C, 'Mika'));
+  const sp = lastTg('sendMessage').payload;
+  assert.match(sp.text, /spare tag — for which pet/);
+  await tgUpdate(env, cb(C, 'fam_sp_0'));
+  const conf = lastTg('sendMessage').payload.text;
+  assert.match(conf, /Rex — 2 tags \(1 spare\)/);
+  assert.match(conf, /• Mika/);
+  assert.match(conf, /Family/);
+  assert.match(conf, /Privacy policy/);
+  const n = state.tags.length;
   await tgUpdate(env, cb(C, 'reg_ok'));
-  const rex = state.tags.find((t) => t.pet_name === 'Rex' && t.telegram_chat_id === C);
-  assert.ok(rex);
-  assert.equal((await KV.get(`x:${rex.tag_id}`, 'json')).plan, 'family');
-  assert.ok(state.tg.some((c) => c.payload.chat_id === 'admin' && /Plan: <b>Family/.test(c.payload.text)));
+  const created = state.tags.slice(n);
+  assert.deepEqual(created.map((t) => t.pet_name), ['Rex', 'Mika']);
+  assert.ok(created.every((t) => t.telegram_chat_id === C && t.phone === '+972541112222' && t.address === 'Tel Aviv'));
+  const rx = await KV.get(`x:${created[0].tag_id}`, 'json');
+  assert.equal(rx.plan, 'family'); assert.equal(rx.copies, 2); assert.equal(rx.order_id, `FY${created[0].tag_id}`);
+  assert.equal((await KV.get(`x:${created[1].tag_id}`, 'json')).copies, 1);
+  const order = await KV.get(`o:FY${created[0].tag_id}`, 'json');
+  assert.equal(order.chat_id, C);
+  assert.equal(order.items.reduce((s, i) => s + i.copies, 0), 3);
+  const admin = [...state.tg].reverse().find((c) => c.payload.chat_id === 'admin').payload.text;
+  assert.match(admin, /3 physical tags/);
+  assert.match(admin, /Tag 2 of 3 — #\d+ \(spare\)/);
+  assert.match(admin, /Engrave front: <b>MIKA<\/b>/);
+  const reg = state.tg.filter((c) => c.payload.chat_id === C && c.method === 'sendMessage').at(-2).payload.text;
+  assert.match(reg, /Order <b>FY/);
+  assert.match(reg, /Rex<\/b> — tag #\d+ · 2 tags \(incl. 1 spare\)/);
 });
 
 await test('Telegram blocked → SMS fallback for location', async () => {
@@ -203,6 +233,116 @@ await test('setup reports KV status', async () => {
   const d = await (await call(env, '/setup?key=sec')).json();
   assert.match(d.kv, /connected/);
   assert.equal(d.setMyCommands.ok, true);
+});
+
+await test('site: Family with 1 pet → one tag ×3 (2 spares)', async () => {
+  const n = state.tags.length;
+  const d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Dana Levi', phone: '052-999-8877', pet_name: 'Luna', address: 'Haifa', consent: true, plan: 'family' } })).json();
+  assert.equal(d.success, true);
+  assert.equal(state.tags.length, n + 1);
+  assert.equal(d.total_tags, 3);
+  assert.deepEqual(d.tags.map((t) => [t.pet_name, t.copies]), [['Luna', 3]]);
+});
+
+let famTokenTagIds;
+await test('site: Family with 3 pets → 3 rows, same owner data, one order', async () => {
+  const n = state.tags.length;
+  const d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Olga K', phone: '053-222-3344', pet_name: 'Tom', address: 'Ashdod, Herzl 5', consent: true, plan: 'family',
+    pets: ['Jerry', 'Spike'], phone2: '053-000-1111', notes: 'Tom is deaf' } })).json();
+  assert.equal(d.success, true);
+  const rows = state.tags.slice(n);
+  assert.deepEqual(rows.map((t) => t.pet_name), ['Tom', 'Jerry', 'Spike']);
+  assert.ok(rows.every((t) => t.owner_name === 'Olga K' && t.phone === '+972532223344' && t.address === 'Ashdod, Herzl 5'));
+  assert.equal(new Set(rows.map((t) => t.tag_id)).size, 3);
+  assert.deepEqual(d.tags.map((t) => t.copies), [1, 1, 1]);
+  // второй контакт — для всех, заметки — только для первого питомца
+  const x = await Promise.all(rows.map((t) => KV.get(`x:${t.tag_id}`, 'json')));
+  assert.ok(x.every((e) => e.phone2 === '+972530001111' && e.order_id === d.order_id));
+  assert.equal(x[0].notes, 'Tom is deaf'); assert.equal(x[1].notes, undefined);
+  famTokenTagIds = { token: d.telegram_link.split('start=')[1], ids: rows.map((t) => t.tag_id), order: d.order_id };
+});
+
+await test('site: Family with 2 pets, spare for pet #2', async () => {
+  const d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Ron', phone: '054-555-6666', pet_name: 'Max', address: 'Eilat', consent: true, plan: 'family',
+    pets: ['Bim'], spare_for: [1] } })).json();
+  assert.deepEqual(d.tags.map((t) => [t.pet_name, t.copies]), [['Max', 1], ['Bim', 2]]);
+});
+
+await test('site: Smart ignores extra pets (1 tag)', async () => {
+  const d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Ron', phone: '054-555-6666', pet_name: 'Solo', address: 'Eilat', consent: true, plan: 'smart', pets: ['X', 'Y'] } })).json();
+  assert.equal(d.tags.length, 1); assert.equal(d.total_tags, 1);
+});
+
+await test('one Start links ALL tags of the order to Telegram', async () => {
+  const C = '9009';
+  await tgUpdate(env, msg(C, '/start ' + famTokenTagIds.token));
+  for (const id of famTokenTagIds.ids) assert.equal(state.tags.find((t) => t.tag_id === id).telegram_chat_id, C);
+  assert.equal((await KV.get(`o:${famTokenTagIds.order}`, 'json')).chat_id, C);
+  const m = state.tg.filter((c) => c.payload.chat_id === C && c.method === 'sendMessage').at(-2).payload.text;
+  assert.match(m, /Tom<\/b>/); assert.match(m, /Jerry<\/b>/); assert.match(m, /Spike<\/b>/);
+});
+
+await test('admin order status → customer is notified; others cannot', async () => {
+  const C = '9009';
+  const n = state.tg.length;
+  await tgUpdate(env, cb('6666', `ord:${famTokenTagIds.order}:paid`));
+  assert.equal((await KV.get(`o:${famTokenTagIds.order}`, 'json')).status, 'new');
+  await tgUpdate(env, cb('admin', `ord:${famTokenTagIds.order}:shipped`));
+  const o = await KV.get(`o:${famTokenTagIds.order}`, 'json');
+  assert.equal(o.status, 'shipped');
+  const toCustomer = state.tg.slice(n).find((c) => c.payload.chat_id === C).payload.text;
+  assert.match(toCustomer, /on the way/);
+  assert.match(toCustomer, /\/t\/\d+/);
+  assert.match(lastTg('sendMessage').payload.text, /Customer notified/);
+});
+
+await test('admin status for order without Telegram → admin asked to call', async () => {
+  const o = (await KV._dump()) && Object.keys(KV._dump()).find((k) => k.startsWith('o:') && !JSON.parse(KV._dump()[k]).chat_id);
+  await tgUpdate(env, cb('admin', `${'ord:' + o.slice(2)}:paid`));
+  assert.match(lastTg('sendMessage').payload.text, /please call/);
+});
+
+await test('/orders for admin lists open orders; ignored for others', async () => {
+  await tgUpdate(env, msg('admin', '/orders'));
+  const t = lastTg('sendMessage').payload.text;
+  assert.match(t, /Open orders/);
+  assert.doesNotMatch(t, new RegExp(famTokenTagIds.order + '\\b')); // отправленный заказ не показываем
+  await tgUpdate(env, msg('5555', '/orders'));
+  assert.doesNotMatch(lastTg('sendMessage').payload.text, /Open orders/);
+});
+
+await test('Basic plan: no scan alerts, location goes via WhatsApp, Lost mode offers upgrade', async () => {
+  const d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Basic Ben', phone: '050-777-8888', pet_name: 'Pip', address: 'Holon', consent: true, plan: 'basic',
+    phone2: '050-111-1111', notes: 'secret' } })).json();
+  const id = d.id_tag, C = '4004';
+  const x = await KV.get(`x:${id}`, 'json');
+  assert.equal(x.phone2, undefined); assert.equal(x.notes, undefined); // доп. поля — только в Смарт
+  await tgUpdate(env, msg(C, '/start ' + d.telegram_link.split('start=')[1]));
+  const reg = state.tg.filter((c) => c.payload.chat_id === C).at(-2).payload.text;
+  assert.match(reg, /Your plan is <b>Basic<\/b>/);
+  const t = await (await call(env, `/api/tag?id=${id}`)).json();
+  assert.equal(t.can_notify, false);
+  const n = state.tg.length;
+  await new Promise((r) => setTimeout(r, 1100));
+  await call(env, '/api/scan', { method: 'POST', body: { id_tag: id } });
+  assert.equal(state.tg.slice(n).filter((c) => c.payload.chat_id === C).length, 0);
+  const loc = await (await call(env, '/api/location', { method: 'POST', body: { id_tag: id, lat: 32, lon: 34.8 } })).json();
+  assert.equal(loc.error, 'not_linked');
+  await tgUpdate(env, msg(C, '/lost'));
+  assert.match(lastTg('sendMessage').payload.text, /part of the <b>Smart<\/b> plan/);
+});
+
+await test('old tags without a plan keep Smart features', async () => {
+  const t = state.tags.find((x) => x.pet_name === 'Bella');
+  const x = await KV.get(`x:${t.tag_id}`, 'json');
+  delete x.plan; await KV.put(`x:${t.tag_id}`, JSON.stringify(x));
+  const d = await (await call(env, `/api/tag?id=${t.tag_id}`)).json();
+  assert.equal(d.can_notify, true);
 });
 
 console.log(`\n${passed} tests passed`);

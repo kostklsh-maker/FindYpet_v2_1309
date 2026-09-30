@@ -3,14 +3,17 @@
 const PLANS = {
     "basic": {
         "price": "49 ₪",
-        "name": "Basic"
+        "name": "Basic",
+        "tags": 1
     },
     "smart": {
         "price": "79 ₪",
-        "name": "Smart"
+        "name": "Smart",
+        "tags": 1
     },
     "family": {
         "price": "199 ₪",
-        "name": "Family (3 Smart tags)"
+        "name": "Family (3 Smart tags)",
+        "tags": 3
     }
 };

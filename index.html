@@ -311,7 +311,7 @@
                         <li data-t="pb1">Tag with your phone number, QR and NFC</li>
                         <li data-t="pb2">Pet page in English, Hebrew and Russian</li>
                         <li data-t="pb3">Call and WhatsApp straight from the page</li>
-                        <li data-t="pb4">Location — only with the finder's consent</li>
+                        <li data-t="pb4">The finder can send you their location via WhatsApp</li>
                     </ul>
                     <button type="button" class="btn btn-outline btn-block choose" data-plan="basic" data-t="choose">Choose</button>
                 </div>
@@ -337,7 +337,8 @@
                     <div class="plan-per" data-t="familyPer">3 Smart tags</div>
                     <ul class="checks">
                         <li data-t="pf1">3 tags with all Smart features</li>
-                        <li data-t="pf2">For several pets — or a spare tag</li>
+                        <li data-t="pf2">One per pet — or spares for one pet</li>
+                        <li data-t="pf4">You choose how to use them when ordering</li>
                         <li data-t="pf3">Lowest price per tag</li>
                     </ul>
                     <button type="button" class="btn btn-outline btn-block choose" data-plan="family" data-t="choose">Choose</button>
@@ -363,11 +364,20 @@
                         <span class="tag-phone ltr" id="pvPhone">050-123-4567</span>
                         <span class="tag-small" data-t="tagCallMe">Call me</span>
                     </div>
+                    <span class="pv-count ltr" id="pvCount" hidden></span>
                     <p class="preview-hint" data-t="previewHint">Updates as you type</p>
+                    <ul class="pv-list" id="pvList" hidden></ul>
                     <div class="summary">
                         <div><span data-t="lblPlan">Plan</span><b id="sumPlan"></b></div>
+                        <div><span data-t="sumTags">Tags</span><b id="sumTags">1</b></div>
                         <div class="total"><span data-t="sumTotal">Total</span><b class="ltr" id="sumPrice"></b></div>
-                        <p data-t="payNote">We'll message you to confirm the order and payment.</p>
+                        <p class="after-title" data-t="asTitle">After you order:</p>
+                        <ol class="after-steps">
+                            <li data-t="as1">We confirm the order and payment with you</li>
+                            <li data-t="as2">We engrave the tag and write the NFC</li>
+                            <li data-t="as3">Delivery to your address</li>
+                            <li data-t="as4">Scan it to check — and onto the collar</li>
+                        </ol>
                     </div>
                 </aside>
 
@@ -390,11 +400,28 @@
                             <label><span data-t="lblOwner">Your name</span>
                                 <input type="text" id="ownerName" data-t-ph="phOwner" placeholder="Owner full name" autocomplete="name" required></label>
                         </div>
+                        <div class="family-box" id="familyBox" hidden>
+                            <span class="fb-title" data-t="famQ">How many pets will wear the 3 tags?</span>
+                            <div class="seg seg-sm" id="famSeg">
+                                <button type="button" class="on" data-n="1">1</button>
+                                <button type="button" data-n="2">2</button>
+                                <button type="button" data-n="3">3</button>
+                            </div>
+                            <p class="fb-hint" data-t="famHint">Each pet gets its own tag and page. Tags left over are spares — an exact copy of a pet's tag.</p>
+                            <label class="fam-pet" data-i="1" hidden><span data-t="lblPet2">Second pet's name</span>
+                                <input type="text" id="pet2" maxlength="16" data-t-ph="phPet" placeholder="Pet's name"></label>
+                            <label class="fam-pet" data-i="2" hidden><span data-t="lblPet3">Third pet's name</span>
+                                <input type="text" id="pet3" maxlength="16" data-t-ph="phPet" placeholder="Pet's name"></label>
+                            <label class="spare-row" id="spareRow" hidden><span data-t="lblSpareFor">The spare tag is for</span>
+                                <select id="spareFor"><option value="0"></option><option value="1"></option></select></label>
+                            <ul class="fam-summary" id="famSummary"></ul>
+                        </div>
                         <label><span data-t="lblPhone">Your phone — the finder will call it</span>
                             <input type="tel" id="ownerPhone" data-t-ph="phPhone" placeholder="050-123-4567" autocomplete="tel" required></label>
                         <label><span data-t="lblAddress">Delivery address</span>
                             <input type="text" id="shippingAddress" data-t-ph="phAddress" placeholder="City, street, apartment" autocomplete="street-address" required></label>
-                        <details class="more">
+                        <p class="basic-note" id="basicNote" hidden><svg class="ic"><use href="#i-lock"/></svg><span data-t="basicNote">Second contact, notes, scan alerts and Lost mode come with Smart.</span></p>
+                        <details class="more" id="moreBox">
                             <summary data-t="moreFields">+ Second contact and notes (optional)</summary>
                             <label><span data-t="lblPhone2">Second phone (family member)</span>
                                 <input type="tel" id="phone2" data-t-ph="phPhone2" placeholder="052-765-4321"></label>
@@ -414,14 +441,19 @@
 
                     <div id="telegramStep" hidden>
                         <div class="done-ic"><svg class="ic"><use href="#i-check"/></svg></div>
-                        <h3><span data-t="tagWord">Tag</span> <span class="ltr">#<span id="tagIdDisplay">---</span></span> <span data-t="created">created!</span></h3>
-                        <p data-t="connectTg">Last step: connect Telegram to receive scan alerts and the finder's location.</p>
+                        <h3><span data-t="orderWord">Order</span> <span class="ltr" id="orderIdDisplay"></span> <span data-t="received">received!</span></h3>
+                        <ul class="done-tags" id="doneTags"></ul>
+                        <p class="done-lead" id="connectText" data-t="connectTg">Last step: connect Telegram — scan alerts, the finder's location and order updates come there.</p>
                         <a id="telegramLinkBtn" href="#" class="btn btn-telegram btn-lg" target="_blank" rel="noopener"><svg class="ic"><use href="#i-send"/></svg><span data-t="openTg">Open Telegram & activate</span></a>
                         <p class="small-note" data-t="afterClick">A chat with our bot @YourPetLocatorBot will open. Press Start.</p>
                         <p class="small-note" data-t="noTgNote">No Telegram? The finder can still call you and write to you on WhatsApp straight from the pet's page.</p>
-                        <p class="tag-page"><span data-t="yourTagPage">Your pet's page:</span><br>
-                            <a id="tagUrlDisplay" href="#" target="_blank" rel="noopener" class="ltr"></a>
-                        </p>
+                        <p class="next-title" data-t="nextTitle">What happens next</p>
+                        <ol class="next-steps">
+                            <li><b data-t="nx1t">Confirm & pay</b><span data-t="nx1">We message you to confirm the order and arrange payment.</span></li>
+                            <li><b data-t="nx2t">We make it</b><span data-t="nx2">We engrave your tag and write its NFC with your pet's page.</span></li>
+                            <li><b data-t="nx3t">Delivery</b><span data-t="nx3">We ship it to your address and let you know when it's on the way.</span></li>
+                            <li><b data-t="nx4t">Check & wear</b><span data-t="nx4">Scan the QR or tap your phone to the tag — it opens the pet's page. Then onto the collar!</span></li>
+                        </ol>
                     </div>
                 </div>
             </div>
@@ -439,6 +471,9 @@
                 <details class="faq"><summary data-t="q4">Where do I get alerts?</summary><p data-t="a4">Today — in Telegram, via our bot @YourPetLocatorBot. We're adding WhatsApp and SMS. Even without Telegram, the finder can call you or write to you on WhatsApp.</p></details>
                 <details class="faq"><summary data-t="q5">Who sees my details?</summary><p data-t="a5">Whoever scans the tag sees your pet's name, your first name, your phone and the notes you chose to add. Your address is used only for delivery and is never shown. The finder's location is sent only if they press the button.</p></details>
                 <details class="faq"><summary data-t="q6">Does it replace the microchip?</summary><p data-t="a6">No. The microchip is required by law and remains the last backup. FindYpet adds a fast way to reach you without a vet's scanner.</p></details>
+                <details class="faq"><summary data-t="q8">What is a spare tag?</summary><p data-t="a8">An exact copy of your pet's tag — same engraving, same page and link. Keep it at home or put it on a harness. In the Family plan you choose: a tag for each pet, or spares.</p></details>
+                <details class="faq"><summary data-t="q9">How do I pay, and when will I get the tag?</summary><p data-t="a9">After you order, we message you to confirm the order and arrange payment. Then we engrave the tag, write its NFC and ship it to your address. Each step is announced in Telegram — or we call you.</p></details>
+                <details class="faq"><summary data-t="q10">What if my phone number changes?</summary><p data-t="a10">Write to us in the bot — we update your pet's page right away. The old number stays engraved on the front, so you can order a new tag with the new number.</p></details>
                 <details class="faq"><summary data-t="q7">How do I update my phone or notes?</summary><p data-t="a7">In the Telegram bot: /settings. Keep your contacts up to date — outdated contacts are a common reason a found pet doesn't get home.</p></details>
             </div>
         </div>

@@ -456,3 +456,36 @@ input[type="text"]:focus, input[type="tel"]:focus, textarea:focus { outline: non
     .toast { opacity: 1; }
     .reveal { opacity: 1; transform: none; }
 }
+
+/* ---------- v7: заказ из нескольких жетонов, экран «что дальше» ---------- */
+.family-box { background: var(--soft); border: 1.5px solid #dcdffb; border-radius: 16px; padding: 16px; margin: 2px 0 16px; }
+.fb-title { display: block; font-weight: 700; font-size: 15px; margin-bottom: 10px; }
+.family-box .seg { background: #fff; }
+.family-box .seg button.on { background: var(--brand); color: #fff; }
+.fb-hint { font-size: 13px; color: var(--muted); margin: 10px 0 12px; }
+.family-box label { display: block; margin-bottom: 12px; }
+.family-box label > span:first-child { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.family-box input[type="text"] { background: #fff; }
+.spare-row select { width: 100%; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px; font-size: 16px; font-family: inherit; background: #fff; color: var(--ink); }
+.fam-summary { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.fam-summary li { background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 13.5px; font-weight: 600; color: var(--brand2); }
+.basic-note { display: flex; gap: 8px; align-items: center; font-size: 13.5px; color: var(--muted); background: var(--soft); border-radius: 12px; padding: 10px 12px; margin: 2px 0 14px; }
+.basic-note .ic { color: var(--brand2); flex: none; }
+.pv-count { position: relative; display: inline-block; margin-top: -4px; margin-bottom: 8px; background: var(--cta); color: #fff; font-weight: 800; font-size: 14px; padding: 4px 12px; border-radius: 999px; box-shadow: 0 6px 14px -6px rgba(255,149,0,.8); }
+.pv-list { position: relative; list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 10px; }
+.pv-list li { background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.35); border-radius: 999px; padding: 4px 11px; font-size: 12.5px; font-weight: 700; letter-spacing: .5px; }
+.after-title { font-weight: 700; opacity: 1 !important; margin-top: 12px !important; font-size: 13px !important; }
+.after-steps { list-style: none; counter-reset: as; margin-top: 6px; }
+.after-steps li { counter-increment: as; position: relative; padding: 3px 0; padding-inline-start: 26px; font-size: 13px; opacity: .92; }
+.after-steps li::before { content: counter(as); position: absolute; inset-inline-start: 0; top: 4px; width: 18px; height: 18px; border-radius: 50%; background: rgba(255,255,255,.25); font-size: 11px; font-weight: 800; display: grid; place-items: center; }
+.done-tags { list-style: none; display: flex; flex-direction: column; gap: 8px; margin: 14px 0 16px; text-align: start; }
+.done-tags li { background: var(--soft); border-radius: 14px; padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; }
+.done-tags b { font-size: 15px; }
+.done-tags a { font-size: 13px; word-break: break-all; }
+.done-lead { font-weight: 500; }
+.next-title { font-weight: 800; font-size: 17px; margin: 22px 0 10px; text-align: start; }
+.next-steps { list-style: none; counter-reset: nx; text-align: start; display: flex; flex-direction: column; gap: 10px; }
+.next-steps li { counter-increment: nx; position: relative; padding-inline-start: 42px; min-height: 30px; }
+.next-steps li::before { content: counter(nx); position: absolute; inset-inline-start: 0; top: 0; width: 30px; height: 30px; border-radius: 10px; background: var(--grad); color: #fff; font-weight: 800; display: grid; place-items: center; }
+.next-steps b { display: block; font-size: 15px; }
+.next-steps span { display: block; color: var(--muted); font-size: 14px; }

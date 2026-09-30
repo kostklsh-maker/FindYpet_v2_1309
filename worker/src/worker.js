@@ -6,12 +6,13 @@
  *   • отдаёт сайт — главная, страница метки /tag/?id=101 (и короткая /t/101),
  *     политика конфиденциальности /privacy/
  *   • API для сайта:
- *        POST /api/register   — регистрация с сайта (+ второй телефон, заметки, согласие)
+ *        POST /api/register   — заказ с сайта: один или несколько жетонов (Семейный: питомцы + запасные)
  *        GET  /api/tag?id=101 — данные питомца для страницы метки (с резервным кэшем)
  *        POST /api/scan       — "метку отсканировали" (уведомление владельцу)
  *        POST /api/location   — геолокация от нашедшего → владельцу
  *   • Telegram-бот @YourPetLocatorBot (webhook: POST /telegram)
- *        /register /mytags /lost /found /settings /cancel /help /id
+ *        /register /mytags /lost /found /settings /cancel /help /id; для админа /orders и
+ *        кнопки статуса заказа (Оплачен → Изготовлен → Отправлен) — клиенту уходит сообщение
  *   • GET /setup?key=WEBHOOK_SECRET — одноразовая настройка бота (повторить после обновления!)
  *   • scheduled() — напоминание владельцам раз в 180 дней проверить контакты (нужен Cron Trigger)
  *
@@ -97,12 +98,28 @@ const REMINDER_DAYS = 180;
 // отсюда их берут сайт (/js/plans.js) и бот. id не менять — они сохраняются в заказе.
 // ---------------------------------------------------------------
 const PLANS = {
-  basic: { price: '49 ₪', name: 'Basic' },
-  smart: { price: '79 ₪', name: 'Smart' },
-  family: { price: '199 ₪', name: 'Family (3 Smart tags)' },
+  basic: { price: '49 ₪', name: 'Basic', tags: 1 },
+  smart: { price: '79 ₪', name: 'Smart', tags: 1 },
+  family: { price: '199 ₪', name: 'Family (3 Smart tags)', tags: 3 },
 };
 const DEFAULT_PLAN = 'smart';
 function planLabel(id) { const p = PLANS[id]; return p ? `${p.name} · ${p.price}` : '—'; }
+
+// Функции по тарифу. Базовый: жетон, страница, звонок и WhatsApp (геолокацию нашедший
+// отправляет через WhatsApp). Смарт и Семейный: + уведомления о скане и геолокации в Telegram,
+// режим «Потерялся», второй контакт и заметки.
+// Жетоны без записанного тарифа (зарегистрированы до v6) считаются Смарт.
+// false — выключить ограничения: все жетоны получают функции Смарт.
+const ENFORCE_PLAN_FEATURES = true;
+function planOf(x) { return x && PLANS[x.plan] ? x.plan : DEFAULT_PLAN; }
+function feats(x) {
+  const smart = !ENFORCE_PLAN_FEATURES || planOf(x) !== 'basic';
+  return { alerts: smart, lost: smart, extras: smart };
+}
+const T_UPGRADE =
+  '🔒 This is part of the <b>Smart</b> plan (scan & location alerts, Lost mode, second contact and notes).\n' +
+  'Your tag is on <b>Basic</b> — finders can call you or write to you on WhatsApp.\n' +
+  'Want to upgrade? Just write to us here.';
 
 // ---------------------------------------------------------------
 // Entry point
@@ -182,30 +199,110 @@ async function apiRegister(request, env, url, ctx) {
   if (phone2Raw && !phone2) return json({ success: false, error: 'Second phone is not valid.', error_code: 'phone2' }, env, 400);
   if (b.consent !== true) return json({ success: false, error: 'Consent is required.', error_code: 'consent' }, env, 400);
   const plan = PLANS[b.plan] ? b.plan : DEFAULT_PLAN;
+  const lang = ['en', 'he', 'ru'].includes(b.lang) ? b.lang : 'en';
 
-  const r = await db(env, 'register', {
-    owner_name: owner, phone, pet_name: pet, address,
-    tag_url_base: tagUrlBase(env, url), source: 'site',
+  const items = orderItems(plan, pet, b.pets, b.spare_for);
+  const res = await createOrder(env, url, {
+    source: 'site', plan, lang, owner_name: owner, phone, address, items,
+    phone2: feats({ plan }).extras ? phone2 : '',
+    notes: feats({ plan }).extras ? notes : '',
   });
-  if (!r.ok) return json({ success: false, error: 'Database error. Please try again.', error_code: 'db' }, env, 502);
-  const tag = r.tag;
-
-  // Доп. данные и факт согласия — в KV (таблицу не трогаем)
-  await putExtras(env, tag.tag_id, {
-    phone2, notes,
-    consent_at: new Date().toISOString(),
-    lang: ['en', 'he', 'ru'].includes(b.lang) ? b.lang : 'en',
-    plan,
-  });
-  ctx.waitUntil(cachePublic(env, tag));
-  await notifyAdmin(env, url, tag, 'site', plan);
+  if (!res.ok) return json({ success: false, error: 'Database error. Please try again.', error_code: 'db' }, env, 502);
+  ctx.waitUntil(Promise.all(res.tags.map((t) => cachePublic(env, t))));
+  const first = res.tags[0];
 
   return json({
     success: true,
-    id_tag: tag.tag_id,
-    tag_url: shortUrl(env, url, tag.tag_id),
-    telegram_link: `https://t.me/${env.BOT_USERNAME}?start=${tag.link_token}`,
+    order_id: res.order.order_id,
+    plan,
+    total_tags: res.order.items.reduce((n, i) => n + i.copies, 0),
+    tags: res.order.items.map((i) => ({ id_tag: i.tag_id, pet_name: i.pet_name, copies: i.copies, tag_url: shortUrl(env, url, i.tag_id) })),
+    // первый жетон — для совместимости со старым кодом страницы
+    id_tag: first.tag_id,
+    tag_url: shortUrl(env, url, first.tag_id),
+    telegram_link: `https://t.me/${env.BOT_USERNAME}?start=${first.link_token}`,
   }, env);
+}
+
+// ---------------------------------------------------------------
+// Заказы. Один заказ = один или несколько жетонов.
+// «Питомец» = своя строка в таблице (свой tag_id, своя страница и ссылка для NFC/QR).
+// «Запасной жетон» = ещё одна физическая копия того же жетона (тот же tag_id и ссылка).
+// Заказ хранится в KV: o:<order_id>; у каждого жетона x:<tag_id>.order_id.
+// ---------------------------------------------------------------
+const ORDER_STATUSES = ['new', 'paid', 'made', 'shipped'];
+
+/** Из тарифа, первой клички, доп. кличек и «запасной для питомца №…» собираем состав заказа. */
+function orderItems(plan, firstPet, morePets, spareFor) {
+  const slots = (PLANS[plan] && PLANS[plan].tags) || 1;
+  const names = [firstPet, ...(Array.isArray(morePets) ? morePets : [])]
+    .map((n) => str(n, 40)).filter(Boolean).slice(0, slots);
+  const items = names.map((pet_name) => ({ pet_name, copies: 1 }));
+  const spares = slots - items.length;
+  const want = Array.isArray(spareFor) ? spareFor : [];
+  for (let k = 0; k < spares; k++) {
+    const i = Number(want[k]);
+    items[Number.isInteger(i) && i >= 0 && i < items.length ? i : 0].copies++;
+  }
+  return items;
+}
+
+/**
+ * Создаёт строки в таблице (по одной на питомца), доп. данные и заказ в KV,
+ * отправляет админу один лист производства. o: { source, plan, lang, owner_name, phone,
+ * address, items, phone2?, notes?, chat_id? }
+ */
+async function createOrder(env, url, o) {
+  const tags = [];
+  for (let i = 0; i < o.items.length; i++) {
+    let r = await db(env, 'register', {
+      owner_name: o.owner_name, phone: o.phone, pet_name: o.items[i].pet_name, address: o.address,
+      telegram_chat_id: o.chat_id || undefined, tag_url_base: tagUrlBase(env, url), source: o.source,
+    });
+    if (!r.ok) r = await db(env, 'register', { // одна повторная попытка
+      owner_name: o.owner_name, phone: o.phone, pet_name: o.items[i].pet_name, address: o.address,
+      telegram_chat_id: o.chat_id || undefined, tag_url_base: tagUrlBase(env, url), source: o.source,
+    });
+    if (!r.ok) {
+      if (!tags.length) return { ok: false };
+      break; // часть жетонов создана — остальные админ создаст вручную (он увидит это в сообщении)
+    }
+    tags.push(r.tag);
+  }
+  const order_id = 'FY' + tags[0].tag_id;
+  const now = new Date().toISOString();
+  const items = tags.map((t, i) => ({ tag_id: String(t.tag_id), pet_name: t.pet_name || o.items[i].pet_name, copies: o.items[i].copies }));
+  const missing = o.items.slice(tags.length).map((i) => i.pet_name);
+  for (let i = 0; i < tags.length; i++) {
+    await putExtras(env, tags[i].tag_id, {
+      plan: o.plan, order_id, copies: items[i].copies, lang: o.lang || 'en',
+      consent_at: now, consent_via: o.source,
+      ...(o.phone2 ? { phone2: o.phone2 } : {}),
+      ...(o.notes && i === 0 ? { notes: o.notes } : {}),
+    });
+  }
+  const order = {
+    order_id, created_at: now, source: o.source, plan: o.plan, lang: o.lang || 'en',
+    owner_name: o.owner_name, phone: o.phone, address: o.address,
+    items, missing, chat_id: o.chat_id || '',
+    tokens: Object.fromEntries(tags.map((t) => [String(t.tag_id), t.link_token || ''])),
+    status: 'new', history: [{ status: 'new', at: now }],
+  };
+  await saveOrder(env, order);
+  await notifyAdmin(env, url, order);
+  return { ok: true, order, tags };
+}
+
+async function getOrder(env, id) {
+  if (!kvOn(env) || !id) return null;
+  try { return await env.FYP_KV.get(`o:${id}`, 'json'); } catch (e) { console.error('order get', e); return null; }
+}
+async function saveOrder(env, order) {
+  if (!kvOn(env)) return;
+  try { await env.FYP_KV.put(`o:${order.order_id}`, JSON.stringify(order)); } catch (e) { console.error('order put', e); }
+}
+function orderTagsLine(order) {
+  return order.items.map((i) => `${i.pet_name} #${i.tag_id}` + (i.copies > 1 ? ` ×${i.copies}` : '')).join(', ');
 }
 
 async function apiTag(url, env, ctx) {
@@ -217,12 +314,13 @@ async function apiTag(url, env, ctx) {
   // страницы (номер телефона важнее всего), и только если её нет — temp_error.
   if (!r.ok) {
     const cached = await getCachedPublic(env, id);
-    if (cached) return json({ ...cached, ...publicExtras(extras), stale: true }, env);
+    if (cached) return json({ ...cached, ...publicExtras(extras), can_notify: !!cached.can_notify && feats(extras).alerts, stale: true }, env);
     return json({ found: false, error: 'temp_error' }, env, 502);
   }
   if (!r.found || String(r.tag.status) === 'disabled') return json({ found: false }, env);
   ctx.waitUntil(cachePublic(env, r.tag));
-  return json({ ...publicTag(r.tag, env), ...publicExtras(extras) }, env);
+  const pub = publicTag(r.tag, env);
+  return json({ ...pub, ...publicExtras(extras), can_notify: pub.can_notify && feats(extras).alerts }, env);
 }
 
 async function apiScan(request, env, url) {
@@ -234,6 +332,7 @@ async function apiScan(request, env, url) {
   const tag = r.tag;
   if (r.throttled) return json({ success: true }, env);
   const extras = await getExtras(env, id);
+  if (!feats(extras).alerts) return json({ success: true }, env); // Базовый: без уведомлений о скане
 
   if (tag.telegram_chat_id) {
     const kb = extras.lost
@@ -268,6 +367,8 @@ async function apiLocation(request, env) {
   if (!r.ok) return json({ success: false, error: 'temp_error' }, env, 502);
   if (!r.found) return json({ success: false, error: 'not_found' }, env);
   const tag = r.tag;
+  // Базовый тариф: геолокацию нашедший отправляет через WhatsApp (страница делает это сама)
+  if (!feats(await getExtras(env, id)).alerts) return json({ success: false, error: 'not_linked' }, env);
 
   const maps = `https://maps.google.com/?q=${lat},${lon}`;
   const waze = `https://waze.com/ul?ll=${lat},${lon}&navigate=yes`;
@@ -315,6 +416,7 @@ function publicTag(t, env) {
 /** Публичная часть доп. данных (то, что владелец разрешил показывать). */
 function publicExtras(x) {
   x = x || {};
+  if (!feats(x).extras) x = {};
   const phone2 = normalizePhone(x.phone2);
   return {
     lost: !!x.lost,
@@ -455,6 +557,7 @@ async function handleUpdate(update, env, url) {
     return send(env, chatId, T.cancelled, mainMenu());
   }
   if (text === '/id') return send(env, chatId, `Your chat ID: <code>${chatId}</code>`);
+  if (text === '/orders' && isAdmin(env, chatId)) return listOrders(env, chatId);
   if (text === '/help') return send(env, chatId, T.help, mainMenu());
 
   // --- многошаговые диалоги ---
@@ -525,6 +628,19 @@ async function handleUpdate(update, env, url) {
   if (st.step === 'plan') {
     return send(env, chatId, 'Please choose a plan using the buttons above.');
   }
+  if (st.step === 'f_count' || st.step === 'f_spare') {
+    return send(env, chatId, 'Please choose using the buttons above.');
+  }
+  if (st.step === 'f_pet') {
+    if (!text || text === BTN_CANCEL) return send(env, chatId, `🐾 Name of pet #${st.pets.length + 1}?`, cancelKb());
+    st.pets.push(str(text, 40));
+    if (st.pets.length < st.fam_n) {
+      await db(env, 'setState', { chat_id: chatId, state: st });
+      return send(env, chatId, `🐾 Name of pet #${st.pets.length + 1}?`, cancelKb());
+    }
+    await send(env, chatId, '👌', { remove_keyboard: true });
+    return afterFamilyPets(env, chatId, st, url);
+  }
   if (st.step === 'confirm') {
     return send(env, chatId, 'Please tap ✅ Confirm or ✏️ Start over above.');
   }
@@ -535,7 +651,7 @@ function confirmMessage(env, chatId, st, url) {
   return send(env, chatId,
       '<b>Please check your details:</b>\n\n' +
       `👤 Owner: ${esc(st.owner_name)}\n📱 Phone: ${esc(prettyPhone(st.phone))}\n` +
-      `🐾 Pet: ${esc(st.pet_name)}\n🏠 Address: ${esc(st.address)}\n💳 Plan: ${esc(planLabel(st.plan))}\n\n` +
+      itemsText(st) + `🏠 Address: ${esc(st.address)}\n💳 Plan: ${esc(planLabel(st.plan))}\n\n` +
       '🔒 By confirming, you agree that your first name, phone and pet\'s name are shown on the pet page ' +
       'to whoever scans the tag. Your address is used only for delivery. ' +
       `<a href="${esc(siteBase(env, url))}/privacy/">Privacy policy</a>`,
@@ -554,6 +670,7 @@ async function handleCallback(cq, env, url) {
     const tag = await ownedTag(chatId, id, env);
     if (!tag) return send(env, chatId, '⚠️ This tag is not linked to your Telegram.', mainMenu());
     if (!kvOn(env)) return send(env, chatId, T.noKv, mainMenu());
+    if (act !== 'found' && !feats(await getExtras(env, id)).lost) return send(env, chatId, T_UPGRADE, mainMenu());
     if (act === 'lost') {
       await db(env, 'setState', { chat_id: chatId, state: { step: 'lost_area', tag_id: id } });
       return send(env, chatId, `🚨 <b>Lost mode for ${esc(tag.pet_name)}</b>\n\n` + T.askArea, {
@@ -579,9 +696,53 @@ async function handleCallback(cq, env, url) {
     if (!st || st.step !== 'plan') return send(env, chatId, 'Session expired. Tap /register to start again.', mainMenu());
     await tg(env, 'editMessageReplyMarkup', { chat_id: chatId, message_id: cq.message.message_id, reply_markup: { inline_keyboard: [] } });
     st.plan = pm[1];
+    st.pets = [st.pet_name];
+    st.spare_for = [];
+    if ((PLANS[st.plan].tags || 1) > 1) {
+      st.step = 'f_count';
+      await db(env, 'setState', { chat_id: chatId, state: st });
+      const n = PLANS[st.plan].tags;
+      return send(env, chatId,
+        `🏷 <b>Your ${esc(PLANS[st.plan].name.split(' (')[0])} plan has ${n} tags.</b>\n` +
+        'How many pets will wear them?\n\n' +
+        'Each pet gets its own tag and page. Tags left over become <b>spare tags</b> — an exact copy of a pet\'s tag ' +
+        '(same page and link), handy if one gets lost.',
+        { inline_keyboard: Array.from({ length: n }, (_, k) => k + 1).map((c) =>
+          [{ text: c === 1 ? `1 pet: ${esc(st.pet_name)} (+${n - 1} spare)` : `${c} pets` + (n - c ? ` (+${n - c} spare)` : ''), callback_data: `fam_n_${c}` }]) });
+    }
     st.step = 'confirm';
     await db(env, 'setState', { chat_id: chatId, state: st });
     return confirmMessage(env, chatId, st, url);
+  }
+
+  // --- регистрация по Семейному тарифу: сколько питомцев / для кого запасной ---
+  const fm = /^fam_(n|sp)_(\d)$/.exec(data);
+  if (fm) {
+    const st = (await db(env, 'getState', { chat_id: chatId })).state;
+    const want = fm[1] === 'n' ? 'f_count' : 'f_spare';
+    if (!st || st.step !== want) return send(env, chatId, 'Session expired. Tap /register to start again.', mainMenu());
+    await tg(env, 'editMessageReplyMarkup', { chat_id: chatId, message_id: cq.message.message_id, reply_markup: { inline_keyboard: [] } });
+    const v = Number(fm[2]);
+    if (fm[1] === 'n') {
+      st.fam_n = Math.min(Math.max(v, 1), PLANS[st.plan].tags || 1);
+      if (st.fam_n > 1) {
+        st.step = 'f_pet';
+        await db(env, 'setState', { chat_id: chatId, state: st });
+        return send(env, chatId, `🐾 Name of pet #${st.pets.length + 1}?`, cancelKb());
+      }
+      return afterFamilyPets(env, chatId, st, url);
+    }
+    st.spare_for = [v < st.pets.length ? v : 0];
+    st.step = 'confirm';
+    await db(env, 'setState', { chat_id: chatId, state: st });
+    return confirmMessage(env, chatId, st, url);
+  }
+
+  // --- админ: статус заказа ---
+  const om = /^ord:(FY\d{1,9}):(paid|made|shipped)$/.exec(data);
+  if (om) {
+    if (!isAdmin(env, chatId)) return;
+    return setOrderStatus(env, url, chatId, om[1], om[2]);
   }
 
   // --- регистрация ---
@@ -595,18 +756,37 @@ async function handleCallback(cq, env, url) {
   const st = (await db(env, 'getState', { chat_id: chatId })).state;
   if (!st || st.step !== 'confirm') return send(env, chatId, 'Session expired. Tap /register to start again.', mainMenu());
 
-  const r = await db(env, 'register', {
-    owner_name: st.owner_name, phone: st.phone, pet_name: st.pet_name, address: st.address,
-    telegram_chat_id: chatId, tag_url_base: tagUrlBase(env, url), source: 'telegram',
-  });
-  if (!r.ok) return send(env, chatId, '⚠️ Something went wrong. Please try again: /register');
-  await db(env, 'clearState', { chat_id: chatId });
   const plan = PLANS[st.plan] ? st.plan : DEFAULT_PLAN;
-  await putExtras(env, r.tag.tag_id, { consent_at: new Date().toISOString(), consent_via: 'telegram', plan });
-  await cachePublic(env, r.tag);
+  const res = await createOrder(env, url, {
+    source: 'telegram', plan, lang: 'en', owner_name: st.owner_name, phone: st.phone, address: st.address,
+    items: orderItems(plan, st.pet_name, (st.pets || []).slice(1), st.spare_for), chat_id: chatId,
+  });
+  if (!res.ok) return send(env, chatId, '⚠️ Something went wrong. Please try again: /register');
+  await db(env, 'clearState', { chat_id: chatId });
+  await Promise.all(res.tags.map((t) => cachePublic(env, t)));
   await rememberChat(env, chatId);
-  await sendRegistered(chatId, r.tag, env, url);
-  await notifyAdmin(env, url, r.tag, 'telegram', plan);
+  await sendRegistered(chatId, res.tags, env, url, res.order);
+}
+
+/** После ввода кличек: спросить, для кого запасной (если питомцев 2), иначе — подтверждение. */
+async function afterFamilyPets(env, chatId, st, url) {
+  const spares = (PLANS[st.plan].tags || 1) - st.pets.length;
+  if (spares > 0 && st.pets.length > 1) {
+    st.step = 'f_spare';
+    await db(env, 'setState', { chat_id: chatId, state: st });
+    return send(env, chatId, '🏷 The spare tag — for which pet? It will be an exact copy of that pet\'s tag.',
+      { inline_keyboard: st.pets.map((n, i) => [{ text: `🐾 ${n}`, callback_data: `fam_sp_${i}` }]) });
+  }
+  st.spare_for = [];
+  st.step = 'confirm';
+  await db(env, 'setState', { chat_id: chatId, state: st });
+  return confirmMessage(env, chatId, st, url);
+}
+
+function itemsText(st) {
+  const items = orderItems(st.plan || DEFAULT_PLAN, st.pet_name, (st.pets || []).slice(1), st.spare_for);
+  if (items.length === 1 && items[0].copies === 1) return `🐾 Pet: ${esc(items[0].pet_name)}\n`;
+  return '🏷 Tags:\n' + items.map((i) => `   • ${esc(i.pet_name)}` + (i.copies > 1 ? ` — ${i.copies} tags (${i.copies - 1} spare)` : '')).join('\n') + '\n';
 }
 
 /** Выбор метки для действия. Если метка одна — действие сразу. */
@@ -718,24 +898,51 @@ async function linkFromSite(chatId, token, env, url) {
   const r = await db(env, 'linkTelegram', { token, chat_id: chatId });
   if (!r.ok || !r.found) return send(env, chatId, T.notFoundToken, mainMenu());
   await rememberChat(env, chatId);
-  await cachePublic(env, r.tag);
-  return sendRegistered(chatId, r.tag, env, url);
+  // Все жетоны того же заказа привязываются одним нажатием Start
+  const tags = [r.tag];
+  const order = await getOrder(env, (await getExtras(env, r.tag.tag_id)).order_id);
+  if (order) {
+    for (const [id, tok] of Object.entries(order.tokens || {})) {
+      if (id === String(r.tag.tag_id) || !tok) continue;
+      const r2 = await db(env, 'linkTelegram', { token: tok, chat_id: chatId });
+      if (r2.ok && r2.found) tags.push(r2.tag);
+    }
+    order.chat_id = chatId;
+    await saveOrder(env, order);
+  }
+  await Promise.all(tags.map((t) => cachePublic(env, t)));
+  return sendRegistered(chatId, tags, env, url, order);
 }
 
-async function sendRegistered(chatId, tag, env, url) {
-  const link = shortUrl(env, url, tag.tag_id);
+async function sendRegistered(chatId, tagsIn, env, url, order) {
+  const tags = Array.isArray(tagsIn) ? tagsIn : [tagsIn];
+  const first = tags[0];
+  const f = feats(await getExtras(env, first.tag_id));
+  const copies = (id) => { const it = order && order.items.find((i) => i.tag_id === String(id)); return it ? it.copies : 1; };
+  const list = tags.map((t) =>
+    `🐾 <b>${esc(t.pet_name)}</b> — tag #${t.tag_id}` + (copies(t.tag_id) > 1 ? ` · ${copies(t.tag_id)} tags (incl. ${copies(t.tag_id) - 1} spare)` : '') +
+    `\n🔗 ${esc(shortUrl(env, url, t.tag_id))}`).join('\n\n');
+  const names = tags.map((t) => esc(t.pet_name)).join(', ');
   await send(env, chatId,
-    `🎉 <b>${esc(tag.owner_name)}, you are registered in FindYpet!</b>\n\n` +
-    `🐾 Pet: <b>${esc(tag.pet_name)}</b>\n` +
-    `🆔 Tag: <b>#${tag.tag_id}</b>\n` +
-    `🔗 Pet page: ${esc(link)}\n\n` +
-    `When someone scans the tag, I'll alert you here, and they can call you, write on WhatsApp ` +
-    `or send you their location. Keep notifications for this chat turned on 🔔\n\n` +
-    `<b>Useful commands</b>\n` +
-    `⚙️ /settings — add a second contact and notes (allergies, "don't chase me")\n` +
-    `🚨 /lost — if ${esc(tag.pet_name)} goes missing\n` +
-    `📲 When the tag arrives: hold your phone to it to check it opens this page.`,
-    { inline_keyboard: [[{ text: '👀 Preview pet page', url: link }], [{ text: '⚙️ Add second contact / notes', callback_data: `set:${tag.tag_id}` }]] });
+    `🎉 <b>${esc(first.owner_name)}, you are registered in FindYpet!</b>\n\n` + list + '\n\n' +
+    (order
+      ? `🧾 Order <b>${order.order_id}</b> · ${esc(planLabel(order.plan))}\n` +
+        `<b>What happens next:</b> we contact you to confirm the order and payment → we engrave the tag and write the NFC → ` +
+        `we ship it to your address. I'll keep you posted right here.\n\n`
+      : '') +
+    (f.alerts
+      ? `When someone scans a tag, I'll alert you here, and they can call you, write on WhatsApp ` +
+        `or send you their location. Keep notifications for this chat turned on 🔔\n\n` +
+        `<b>Useful commands</b>\n` +
+        `⚙️ /settings — second contact and notes (allergies, "don't chase me")\n` +
+        `🚨 /lost — if ${names} goes missing\n`
+      : `Your plan is <b>Basic</b>: finders call you or write to you on WhatsApp straight from the pet page. ` +
+        `Scan alerts and Lost mode are part of Smart — write to us here to upgrade.\n`) +
+    `📲 When the tag arrives: scan the QR or hold your phone to it — it must open the pet page.`,
+    { inline_keyboard: [
+      [{ text: '👀 Preview pet page', url: shortUrl(env, url, first.tag_id) }],
+      ...(f.extras ? [[{ text: '⚙️ Add second contact / notes', callback_data: `set:${first.tag_id}` }]] : []),
+    ] });
   return send(env, chatId, 'Use /mytags any time to see your tags.', mainMenu());
 }
 
@@ -745,7 +952,11 @@ async function myTags(chatId, env, url) {
   if (!tags.length) return send(env, chatId, T.noTags, mainMenu());
   const lines = await Promise.all(tags.map(async (t) => {
     const x = await getExtras(env, t.tag_id);
-    return `🐾 <b>${esc(t.pet_name)}</b> — tag #${t.tag_id}` + (x.lost ? '  🚨 <b>LOST MODE</b>' : '') + '\n' +
+    const o = x.order_id ? await getOrder(env, x.order_id) : null;
+    const ORDER_TXT = { new: 'received — we will contact you', paid: 'paid — being made', made: 'ready — shipping soon', shipped: 'shipped' };
+    return `🐾 <b>${esc(t.pet_name)}</b> — tag #${t.tag_id}` + (x.lost ? '  🚨 <b>LOST MODE</b>' : '') +
+      (x.copies > 1 ? ` · ${x.copies} tags` : '') + ` · ${esc(PLANS[planOf(x)].name.split(' (')[0])}\n` +
+      (o && o.status !== 'shipped' ? `🧾 Order ${o.order_id}: ${ORDER_TXT[o.status] || o.status}\n` : '') +
       `🔗 ${esc(shortUrl(env, url, t.tag_id))}` +
       (x.phone2 ? `\n📞 2nd contact: ${esc(prettyPhone(normalizePhone(x.phone2)))}` : '') +
       (x.notes ? `\n📝 ${esc(x.notes)}` : '') +
@@ -754,25 +965,107 @@ async function myTags(chatId, env, url) {
   return send(env, chatId, '<b>Your tags</b>\n\n' + lines.join('\n\n') + '\n\n/settings · /lost · /found', mainMenu());
 }
 
-async function notifyAdmin(env, url, tag, source, plan) {
+function isAdmin(env, chatId) { return !!env.ADMIN_CHAT_ID && String(chatId) === String(env.ADMIN_CHAT_ID); }
+
+const STATUS_LABEL = { new: '🆕 New', paid: '💰 Paid', made: '🏭 Made', shipped: '📦 Shipped' };
+
+/** Лист производства: по одному блоку на каждый физический жетон + кнопки статуса. */
+async function notifyAdmin(env, url, order) {
   if (!env.ADMIN_CHAT_ID) return;
-  const link = tagUrlBase(env, url) + tag.tag_id;
-  const short = shortUrl(env, url, tag.tag_id);
-  const qr = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=8&data=${encodeURIComponent(short)}`;
+  const total = order.items.reduce((n, i) => n + i.copies, 0);
+  const phoneEngrave = prettyPhone(normalizePhone(order.phone)).replace('+972 ', '0');
+  let k = 0;
+  const blocks = [];
+  for (const it of order.items) {
+    const short = shortUrl(env, url, it.tag_id);
+    const qr = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=8&data=${encodeURIComponent(short)}`;
+    for (let c = 0; c < it.copies; c++) {
+      k++;
+      blocks.push(c === 0
+        ? `🏷 <b>Tag ${k} of ${total} — #${it.tag_id}</b>\n` +
+          `🔤 Engrave front: <b>${esc(String(it.pet_name).toUpperCase())}</b> · ${esc(phoneEngrave)}\n` +
+          `✍️ NFC + 🔳 QR: <code>${esc(short)}</code>\n<a href="${esc(qr)}">Download QR image</a>`
+        : `🏷 <b>Tag ${k} of ${total} — #${it.tag_id} (spare)</b>\n` +
+          `Exact copy of the ${esc(it.pet_name)} tag above: same engraving, same NFC/QR link.`);
+    }
+  }
+  const missing = (order.missing || []).length
+    ? `\n\n⚠️ <b>Could not create tags for:</b> ${esc(order.missing.join(', '))} — the table did not answer. Create them manually.`
+    : '';
   await tg(env, 'sendMessage', {
     chat_id: env.ADMIN_CHAT_ID,
     parse_mode: 'HTML',
     disable_web_page_preview: true,
     text:
-      `🆕 <b>New tag #${tag.tag_id}</b> (via ${source})\n` +
-      `💳 Plan: <b>${esc(planLabel(plan))}</b>\n` +
-      `👤 ${esc(tag.owner_name)} · 📱 ${esc(prettyPhone(normalizePhone(tag.phone)))}\n` +
-      `🐾 ${esc(tag.pet_name)}\n🏠 ${esc(tag.address)}\n` +
-      `Telegram: ${tag.telegram_chat_id ? '✅ linked' : '⏳ not yet'}\n\n` +
-      `🔤 <b>Engrave on the front:</b> ${esc(String(tag.pet_name).toUpperCase())} · ${esc(prettyPhone(normalizePhone(tag.phone)).replace('+972 ', '0'))}\n` +
-      `✍️ <b>Write to NFC:</b>\n<code>${esc(link)}</code>\n` +
-      `🔳 <b>QR (print on the back):</b> <code>${esc(short)}</code>\n<a href="${esc(qr)}">Download QR image</a>`,
+      `🆕 <b>New order ${order.order_id}</b> (via ${order.source})\n` +
+      `💳 ${esc(planLabel(order.plan))} — <b>${total} physical tag${total > 1 ? 's' : ''}</b>\n` +
+      `👤 ${esc(order.owner_name)} · 📱 ${esc(prettyPhone(normalizePhone(order.phone)))}\n` +
+      `🏠 ${esc(order.address)}\n` +
+      `Telegram: ${order.chat_id ? '✅ linked' : '⏳ not yet (updates will go to Telegram once linked)'}\n\n` +
+      blocks.join('\n\n') + missing +
+      `\n\nSet the status when it changes — the customer gets a message:`,
+    reply_markup: { inline_keyboard: [[
+      { text: STATUS_LABEL.paid, callback_data: `ord:${order.order_id}:paid` },
+      { text: STATUS_LABEL.made, callback_data: `ord:${order.order_id}:made` },
+      { text: STATUS_LABEL.shipped, callback_data: `ord:${order.order_id}:shipped` },
+    ]] },
   });
+}
+
+async function setOrderStatus(env, url, adminChat, orderId, status) {
+  const order = await getOrder(env, orderId);
+  if (!order) return send(env, adminChat, `⚠️ Order ${orderId} not found.`);
+  if (order.status === status) return send(env, adminChat, `Order ${orderId} is already ${STATUS_LABEL[status]}.`);
+  order.status = status;
+  order.history = [...(order.history || []), { status, at: new Date().toISOString() }];
+  await saveOrder(env, order);
+
+  const names = order.items.map((i) => esc(i.pet_name)).join(', ');
+  const total = order.items.reduce((n, i) => n + i.copies, 0);
+  const tagWord = total > 1 ? 'tags' : 'tag';
+  const links = order.items.map((i) => `🐾 ${esc(i.pet_name)}: ${esc(shortUrl(env, url, i.tag_id))}`).join('\n');
+  const text = {
+    paid: `💰 <b>Payment received — thank you!</b>\nOrder ${order.order_id}: we're now making your ${tagWord} for ${names}.`,
+    made: `🏭 <b>Your ${tagWord} ${total > 1 ? 'are' : 'is'} ready</b> — engraved and NFC written. We'll ship soon.`,
+    shipped:
+      `📦 <b>Your FindYpet ${tagWord} ${total > 1 ? 'are' : 'is'} on the way!</b>\nOrder ${order.order_id} → ${esc(order.address)}\n\n` +
+      `<b>When it arrives:</b>\n1️⃣ Scan the QR or hold your phone to the tag — it must open the pet page:\n${links}\n` +
+      `2️⃣ Put it on the collar.\n3️⃣ /settings — add a second contact and notes for the finder.`,
+  }[status];
+
+  let delivered = false;
+  if (order.chat_id) {
+    const r = await send(env, order.chat_id, text, mainMenu());
+    delivered = !!(r && r.ok);
+  }
+  return send(env, adminChat,
+    `✅ Order ${orderId} → ${STATUS_LABEL[status]}\n` +
+    (delivered ? 'Customer notified in Telegram.'
+      : `Customer has no Telegram linked — please call: ${esc(prettyPhone(normalizePhone(order.phone)))}`));
+}
+
+async function listOrders(env, chatId) {
+  if (!kvOn(env)) return send(env, chatId, T.noKv);
+  const open = [];
+  let cursor;
+  do {
+    const page = await env.FYP_KV.list({ prefix: 'o:', cursor });
+    for (const k of page.keys) {
+      const o = await env.FYP_KV.get(k.name, 'json');
+      if (o && o.status !== 'shipped') open.push(o);
+    }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  if (!open.length) return send(env, chatId, 'No open orders 🎉');
+  open.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+  return send(env, chatId, '<b>Open orders</b>\n\n' + open.map((o) =>
+    `${STATUS_LABEL[o.status] || o.status} · <b>${o.order_id}</b> · ${esc(PLANS[o.plan] ? PLANS[o.plan].name : o.plan)}\n` +
+    `${esc(orderTagsLine(o))}\n📱 ${esc(prettyPhone(normalizePhone(o.phone)))} · ${esc(String(o.created_at).slice(0, 10))}`).join('\n\n'),
+    { inline_keyboard: open.slice(0, 20).flatMap((o) => [[
+      { text: `${o.order_id} → ${STATUS_LABEL.paid}`, callback_data: `ord:${o.order_id}:paid` },
+      { text: STATUS_LABEL.made, callback_data: `ord:${o.order_id}:made` },
+      { text: STATUS_LABEL.shipped, callback_data: `ord:${o.order_id}:shipped` },
+    ]]) });
 }
 
 // ---------------------------------------------------------------
@@ -970,4 +1263,4 @@ function serveEmbedded(url, env) {
 }
 
 // экспорт для тестов
-export const _test = { normalizePhone, prettyPhone, publicTag, publicExtras, PLANS };
+export const _test = { normalizePhone, prettyPhone, publicTag, publicExtras, PLANS, orderItems, feats };
