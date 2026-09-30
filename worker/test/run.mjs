@@ -1,6 +1,6 @@
 // Сквозные тесты API и бота на мок-окружении. Запуск: node test/run.mjs
 import assert from 'node:assert/strict';
-import { state, KV, makeEnv, call, tgUpdate, msg, cb, worker } from './mock.mjs';
+import { state, KV, makeKV, makeEnv, call, tgUpdate, msg, cb, worker } from './mock.mjs';
 
 let passed = 0;
 async function test(name, fn) {
@@ -356,6 +356,77 @@ await test('www → apex redirect; links use SITE_URL (findy-pet.com)', async ()
   assert.equal(d.tag_url, `https://findy-pet.com/t/${d.id_tag}`);
   const admin = lastTg('sendMessage').payload.text;
   assert.match(admin, new RegExp(`NFC \\+ 🔳 QR: <code>https://findy-pet.com/t/${d.id_tag}</code>`));
+});
+
+// ---- Тестовый сайт (окружение staging: test.findy-pet.com) ----
+const testEnv = () => ({ STAGE: 'test', TEST_DB: '1', SITE_URL: 'https://test.findy-pet.com', BOT_USERNAME: 'FindYpetTestBot',
+  BOT_TOKEN: 'T', WEBHOOK_SECRET: 'sec', ADMIN_CHAT_ID: 'admin', TIMEZONE: 'Asia/Jerusalem', FYP_KV: makeKV() });
+
+await test('test site: TEST banner, [TEST] title, noindex, robots.txt; production pages unmarked', async () => {
+  const tenv = testEnv();
+  for (const p of ['/', '/t/9001', '/privacy/']) {
+    const r = await call(tenv, p);
+    assert.equal(r.status, 200, p);
+    assert.equal(r.headers.get('X-Robots-Tag'), 'noindex, nofollow');
+    const html = await r.text();
+    assert.match(html, /<body[^>]*><div id="fyp-test-banner"/, p);
+    assert.match(html, /<title>\[TEST\] /, p);
+  }
+  const js = await call(tenv, '/js/app.js');
+  assert.equal(js.headers.get('X-Robots-Tag'), 'noindex, nofollow');
+  assert.doesNotMatch(await js.text(), /fyp-test-banner/);
+  const robots = await call(tenv, '/robots.txt');
+  assert.equal(await robots.text(), 'User-agent: *\nDisallow: /\n');
+  // Рабочий сайт: ничего этого нет
+  const prod = await call(makeEnv({ SITE_URL: 'https://findy-pet.com' }), '/');
+  assert.equal(prod.headers.get('X-Robots-Tag'), null);
+  const prodHtml = await prod.text();
+  assert.doesNotMatch(prodHtml, /fyp-test-banner|\[TEST\]/);
+});
+
+await test('test site: orders go to the test DB (KV), never to the Google Sheet', async () => {
+  const tenv = testEnv();
+  const sheetRows = state.tags.length;
+  const d = await (await call(tenv, '/api/register', { method: 'POST', body: {
+    owner_name: 'Test Owner', phone: '050-999-0000', pet_name: 'Testy', address: 'Haifa', consent: true,
+    plan: 'family', pets: ['Bonny'], spare_for: [0] } })).json();
+  assert.equal(d.success, true);
+  assert.deepEqual(d.tags.map((t) => [t.id_tag, t.copies]), [['9001', 2], ['9002', 1]]);
+  assert.equal(d.order_id, 'FY9001');
+  assert.equal(d.tag_url, 'https://test.findy-pet.com/t/9001');
+  assert.match(d.telegram_link, /^https:\/\/t\.me\/FindYpetTestBot\?start=[a-f0-9]{24}$/);
+  assert.equal(state.tags.length, sheetRows, 'Google Sheet must not be touched');
+  // Страница жетона берёт данные из тестовой базы
+  const page = await (await call(tenv, '/api/tag?id=9002')).json();
+  assert.equal(page.found, true);
+  assert.equal(page.pet_name, 'Bonny');
+  assert.equal(page.phone, '+972509990000');
+  // Привязка Telegram одним Start: оба жетона заказа
+  const CH = 7700;
+  await tgUpdate(tenv, msg(CH, '/start ' + d.telegram_link.split('start=')[1]));
+  const kv = tenv.FYP_KV;
+  assert.deepEqual(await kv.get(`db:chat:${CH}`, 'json'), ['9001', '9002']);
+  // Скан → уведомление владельцу; повторный скан в течение минуты не дублирует уведомление
+  const before = state.tg.length;
+  await call(tenv, '/api/scan', { method: 'POST', body: { id_tag: '9001' } });
+  await call(tenv, '/api/scan', { method: 'POST', body: { id_tag: '9001' } });
+  const alerts = state.tg.slice(before).filter((c) => String(c.payload.chat_id) === String(CH));
+  assert.equal(alerts.length, 1);
+  // Диалог с ботом тоже хранится в тестовой базе
+  await tgUpdate(tenv, msg(CH, '/register'));
+  assert.ok(await kv.get(`db:st:${CH}`));
+  await tgUpdate(tenv, msg(CH, '/cancel'));
+  assert.equal(await kv.get(`db:st:${CH}`), null);
+});
+
+await test('test site: no scheduled reminders', async () => {
+  const tenv = testEnv();
+  await tenv.FYP_KV.put('chat:1', JSON.stringify({ since: '2020-01-01T00:00:00Z', last_reminder: '2020-01-01T00:00:00Z' }));
+  const before = state.tg.length;
+  const pending = [];
+  await worker.scheduled({}, tenv, { waitUntil: (p) => pending.push(p) });
+  await Promise.all(pending);
+  assert.equal(state.tg.length, before);
 });
 
 console.log(`\n${passed} tests passed`);

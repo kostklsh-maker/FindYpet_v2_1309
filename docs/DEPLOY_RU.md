@@ -1,21 +1,71 @@
 # FindYpet — как выкладывать обновления
 
-## Автоматически (основной способ, с 29.09.2026)
-Любое изменение в ветке `main` этого репозитория (сайт в корне или `worker/`) запускает GitHub Actions
-«Deploy worker»: сборка `python3 worker/build.py` → 18 тестов → выкладка в Cloudflare (`findypet-app`) → проверка, что сайт открывается.
+## Два сайта: тестовый и рабочий (с 01.10.2026)
+| | Тестовый | Рабочий |
+|---|---|---|
+| Адрес | **https://test.findy-pet.com** | **https://findy-pet.com** (`www` перенаправляет сюда) |
+| Ветка в GitHub | `test` | `main` |
+| Worker в Cloudflare | `findypet-app-staging` | `findypet-app` |
+| Заказы и жетоны | хранилище KV `findypet-data-test`, номера с 9001 | Google-таблица FindYpetDatabase + KV `findypet-data` |
+| Telegram-бот | свой тестовый бот (подключается отдельно, см. ниже) | @YourPetLocatorBot |
+| Отличия | оранжевая полоса «Тестовый сайт» сверху, закрыт от поисковиков, без напоминаний | — |
+
+Тестовые заказы не попадают ни в Google-таблицу, ни в данные рабочего сайта, и жетоны по ним не изготавливаются.
+
+## Порядок работы
+1. **Изменение → ветка `test`.** Через ~1 минуту оно на test.findy-pet.com.
+2. **Проверить** на телефоне и компьютере: страницы, заказ, страницу жетона `/t/9001`.
+3. **Опубликовать** — перенести `test` в `main`:
+   GitHub → **Pull requests** → **New pull request** → base: `main`, compare: `test` → **Create pull request** → **Merge**.
+   (Или написать Claude: «опубликуй тестовую версию».)
+4. Через ~1 минуту изменения на findy-pet.com.
+
+Срочное исправление можно внести сразу в `main`, но потом перенести его и в `test`, чтобы ветки не разошлись.
+
+## Как это устроено
+Любое изменение в ветке `test` или `main` (сайт в корне или `worker/`) запускает GitHub Actions «Deploy worker»:
+сборка `python3 worker/build.py` → 32 автотеста → выкладка в Cloudflare → проверка, что сайт открывается.
 Если тесты не прошли — выкладки не будет, сайт остаётся прежним.
-Запустить вручную: GitHub → Actions → Deploy worker → Run workflow.
+Запустить вручную: GitHub → Actions → Deploy worker → Run workflow (выбрать ветку).
 Секреты репозитория: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
 Переменные и секреты бота в панели Cloudflare выкладка не меняет (`keep_vars = true` в `worker/wrangler.toml`).
 
-## Адрес сайта
-- Основной: **https://findy-pet.com** (домен подключён к Worker'у в `worker/wrangler.toml` → `routes`; `www` перенаправляет на основной).
-- `SITE_URL = "https://findy-pet.com"` (там же, `[vars]`) — от него строятся ссылки на страницы питомцев, QR и NFC.
+**Зачем GitHub, если сайт на Cloudflare.** Сам сайт GitHub не показывает — оба сайта работают в Cloudflare.
+GitHub — это хранилище кода с историей каждой правки (любую можно откатить) и «пульт выкладки»:
+без него обновлять сайт пришлось бы вручную с компьютера.
+
+## GitHub Pages — выключить
+Старая копия сайта `kostklsh-maker.github.io/findypet_v2_1309` больше не нужна: она только перенаправляет на findy-pet.com,
+а заказы и страницы жетонов на ней работать не могут. Выключить:
+GitHub → репозиторий → **Settings** → **Pages** → **Build and deployment** → Branch: **None** → **Save**
+(или кнопка **Unpublish site**, если она есть).
+
+## Тестовый бот (по желанию)
+У Telegram-бота может быть только один адрес для сообщений, поэтому рабочий бот обслуживает только рабочий сайт.
+Без своего бота на тестовом сайте работают страницы, заказы и страницы жетонов, но не уведомления и не привязка Telegram.
+Чтобы проверять и бота:
+1. @BotFather → `/newbot` → имя «FindYpet TEST», username например `FindYpetTestBot` → скопировать токен.
+2. Cloudflare → **Workers & Pages** → **findypet-app-staging** → **Settings** → **Variables and Secrets** → **Add**:
+   - `BOT_TOKEN` (Secret) — токен тестового бота;
+   - `BOT_USERNAME` (Text) — username тестового бота без @;
+   - `WEBHOOK_SECRET` (Secret) — любая строка из букв и цифр;
+   - `ADMIN_CHAT_ID` (Secret) — ваш chat id (тот же, что у рабочего сайта; бот показывает его по команде `/id`).
+3. Открыть `https://test.findy-pet.com/setup?key=<WEBHOOK_SECRET>` — в ответе `"setWebhook": { "ok": true }`.
+4. Написать тестовому боту `/start`.
+
+⚠️ Никогда не вписывайте в тестовый сайт токен рабочего бота @YourPetLocatorBot — рабочий бот перестанет отвечать клиентам.
+
+**Очистить тестовые данные:** Cloudflare → **Storage & Databases** → **KV** → `findypet-data-test` → удалить ключи.
+
+## Адреса и ссылки на жетонах
+- `SITE_URL` в `worker/wrangler.toml` (`[vars]` — рабочий, `[env.staging.vars]` — тестовый) — от него строятся ссылки на страницы питомцев, QR и NFC.
 - Старый адрес `findypet-app.kostikklsh.workers.dev` продолжает работать (уже записанные жетоны и вебхук бота).
-- Копия на GitHub Pages перенаправляет посетителей на findy-pet.com.
+- Тестовый сайт доступен также по `findypet-app-staging.kostikklsh.workers.dev`.
+- Репозиторий открытый: код виден всем, секретов в нём нет (они хранятся в Cloudflare и в секретах GitHub).
+  Его можно сделать закрытым: Settings → General → Danger Zone → Change visibility → Private — выкладка продолжит работать.
 
 ## Где что лежит
-- Корень репозитория — сайт (он же копия на GitHub Pages): `index.html`, `css/`, `js/`, `tag/`, `privacy/`, `assets/logo.png`.
+- Корень репозитория — сайт: `index.html`, `css/`, `js/`, `tag/`, `privacy/`, `assets/logo.png`.
 - `worker/src/worker.js` — API и Telegram-бот; `worker/build.py` встраивает сайт в `worker/dist/worker.js`.
 - Цены — только в `worker/src/worker.js` → `const PLANS`; `js/plans.js` генерируется сборкой.
 
@@ -74,7 +124,7 @@ Google-таблица и Apps Script **не меняются**.
 ## Как пересобрать и проверить после правок
 ```
 python3 worker/build.py        # собрать worker/dist/worker.js
-node worker/test/run.mjs       # 18 автотестов (моки таблицы, Telegram, KV, SMS)
+node worker/test/run.mjs       # 32 автотеста (моки таблицы, Telegram, KV, SMS; тестовый сайт)
 python3 worker/test/shots_v6.py  # скриншоты лендинга на 3 языках (нужен запущенный test/server.mjs)
 node worker/test/server.mjs    # локальный просмотр: http://localhost:8787 , /t/101 , /t/102 (Lost), /t/103 (сбой базы)
 ```

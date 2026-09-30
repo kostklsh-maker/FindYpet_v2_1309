@@ -1,10 +1,13 @@
-# Сборка, тесты и выкладка Worker'а findypet-app в Cloudflare.
+# Сборка, тесты и выкладка сайта в Cloudflare.
+#   ветка test → тестовый сайт  test.findy-pet.com  (Worker findypet-app-staging)
+#   ветка main → рабочий сайт   findy-pet.com       (Worker findypet-app)
+# Порядок работы: изменения сначала в test → проверка на test.findy-pet.com → перенос в main.
 # Нужны секреты репозитория: CLOUDFLARE_API_TOKEN (шаблон «Edit Cloudflare Workers») и CLOUDFLARE_ACCOUNT_ID.
 name: Deploy worker
 
 on:
   push:
-    branches: [main]
+    branches: [main, test]
     paths:
       - 'index.html'
       - 'css/**'
@@ -19,13 +22,16 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-worker
+  group: deploy-worker-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   deploy:
+    # выкладываются только две ветки: main (рабочий сайт) и test (тестовый)
+    if: github.ref_name == 'main' || github.ref_name == 'test'
+    name: ${{ github.ref_name == 'main' && 'findy-pet.com (production)' || 'test.findy-pet.com (staging)' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
 
@@ -45,22 +51,26 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
-          command: deploy
+          command: ${{ github.ref_name == 'main' && 'deploy' || 'deploy --env staging' }}
 
+      # ---------- Рабочий сайт ----------
       - name: Smoke test (workers.dev)
+        if: github.ref_name == 'main'
         run: |
           set -e
           base="https://findypet-app.kostikklsh.workers.dev"
           sleep 5
-          curl -fsS "$base/" | grep -q 'fastest way home'
+          page=$(curl -fsS "$base/")
+          echo "$page" | grep -q 'fastest way home'
+          if echo "$page" | grep -q 'fyp-test-banner'; then echo "::error::production shows the TEST banner"; exit 1; fi
           curl -fsS "$base/js/plans.js" | grep -q 'PLANS'
           code=$(curl -s -o /dev/null -w '%{http_code}' "$base/t/1")
           test "$code" = "200"
           echo "workers.dev is up ✅"
 
       - name: Smoke test (findy-pet.com)
+        if: github.ref_name == 'main'
         run: |
-          # Сразу после подключения домена сертификат выпускается несколько минут — ждём до ~5 минут
           for i in $(seq 1 20); do
             if curl -fsS "https://findy-pet.com/" | grep -q 'fastest way home'; then
               echo "findy-pet.com is up ✅"
@@ -71,3 +81,25 @@ jobs:
             echo "waiting for findy-pet.com ($i)…"; sleep 15
           done
           echo "::warning::findy-pet.com is not answering yet (DNS/certificate may still be propagating)"
+
+      # ---------- Тестовый сайт ----------
+      - name: Smoke test (test site)
+        if: github.ref_name != 'main'
+        run: |
+          set -e
+          base="https://findypet-app-staging.kostikklsh.workers.dev"
+          sleep 5
+          page=$(curl -fsS "$base/")
+          echo "$page" | grep -q 'fastest way home'
+          echo "$page" | grep -q 'fyp-test-banner'
+          curl -fsSI "$base/" | grep -qi '^x-robots-tag: noindex'
+          curl -fsS "$base/api/tag?id=1" | grep -q '"found":false'
+          echo "staging workers.dev is up ✅"
+          # Свой адрес: при первом подключении сертификат выпускается несколько минут
+          for i in $(seq 1 20); do
+            if curl -fsS "https://test.findy-pet.com/" | grep -q 'fyp-test-banner'; then
+              echo "test.findy-pet.com is up ✅"; exit 0
+            fi
+            echo "waiting for test.findy-pet.com ($i)…"; sleep 15
+          done
+          echo "::warning::test.findy-pet.com is not answering yet (DNS/certificate may still be propagating)"

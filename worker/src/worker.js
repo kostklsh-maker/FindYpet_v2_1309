@@ -127,66 +127,102 @@ const T_UPGRADE =
 // ---------------------------------------------------------------
 export default {
   async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-    const path = url.pathname.replace(/\/+$/, '') || '/';
-
-    // www.findy-pet.com → findy-pet.com (один адрес для людей и поисковиков)
-    if (url.hostname.startsWith('www.')) {
-      url.hostname = url.hostname.slice(4);
-      return Response.redirect(url.toString(), 301);
+    if (!isTestSite(env)) return route(request, env, ctx);
+    // Тестовый сайт: не индексируется поисковиками, на каждой странице — пометка «ТЕСТ»
+    if (new URL(request.url).pathname === '/robots.txt') {
+      return new Response('User-agent: *\nDisallow: /\n', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
     }
-    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(env) });
-
-    try {
-      // ---- Telegram webhook ----
-      if (path === '/telegram' && request.method === 'POST') {
-        if (request.headers.get('X-Telegram-Bot-Api-Secret-Token') !== env.WEBHOOK_SECRET) {
-          return new Response('forbidden', { status: 403 });
-        }
-        const update = await request.json();
-        // Отвечаем Telegram сразу, обработку делаем в фоне
-        ctx.waitUntil(handleUpdate(update, env, url).catch((e) => console.error('update error', e)));
-        return new Response('ok');
-      }
-
-      // ---- Одноразовая настройка бота ----
-      if (path === '/setup') return await setup(env, url);
-
-      // ---- API сайта ----
-      if (path === '/api/register' && request.method === 'POST') return await apiRegister(request, env, url, ctx);
-      if (path === '/api/tag' && request.method === 'GET') return await apiTag(url, env, ctx);
-      if (path === '/api/scan' && request.method === 'POST') return await apiScan(request, env, url);
-      if (path === '/api/location' && request.method === 'POST') return await apiLocation(request, env);
-      if (path.startsWith('/api/')) return json({ success: false, error: 'not_found' }, env, 404);
-
-      // ---- Короткая ссылка /t/101 (для QR на жетоне) → та же страница метки ----
-      if (/^\/t\/\d{1,9}$/.test(path)) {
-        const tagReq = new Request(new URL('/tag/index.html', url.origin), request);
-        const res = env.ASSETS ? await env.ASSETS.fetch(tagReq) : serveEmbedded(new URL('/tag/index.html', url.origin), env);
-        return new Response(res.body, { status: res.status, headers: res.headers });
-      }
-
-      // ---- Цены тарифов для сайта ----
-      if (path === '/js/plans.js') {
-        return new Response(`const PLANS = ${JSON.stringify(PLANS)};\n`, {
-          headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=300' },
-        });
-      }
-
-      // ---- Статический сайт ----
-      if (env.ASSETS) return env.ASSETS.fetch(request);
-      return serveEmbedded(url, env);
-    } catch (err) {
-      console.error(err);
-      return json({ success: false, error: 'server_error' }, env, 500);
-    }
+    return markTestSite(await route(request, env, ctx));
   },
 
   // Cron Trigger (например, раз в день): напоминание проверить контакты
   async scheduled(event, env, ctx) {
+    if (isTestSite(env)) return; // тестовый сайт напоминаний не рассылает
     ctx.waitUntil(sendReminders(env).catch((e) => console.error('reminders error', e)));
   },
 };
+
+async function route(request, env, ctx) {
+  const url = new URL(request.url);
+  const path = url.pathname.replace(/\/+$/, '') || '/';
+
+  // www.findy-pet.com → findy-pet.com (один адрес для людей и поисковиков)
+  if (url.hostname.startsWith('www.')) {
+    url.hostname = url.hostname.slice(4);
+    return Response.redirect(url.toString(), 301);
+  }
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(env) });
+
+  try {
+    // ---- Telegram webhook ----
+    if (path === '/telegram' && request.method === 'POST') {
+      if (request.headers.get('X-Telegram-Bot-Api-Secret-Token') !== env.WEBHOOK_SECRET) {
+        return new Response('forbidden', { status: 403 });
+      }
+      const update = await request.json();
+      // Отвечаем Telegram сразу, обработку делаем в фоне
+      ctx.waitUntil(handleUpdate(update, env, url).catch((e) => console.error('update error', e)));
+      return new Response('ok');
+    }
+
+    // ---- Одноразовая настройка бота ----
+    if (path === '/setup') return await setup(env, url);
+
+    // ---- API сайта ----
+    if (path === '/api/register' && request.method === 'POST') return await apiRegister(request, env, url, ctx);
+    if (path === '/api/tag' && request.method === 'GET') return await apiTag(url, env, ctx);
+    if (path === '/api/scan' && request.method === 'POST') return await apiScan(request, env, url);
+    if (path === '/api/location' && request.method === 'POST') return await apiLocation(request, env);
+    if (path.startsWith('/api/')) return json({ success: false, error: 'not_found' }, env, 404);
+
+    // ---- Короткая ссылка /t/101 (для QR на жетоне) → та же страница метки ----
+    if (/^\/t\/\d{1,9}$/.test(path)) {
+      const tagReq = new Request(new URL('/tag/index.html', url.origin), request);
+      const res = env.ASSETS ? await env.ASSETS.fetch(tagReq) : serveEmbedded(new URL('/tag/index.html', url.origin), env);
+      return new Response(res.body, { status: res.status, headers: res.headers });
+    }
+
+    // ---- Цены тарифов для сайта ----
+    if (path === '/js/plans.js') {
+      return new Response(`const PLANS = ${JSON.stringify(PLANS)};\n`, {
+        headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=300' },
+      });
+    }
+
+    // ---- Статический сайт ----
+    if (env.ASSETS) return env.ASSETS.fetch(request);
+    return serveEmbedded(url, env);
+  } catch (err) {
+    console.error(err);
+    return json({ success: false, error: 'server_error' }, env, 500);
+  }
+}
+
+// ---------------------------------------------------------------
+// Тестовый сайт (test.findy-pet.com, окружение staging в wrangler.toml).
+// STAGE = "test"  → пометка «ТЕСТ» на страницах, noindex, без напоминаний по расписанию.
+// TEST_DB = "1"   → жетоны хранятся в KV этого сайта, а не в Google-таблице (см. testDb).
+// На рабочем сайте обе переменные не заданы, и ничего из этого не работает.
+// ---------------------------------------------------------------
+function isTestSite(env) { return !!(env && env.STAGE); }
+
+const TEST_BANNER =
+  '<div id="fyp-test-banner" style="background:#f59e0b;color:#1f2937;font:700 13px/1.35 system-ui,-apple-system,sans-serif;' +
+  'text-align:center;padding:7px 12px;letter-spacing:.2px" dir="ltr">🧪 TEST SITE · ТЕСТОВЫЙ САЙТ — ' +
+  'orders here are not real · заказы не настоящие. Рабочий сайт: <a href="https://findy-pet.com" style="color:inherit">findy-pet.com</a></div>';
+
+async function markTestSite(res) {
+  const h = new Headers(res.headers);
+  h.set('X-Robots-Tag', 'noindex, nofollow');
+  if (!(h.get('Content-Type') || '').startsWith('text/html')) {
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
+  }
+  const html = (await res.text())
+    .replace(/<title>/i, '<title>[TEST] ')
+    .replace(/<body([^>]*)>/i, (m) => m + TEST_BANNER);
+  h.delete('Content-Length');
+  return new Response(html, { status: res.status, statusText: res.statusText, headers: h });
+}
 
 // ---------------------------------------------------------------
 // Site API
@@ -1120,6 +1156,7 @@ async function setup(env, url) {
 // Helpers
 // ---------------------------------------------------------------
 async function db(env, action, data = {}) {
+  if (env.TEST_DB === '1' || env.TEST_DB === true) return testDb(env, action, data);
   // Таймаут: если Google Apps Script завис (бывает при пиковой нагрузке на
   // бесплатной квоте), не заставляем прохожего у метки ждать бесконечно —
   // через 9 секунд отдаём явную "временную" ошибку (и страница берёт кэш).
@@ -1146,6 +1183,73 @@ async function db(env, action, data = {}) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * Тестовая база (только тестовый сайт, TEST_DB = "1"): те же действия, что у Apps Script,
+ * но жетоны хранятся в KV тестового сайта. Настоящая Google-таблица не затрагивается.
+ * Номера тестовых жетонов начинаются с 9001, чтобы их нельзя было спутать с настоящими.
+ * Ключи: db:seq — последний номер, db:t:<id> — жетон, db:tok:<token> → id,
+ *        db:chat:<chat_id> — номера жетонов чата, db:st:<chat_id> — шаг диалога с ботом.
+ */
+async function testDb(env, action, d) {
+  const kv = env.FYP_KV;
+  if (!kv) return { ok: false, error: 'no_kv' };
+  const getT = (id) => kv.get(`db:t:${id}`, 'json');
+  const putT = (t) => kv.put(`db:t:${t.tag_id}`, JSON.stringify(t));
+  const chatIds = async (c) => (await kv.get(`db:chat:${c}`, 'json')) || [];
+  const addToChat = async (c, id) => {
+    const ids = await chatIds(c);
+    if (!ids.includes(String(id))) { ids.push(String(id)); await kv.put(`db:chat:${c}`, JSON.stringify(ids)); }
+  };
+  switch (action) {
+    case 'register': {
+      const id = String((Number(await kv.get('db:seq')) || 9000) + 1);
+      await kv.put('db:seq', id);
+      const t = {
+        tag_id: id, owner_name: d.owner_name || '', phone: d.phone || '', pet_name: d.pet_name || '',
+        address: d.address || '', telegram_chat_id: d.telegram_chat_id ? String(d.telegram_chat_id) : '',
+        status: 'active', link_token: crypto.randomUUID().replace(/-/g, '').slice(0, 24),
+        source: d.source || '', created_at: new Date().toISOString(), tag_url: (d.tag_url_base || '') + id,
+      };
+      await putT(t);
+      await kv.put(`db:tok:${t.link_token}`, id);
+      if (t.telegram_chat_id) await addToChat(t.telegram_chat_id, id);
+      return { ok: true, tag: t };
+    }
+    case 'getTag': {
+      const t = await getT(d.id);
+      return t ? { ok: true, found: true, tag: t } : { ok: true, found: false };
+    }
+    case 'logScan': {
+      const t = await getT(d.id);
+      if (!t) return { ok: true, found: false };
+      const now = Date.now();
+      const throttled = !d.lat && now - (Date.parse(t.last_scan_at || '') || 0) < 60000; // повторный скан в течение минуты
+      t.last_scan_at = new Date(now).toISOString();
+      t.scans = (Number(t.scans) || 0) + 1;
+      await putT(t);
+      return { ok: true, found: true, tag: t, throttled };
+    }
+    case 'linkTelegram': {
+      const id = await kv.get(`db:tok:${d.token}`);
+      const t = id && (await getT(id));
+      if (!t) return { ok: true, found: false };
+      t.telegram_chat_id = String(d.chat_id);
+      await putT(t);
+      await addToChat(d.chat_id, t.tag_id);
+      return { ok: true, found: true, tag: t };
+    }
+    case 'listByChat': {
+      const tags = (await Promise.all((await chatIds(d.chat_id)).map(getT)))
+        .filter((t) => t && String(t.telegram_chat_id) === String(d.chat_id));
+      return { ok: true, tags };
+    }
+    case 'getState': return { ok: true, state: (await kv.get(`db:st:${d.chat_id}`, 'json')) || null };
+    case 'setState': await kv.put(`db:st:${d.chat_id}`, JSON.stringify(d.state)); return { ok: true };
+    case 'clearState': await kv.delete(`db:st:${d.chat_id}`); return { ok: true };
+  }
+  return { ok: false, error: 'unknown_action' };
 }
 
 async function tg(env, method, payload) {
