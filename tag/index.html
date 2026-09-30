@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow">
-  <meta name="theme-color" content="#667eea">
+  <meta name="theme-color" content="#0E3B3D">
   <title>FindYpet · Lost pet</title>
   <link rel="icon" href="../assets/logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,10 +12,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --brand: #667eea; --brand2: #764ba2; --grad: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --brand: #00A2A6; --brand2: #007376; --grad: linear-gradient(150deg, #007C80 0%, #0E3B3D 100%);
       --lost: linear-gradient(135deg, #ff5e57 0%, #c81e3a 100%);
-      --ink: #17142e; --muted: #67657d; --line: #ebe9f5; --soft: #f5f4ff; --bg: #f6f5fb;
-      --call: #22c55e; --call-d: #16a34a; --wa: #25d366; --red: #ef4444; --amber: #f59e0b;
+      --ink: #10292A; --muted: #56696A; --line: #DDE8E7; --soft: #F2F8F7; --bg: #F2F8F7;
+      --call: #15803D; --call-d: #116B33; --wa: #0E7C3F; --red: #ef4444; --amber: #f59e0b;
       --font: "Rubik", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -23,7 +23,7 @@
     .ic { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
     .ltr { direction: ltr; unicode-bidi: isolate; }
     .hidden { display: none !important; }
-    :focus-visible { outline: 3px solid rgba(102,126,234,.55); outline-offset: 2px; }
+    :focus-visible { outline: 3px solid rgba(0,162,166,.55); outline-offset: 2px; }
 
     /* ---------- Hero ---------- */
     .hero {
@@ -33,7 +33,7 @@
     body.is-lost .hero { background: var(--lost); }
     .hero::before, .hero::after { content: ""; position: absolute; border-radius: 50%; pointer-events: none; }
     .hero::before { width: 340px; height: 340px; background: rgba(255,255,255,.1); top: -170px; inset-inline-end: -110px; }
-    .hero::after { width: 240px; height: 240px; background: rgba(255,149,0,.22); bottom: -150px; inset-inline-start: -80px; filter: blur(8px); }
+    .hero::after { width: 240px; height: 240px; background: rgba(255,119,19,.22); bottom: -150px; inset-inline-start: -80px; filter: blur(8px); }
     body.is-lost .hero::after { background: rgba(255,255,255,.12); }
     .bar { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; max-width: 460px; margin: 0 auto; }
     .brand { display: flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 16px; }
@@ -45,8 +45,8 @@
 
     .avatar {
       position: relative; z-index: 1; width: 112px; height: 112px; margin: 26px auto 14px; border-radius: 50%;
-      background: radial-gradient(circle at 35% 30%, #fff 0%, #f1f0f8 70%, #e2e0ee 100%);
-      box-shadow: 0 18px 40px rgba(23,20,46,.3), inset 0 0 0 6px rgba(255,255,255,.7);
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #F2F8F7 70%, #E1ECEB 100%);
+      box-shadow: 0 18px 40px rgba(16,41,42,.3), inset 0 0 0 6px rgba(255,255,255,.7);
       display: grid; place-items: center; color: var(--brand); font-size: 50px;
     }
     body.is-lost .avatar { color: #c81e3a; }
@@ -59,7 +59,7 @@
 
     /* ---------- Card ---------- */
     main { position: relative; z-index: 2; max-width: 460px; margin: -64px auto 0; padding: 0 14px; }
-    .card { background: #fff; border-radius: 26px; padding: 22px 18px 18px; box-shadow: 0 20px 50px -20px rgba(40,30,110,.35), 0 1px 2px rgba(23,20,46,.05); }
+    .card { background: #fff; border-radius: 26px; padding: 22px 18px 18px; box-shadow: 0 20px 50px -20px rgba(40,30,110,.35), 0 1px 2px rgba(16,41,42,.05); }
 
     .missing {
       display: flex; gap: 12px; align-items: flex-start; background: #fff1f1; border: 1.5px solid #fecaca; color: #b91c1c;
@@ -95,13 +95,13 @@
     .btn small { font-weight: 500; font-size: 15px; opacity: .92; margin-top: 2px; }
     .btn .go { margin-inline-start: auto; font-size: 20px; opacity: .8; }
     [dir="rtl"] .btn .go { transform: scaleX(-1); }
-    .btn-call { background: var(--call); box-shadow: 0 12px 26px -10px rgba(34,197,94,.8); min-height: 76px; font-size: 20px; }
+    .btn-call { background: var(--call); box-shadow: 0 12px 26px -10px rgba(21,128,61,.8); min-height: 76px; font-size: 20px; }
     .btn-call .b-ic { animation: ring 2.4s ease-in-out infinite; }
     @keyframes ring { 0%, 55%, 100% { transform: rotate(0); } 5%, 15%, 25% { transform: rotate(-12deg); } 10%, 20% { transform: rotate(12deg); } }
-    .btn-call::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 0 rgba(34,197,94,.55); animation: pulse 2.4s ease-out infinite; pointer-events: none; }
-    @keyframes pulse { to { box-shadow: 0 0 0 14px rgba(34,197,94,0); } }
-    .btn-wa { background: var(--wa); box-shadow: 0 10px 22px -12px rgba(37,211,102,.8); }
-    .btn-loc { background: var(--grad); box-shadow: 0 10px 22px -12px rgba(102,126,234,.9); }
+    .btn-call::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 0 rgba(21,128,61,.55); animation: pulse 2.4s ease-out infinite; pointer-events: none; }
+    @keyframes pulse { to { box-shadow: 0 0 0 14px rgba(21,128,61,0); } }
+    .btn-wa { background: var(--wa); box-shadow: 0 10px 22px -12px rgba(14,124,63,.8); }
+    .btn-loc { background: var(--grad); box-shadow: 0 10px 22px -12px rgba(0,162,166,.9); }
     .btn-loc.done { background: var(--call-d); box-shadow: none; }
     .btn-outline { background: #fff; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--line); font-size: 16.5px; min-height: 58px; }
     .btn-outline .b-ic { background: var(--soft); color: var(--brand2); width: 38px; height: 38px; font-size: 19px; }
@@ -364,7 +364,7 @@
       const badgeText = $('badge').firstElementChild;
       badgeText.dataset.t = pet.lost ? 'lost' : 'foundMe';
       badgeText.textContent = t(badgeText.dataset.t);
-      document.querySelector('meta[name="theme-color"]').content = pet.lost ? '#e5383b' : '#667eea';
+      document.querySelector('meta[name="theme-color"]').content = pet.lost ? '#e5383b' : '#0E3B3D';
       $('missing').classList.toggle('hidden', !pet.lost);
       if (pet.lost) {
         const parts = [];
