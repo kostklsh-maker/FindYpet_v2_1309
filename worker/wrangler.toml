@@ -5,9 +5,20 @@ main = "dist/worker.js"
 compatibility_date = "2025-09-01"
 workers_dev = true
 
-# Не трогать переменные, заданные в панели Cloudflare (BOT_USERNAME, TIMEZONE, SITE_URL, LOST_CHANNEL_ID…).
+# Не трогать переменные, заданные в панели Cloudflare (BOT_USERNAME, TIMEZONE, LOST_CHANNEL_ID…);
+# SITE_URL задаётся ниже, в [vars].
 # Секреты (BOT_TOKEN, GAS_URL, GAS_KEY, WEBHOOK_SECRET, ADMIN_CHAT_ID, TWILIO_*) выкладка тоже не меняет.
 keep_vars = true
+
+# Свой домен: Cloudflare сам создаёт DNS-записи и сертификат. workers.dev тоже продолжает работать,
+# поэтому старые ссылки (уже записанные жетоны, вебхук бота) не ломаются.
+routes = [
+  { pattern = "findy-pet.com", custom_domain = true },
+  { pattern = "www.findy-pet.com", custom_domain = true },
+]
+
+[vars]
+SITE_URL = "https://findy-pet.com"   # от этого адреса строятся ссылки на страницы, QR и NFC
 
 [[kv_namespaces]]
 binding = "FYP_KV"

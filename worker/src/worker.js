@@ -129,6 +129,11 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, '') || '/';
 
+    // www.findy-pet.com → findy-pet.com (один адрес для людей и поисковиков)
+    if (url.hostname.startsWith('www.')) {
+      url.hostname = url.hostname.slice(4);
+      return Response.redirect(url.toString(), 301);
+    }
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(env) });
 
     try {

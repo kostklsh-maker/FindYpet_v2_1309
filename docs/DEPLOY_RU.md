@@ -8,6 +8,12 @@
 Секреты репозитория: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
 Переменные и секреты бота в панели Cloudflare выкладка не меняет (`keep_vars = true` в `worker/wrangler.toml`).
 
+## Адрес сайта
+- Основной: **https://findy-pet.com** (домен подключён к Worker'у в `worker/wrangler.toml` → `routes`; `www` перенаправляет на основной).
+- `SITE_URL = "https://findy-pet.com"` (там же, `[vars]`) — от него строятся ссылки на страницы питомцев, QR и NFC.
+- Старый адрес `findypet-app.kostikklsh.workers.dev` продолжает работать (уже записанные жетоны и вебхук бота).
+- Копия на GitHub Pages перенаправляет посетителей на findy-pet.com.
+
 ## Где что лежит
 - Корень репозитория — сайт (он же копия на GitHub Pages): `index.html`, `css/`, `js/`, `tag/`, `privacy/`, `assets/logo.png`.
 - `worker/src/worker.js` — API и Telegram-бот; `worker/build.py` встраивает сайт в `worker/dist/worker.js`.

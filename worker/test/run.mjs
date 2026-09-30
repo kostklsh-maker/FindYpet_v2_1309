@@ -345,4 +345,17 @@ await test('old tags without a plan keep Smart features', async () => {
   assert.equal(d.can_notify, true);
 });
 
+await test('www → apex redirect; links use SITE_URL (findy-pet.com)', async () => {
+  const domEnv = makeEnv({ SITE_URL: 'https://findy-pet.com' });
+  const pending = [];
+  const r = await worker.fetch(new Request('https://www.findy-pet.com/t/101?x=1'), domEnv, { waitUntil: (p) => pending.push(p) });
+  assert.equal(r.status, 301);
+  assert.equal(r.headers.get('Location'), 'https://findy-pet.com/t/101?x=1');
+  const d = await (await call(domEnv, '/api/register', { method: 'POST', body: {
+    owner_name: 'Dom Owner', phone: '050-121-2121', pet_name: 'Doma', address: 'Haifa', consent: true, plan: 'smart' } })).json();
+  assert.equal(d.tag_url, `https://findy-pet.com/t/${d.id_tag}`);
+  const admin = lastTg('sendMessage').payload.text;
+  assert.match(admin, new RegExp(`NFC \\+ 🔳 QR: <code>https://findy-pet.com/t/${d.id_tag}</code>`));
+});
+
 console.log(`\n${passed} tests passed`);

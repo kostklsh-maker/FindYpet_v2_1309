@@ -45,7 +45,7 @@ jobs:
           workingDirectory: worker
           command: deploy
 
-      - name: Smoke test
+      - name: Smoke test (workers.dev)
         run: |
           set -e
           base="https://findypet-app.kostikklsh.workers.dev"
@@ -54,4 +54,18 @@ jobs:
           curl -fsS "$base/js/plans.js" | grep -q 'PLANS'
           code=$(curl -s -o /dev/null -w '%{http_code}' "$base/t/1")
           test "$code" = "200"
-          echo "Site is up ✅"
+          echo "workers.dev is up ✅"
+
+      - name: Smoke test (findy-pet.com)
+        run: |
+          # Сразу после подключения домена сертификат выпускается несколько минут — ждём до ~5 минут
+          for i in $(seq 1 20); do
+            if curl -fsS "https://findy-pet.com/" | grep -q 'fastest way home'; then
+              echo "findy-pet.com is up ✅"
+              loc=$(curl -s -o /dev/null -w '%{redirect_url}' "https://www.findy-pet.com/t/1")
+              echo "www → $loc"
+              exit 0
+            fi
+            echo "waiting for findy-pet.com ($i)…"; sleep 15
+          done
+          echo "::warning::findy-pet.com is not answering yet (DNS/certificate may still be propagating)"

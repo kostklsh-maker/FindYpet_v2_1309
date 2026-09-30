@@ -1,10 +1,14 @@
 // ============================================================
 // FindYpet — настройки сайта
 // ============================================================
-// Сайт работает в двух местах:
-//  • внутри Cloudflare Worker (основной адрес) — API на том же адресе, API_URL = "";
-//  • копия на GitHub Pages — заказы и страница жетона обращаются к Worker'у по полному адресу.
-const API_URL = /\.github\.io$/.test(location.hostname) ? "https://findypet-app.kostikklsh.workers.dev" : "";
+// Основной адрес сайта. Сайт, API и бот работают в Cloudflare Worker на этом домене,
+// поэтому API_URL пустой (тот же адрес).
+const SITE_HOME = "https://findy-pet.com";
+const API_URL = "";
 
-// Цены тарифов задаются в worker/src/worker.js (const PLANS). Worker отдаёт их как /js/plans.js,
-// а файл js/plans.js в репозитории — копия для GitHub Pages (обновляется при сборке).
+// Копия на GitHub Pages (…github.io/<репозиторий>/…) сразу переводит посетителя на основной домен
+if (/\.github\.io$/.test(location.hostname)) {
+    location.replace(SITE_HOME + location.pathname.replace(/^\/[^/]+/, "") + location.search + location.hash);
+}
+
+// Цены тарифов задаются в worker/src/worker.js (const PLANS). Worker отдаёт их как /js/plans.js.
