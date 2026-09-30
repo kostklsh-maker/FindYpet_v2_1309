@@ -1,15 +1,21 @@
-# Выкладка Worker'а findypet-app. Запускается автоматически из GitHub Actions
-# (.github/workflows/deploy-worker.yml) после сборки: python3 worker/build.py
+# Выкладка Worker'а. Запускается автоматически из GitHub Actions (.github/workflows/deploy-worker.yml)
+# после сборки: python3 worker/build.py
+#
+#   ветка main  → рабочий сайт   findy-pet.com       (Worker findypet-app)          wrangler deploy
+#   ветка test  → тестовый сайт  test.findy-pet.com  (Worker findypet-app-staging)  wrangler deploy --env staging
 name = "findypet-app"
 main = "dist/worker.js"
 compatibility_date = "2025-09-01"
 workers_dev = true
 
 # Не трогать переменные, заданные в панели Cloudflare (BOT_USERNAME, TIMEZONE, LOST_CHANNEL_ID…);
-# SITE_URL задаётся ниже, в [vars].
+# SITE_URL задаётся ниже, в [vars]. Действует для обоих сайтов.
 # Секреты (BOT_TOKEN, GAS_URL, GAS_KEY, WEBHOOK_SECRET, ADMIN_CHAT_ID, TWILIO_*) выкладка тоже не меняет.
 keep_vars = true
 
+# ============================================================
+# РАБОЧИЙ САЙТ — findy-pet.com
+# ============================================================
 # Свой домен: Cloudflare сам создаёт DNS-записи и сертификат. workers.dev тоже продолжает работать,
 # поэтому старые ссылки (уже записанные жетоны, вебхук бота) не ломаются.
 routes = [
@@ -26,3 +32,29 @@ id = "d0564acb6cc546f5b82f0a8f6b78508b"   # findypet-data
 
 [triggers]
 crons = ["0 7 * * *"]                     # ежедневно 10:00 по Израилю — напоминания раз в 180 дней
+
+# ============================================================
+# ТЕСТОВЫЙ САЙТ — test.findy-pet.com (Worker findypet-app-staging)
+# ============================================================
+# Полная копия сайта для проверки изменений перед публикацией. Со своим хранилищем:
+# тестовые заказы не попадают ни в Google-таблицу, ни в данные рабочего сайта.
+# routes и triggers наследуются от рабочего сайта, поэтому заданы здесь явно —
+# иначе тестовая копия заняла бы findy-pet.com и рассылала напоминания.
+[env.staging]
+workers_dev = true
+routes = [
+  { pattern = "test.findy-pet.com", custom_domain = true },
+]
+
+[env.staging.vars]
+SITE_URL = "https://test.findy-pet.com"
+STAGE = "test"      # пометка «ТЕСТ» на страницах, запрет индексации, без напоминаний
+TEST_DB = "1"       # жетоны — в хранилище тестового сайта (номера с 9001), а не в Google-таблице
+TIMEZONE = "Asia/Jerusalem"
+
+[[env.staging.kv_namespaces]]
+binding = "FYP_KV"
+id = "a83f6204d6344c058652beff71017527"   # findypet-data-test
+
+[env.staging.triggers]
+crons = []

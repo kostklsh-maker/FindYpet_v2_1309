@@ -3,13 +3,17 @@ import worker from '../dist/worker.js';
 
 export const state = { gasDown: false, tg: [], sms: [], tags: [], states: {}, nextId: 101 };
 
-const kvStore = new Map();
-export const KV = {
-  async get(k, type) { const v = kvStore.get(k); if (v === undefined) return null; return type === 'json' ? JSON.parse(v) : v; },
-  async put(k, v) { kvStore.set(k, v); },
-  async list({ prefix = '' } = {}) { return { keys: [...kvStore.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })), list_complete: true }; },
-  _dump() { return Object.fromEntries(kvStore); },
-};
+export function makeKV() {
+  const kvStore = new Map();
+  return {
+    async get(k, type) { const v = kvStore.get(k); if (v === undefined) return null; return type === 'json' ? JSON.parse(v) : v; },
+    async put(k, v) { kvStore.set(k, String(v)); },
+    async delete(k) { kvStore.delete(k); },
+    async list({ prefix = '' } = {}) { return { keys: [...kvStore.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })), list_complete: true }; },
+    _dump() { return Object.fromEntries(kvStore); },
+  };
+}
+export const KV = makeKV();
 
 function gas(body) {
   const { action } = body;
