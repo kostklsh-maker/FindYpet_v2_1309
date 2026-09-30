@@ -11,7 +11,7 @@ const lastTg = (method) => [...state.tg].reverse().find((c) => !method || c.meth
 const env = makeEnv();
 
 await test('landing, tag page, privacy and /t/ short link are served', async () => {
-  for (const p of ['/', '/tag/?id=1', '/privacy/', '/t/101', '/js/i18n.js', '/assets/logo.png']) {
+  for (const p of ['/', '/tag/?id=1', '/privacy/', '/t/101', '/js/i18n.js', '/assets/logo.png', '/assets/mark.png', '/assets/wordmark.png']) {
     const r = await call(env, p);
     assert.equal(r.status, 200, p);
   }
