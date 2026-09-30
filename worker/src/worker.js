@@ -68,7 +68,8 @@ const T = {
     '✅ /found — pet is home: switch Lost mode off\n' +
     '⚙️ /settings — second contact and notes for the finder\n' +
     '/cancel — cancel the current action\n' +
-    '/id — show your Telegram chat ID',
+    '/id — show your Telegram chat ID\n\n' +
+    '✉️ Questions? Write to us here or at findypet0926@gmail.com',
   askArea:
     '📍 Where was your pet last seen? (area / city — e.g. "Haifa, Carmel Center")\n' +
     'This is shown on the tag page. Tap <b>Skip</b> if you prefer not to say.',
@@ -119,7 +120,7 @@ function feats(x) {
 const T_UPGRADE =
   '🔒 This is part of the <b>Smart</b> plan (scan & location alerts, Lost mode, second contact and notes).\n' +
   'Your tag is on <b>Basic</b> — finders can call you or write to you on WhatsApp.\n' +
-  'Want to upgrade? Just write to us here.';
+  'Want to upgrade? Just write to us here or at findypet0926@gmail.com.';
 
 // ---------------------------------------------------------------
 // Entry point
