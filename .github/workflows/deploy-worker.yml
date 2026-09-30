@@ -62,8 +62,8 @@ jobs:
           for i in $(seq 1 20); do
             if curl -fsS "https://findy-pet.com/" | grep -q 'fastest way home'; then
               echo "findy-pet.com is up ✅"
-              loc=$(curl -s -o /dev/null -w '%{redirect_url}' "https://www.findy-pet.com/t/1")
-              echo "www → $loc"
+              loc=$(curl -s -o /dev/null -w '%{redirect_url}' "https://www.findy-pet.com/t/1" || true)
+              echo "www → ${loc:-not resolving yet (DNS still propagating)}"
               exit 0
             fi
             echo "waiting for findy-pet.com ($i)…"; sleep 15
