@@ -15,7 +15,11 @@
       --brand: #00A2A6; --brand2: #007376; --grad: linear-gradient(150deg, #007C80 0%, #0E3B3D 100%);
       --lost: linear-gradient(135deg, #ff5e57 0%, #c81e3a 100%);
       --ink: #10292A; --muted: #56696A; --line: #DDE8E7; --soft: #F2F8F7; --bg: #F2F8F7;
-      --call: #15803D; --call-d: #116B33; --wa: #0E7C3F; --red: #ef4444; --amber: #f59e0b;
+      /* Кнопки нашедшего: звонок — фирменный оранжевый, WhatsApp — зелёный WhatsApp, геолокация — синий */
+      --call: #FF7713; --call2: #F2630A; --call-ink: #0B2627;
+      --wa: #25D366; --wa2: #1DAA61; --wa-ink: #0B2627;
+      --loc: linear-gradient(150deg, #2563EB 0%, #1E3F9A 100%); --loc-d: #1D4ED8;
+      --ok: #116B33; --red: #ef4444; --amber: #f59e0b;
       --font: "Rubik", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -93,16 +97,24 @@
     .btn .b-ic { flex: none; width: 42px; height: 42px; border-radius: 13px; background: rgba(255,255,255,.2); display: grid; place-items: center; font-size: 22px; }
     .btn .col { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
     .btn small { font-weight: 500; font-size: 15px; opacity: .92; margin-top: 2px; }
-    .btn .go { margin-inline-start: auto; font-size: 20px; opacity: .8; }
-    [dir="rtl"] .btn .go { transform: scaleX(-1); }
-    .btn-call { background: var(--call); box-shadow: 0 12px 26px -10px rgba(21,128,61,.8); min-height: 76px; font-size: 20px; }
-    .btn-call .b-ic { animation: ring 2.4s ease-in-out infinite; }
+    .ic-fill { fill: currentColor; stroke: none; }
+
+    /* Позвонить: только иконка, «Call» и номер */
+    .btn-call { background: linear-gradient(150deg, var(--call) 0%, var(--call2) 100%); color: var(--call-ink); box-shadow: 0 12px 26px -10px rgba(255,119,19,.75); min-height: 76px; font-size: 21px; font-weight: 800; }
+    .btn-call .b-ic { background: rgba(255,255,255,.32); animation: ring 2.4s ease-in-out infinite; }
+    .btn-call .num { font-size: 17.5px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
     @keyframes ring { 0%, 55%, 100% { transform: rotate(0); } 5%, 15%, 25% { transform: rotate(-12deg); } 10%, 20% { transform: rotate(12deg); } }
-    .btn-call::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 0 rgba(21,128,61,.55); animation: pulse 2.4s ease-out infinite; pointer-events: none; }
-    @keyframes pulse { to { box-shadow: 0 0 0 14px rgba(21,128,61,0); } }
-    .btn-wa { background: var(--wa); box-shadow: 0 10px 22px -12px rgba(14,124,63,.8); }
-    .btn-loc { background: var(--grad); box-shadow: 0 10px 22px -12px rgba(0,162,166,.9); }
-    .btn-loc.done { background: var(--call-d); box-shadow: none; }
+    .btn-call::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 0 rgba(255,119,19,.5); animation: pulse 2.4s ease-out infinite; pointer-events: none; }
+    @keyframes pulse { to { box-shadow: 0 0 0 14px rgba(255,119,19,0); } }
+
+    /* WhatsApp: иконка WhatsApp и «Send Message», зелёный WhatsApp */
+    .btn-wa { background: linear-gradient(150deg, var(--wa) 0%, var(--wa2) 100%); color: var(--wa-ink); box-shadow: 0 10px 22px -12px rgba(29,170,97,.85); }
+    .btn-wa .b-ic { background: rgba(255,255,255,.34); font-size: 24px; }
+
+    /* Передать геолокацию: синий */
+    .btn-loc { background: var(--loc); box-shadow: 0 10px 22px -12px rgba(37,99,235,.85); }
+    .btn-loc.done { background: #EEF4FF; color: var(--loc-d); box-shadow: inset 0 0 0 1.5px #C7D7FE; }
+    .btn-loc.done .b-ic { background: #DCE7FE; }
     .btn-outline { background: #fff; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--line); font-size: 16.5px; min-height: 58px; }
     .btn-outline .b-ic { background: var(--soft); color: var(--brand2); width: 38px; height: 38px; font-size: 19px; }
     .btn-outline small { color: var(--muted); }
@@ -112,7 +124,7 @@
 
     .status { font-size: 14.5px; min-height: 0; color: var(--muted); line-height: 1.45; text-align: center; }
     .status:empty { display: none; }
-    .status.ok { color: var(--call-d); font-weight: 600; background: #f0fdf4; border-radius: 14px; padding: 12px; }
+    .status.ok { color: var(--ok); font-weight: 600; background: #f0fdf4; border-radius: 14px; padding: 12px; }
     .status.err { color: #b45309; background: #fffbeb; border-radius: 14px; padding: 12px; }
     .hearts { position: relative; height: 0; }
     .hearts i { position: absolute; bottom: 0; left: 50%; font-style: normal; font-size: 20px; animation: floatUp 1.8s ease-out forwards; }
@@ -148,7 +160,8 @@
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
     <symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
-    <symbol id="i-msg" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M8 12h.01M12 12h.01M16 12h.01"/></symbol>
+    <!-- WhatsApp glyph: Simple Icons (CC0), simpleicons.org; WhatsApp is a trademark of WhatsApp LLC -->
+    <symbol id="i-wa" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></symbol>
     <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
     <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
@@ -158,7 +171,6 @@
     <symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
     <symbol id="i-chip" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></symbol>
     <symbol id="i-paw" viewBox="0 0 24 24"><circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></symbol>
-    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
     <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
     <symbol id="i-tag" viewBox="0 0 24 24"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></symbol>
   </defs></svg>
@@ -207,17 +219,15 @@
         <div class="actions">
           <a class="btn btn-call hidden" id="callBtn" href="#">
             <span class="b-ic"><svg class="ic"><use href="#i-phone"/></svg></span>
-            <span class="col"><span data-t="call">Call my owner</span><small class="ltr" id="phoneText"></small></span>
-            <svg class="ic go"><use href="#i-arrow"/></svg>
+            <span class="col"><span data-t="call">Call</span><span class="num ltr" id="phoneText"></span></span>
           </a>
-          <a class="btn btn-wa hidden" id="waBtn" href="#" target="_blank" rel="noopener">
-            <span class="b-ic"><svg class="ic"><use href="#i-msg"/></svg></span>
-            <span class="col"><span data-t="wa">Write on WhatsApp</span><small data-t="waSub">A ready message is waiting</small></span>
-            <svg class="ic go"><use href="#i-arrow"/></svg>
+          <a class="btn btn-wa hidden" id="waBtn" href="#" target="_blank" rel="noopener" aria-label="Send a WhatsApp message to my owner">
+            <span class="b-ic"><svg class="ic ic-fill"><use href="#i-wa"/></svg></span>
+            <span class="col"><span data-t="wa">Send Message</span></span>
           </a>
           <button class="btn btn-loc" id="locBtn" type="button">
             <span class="b-ic"><svg class="ic ic-pin"><use href="#i-pin"/></svg><svg class="ic ic-done"><use href="#i-check"/></svg></span>
-            <span class="col"><span data-t="sendLoc" id="locLabel">Send my location to my owner</span><small data-t="locSub" id="locSub">One tap — no app needed</small></span>
+            <span class="col"><span data-t="sendLoc" id="locLabel">Share location</span><small data-t="locSub" id="locSub">One tap — no app needed</small></span>
           </button>
           <div class="hearts" id="hearts" aria-hidden="true"></div>
           <div class="status" id="locStatus" aria-live="polite"></div>
@@ -264,8 +274,8 @@
         msg: 'Please help me get home — contact my owner in any way below.',
         owner: 'My owner:', notesTitle: 'Important',
         stale: 'Showing saved info — our server is slow right now, but the contacts work.',
-        call: 'Call my owner', wa: 'Write on WhatsApp', waSub: 'A ready message is waiting', call2: 'Call second contact',
-        sendLoc: 'Send my location to my owner', sendLocWa: 'Send my location via WhatsApp', locSub: 'One tap — no app needed',
+        call: 'Call', wa: 'Send Message', waAria: 'Send a WhatsApp message to my owner', call2: 'Call second contact',
+        sendLoc: 'Share location', sendLocWa: 'Share location via WhatsApp', locSub: 'One tap — no app needed',
         hint: 'Sharing your location is optional. It goes only to my owner, and only when you tap the button.',
         chipNote: "Can't reach anyone? Any vet or the municipal veterinary service can scan my microchip.",
         waText: 'Hi! I found {pet} (FindYpet tag #{id}).', waHere: "I'm here:",
@@ -285,8 +295,8 @@
         msg: 'עזרו לי לחזור הביתה — צרו קשר עם הבעלים שלי בכל דרך שלמטה.',
         owner: 'הבעלים שלי:', notesTitle: 'חשוב',
         stale: 'מוצגים פרטים שמורים — השרת איטי כרגע, אבל פרטי הקשר עובדים.',
-        call: 'התקשרו לבעלים שלי', wa: 'כתבו בוואטסאפ', waSub: 'הודעה מוכנה כבר מחכה', call2: 'התקשרו לאיש קשר נוסף',
-        sendLoc: 'שלחו את המיקום שלי לבעלים', sendLocWa: 'שלחו את המיקום בוואטסאפ', locSub: 'לחיצה אחת — בלי אפליקציה',
+        call: 'התקשרו', wa: 'שלחו הודעה', waAria: 'שלחו הודעת וואטסאפ לבעלים שלי', call2: 'התקשרו לאיש קשר נוסף',
+        sendLoc: 'שתפו מיקום', sendLocWa: 'שתפו מיקום בוואטסאפ', locSub: 'לחיצה אחת — בלי אפליקציה',
         hint: 'שיתוף המיקום הוא לא חובה. הוא נשלח רק לבעלים שלי, ורק כשלוחצים על הכפתור.',
         chipNote: 'לא מצליחים ליצור קשר? כל וטרינר או השירות הווטרינרי העירוני יכולים לסרוק את השבב שלי.',
         waText: 'היי! מצאתי את {pet} (תג FindYpet מס׳ {id}).', waHere: 'אני כאן:',
@@ -306,8 +316,8 @@
         msg: 'Помогите мне вернуться домой — свяжитесь с хозяином любым способом ниже.',
         owner: 'Мой хозяин:', notesTitle: 'Важно',
         stale: 'Показаны сохранённые данные — сервер сейчас медленный, но контакты работают.',
-        call: 'Позвонить хозяину', wa: 'Написать в WhatsApp', waSub: 'Сообщение уже готово', call2: 'Позвонить второму контакту',
-        sendLoc: 'Отправить хозяину, где я', sendLocWa: 'Отправить, где я, в WhatsApp', locSub: 'Одно нажатие — без приложения',
+        call: 'Позвонить', wa: 'Отправить сообщение', waAria: 'Отправить сообщение хозяину в WhatsApp', call2: 'Позвонить второму контакту',
+        sendLoc: 'Передать геолокацию', sendLocWa: 'Передать геолокацию в WhatsApp', locSub: 'Одно нажатие — без приложения',
         hint: 'Делиться геолокацией не обязательно. Она уходит только моему хозяину и только после нажатия кнопки.',
         chipNote: 'Не получается связаться? Любой ветеринар или муниципальная ветслужба могут считать мой микрочип.',
         waText: 'Здравствуйте! Я нашёл(ла) {pet} (жетон FindYpet №{id}).', waHere: 'Я здесь:',
@@ -397,6 +407,7 @@
       document.documentElement.lang = lang;
       document.documentElement.dir = lang === 'he' ? 'rtl' : 'ltr';
       document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.dataset.t); });
+      $('waBtn').setAttribute('aria-label', t('waAria'));
       document.querySelectorAll('.langs button').forEach(b => {
         b.classList.toggle('on', b.dataset.lang === lang);
         b.setAttribute('aria-pressed', b.dataset.lang === lang ? 'true' : 'false');
