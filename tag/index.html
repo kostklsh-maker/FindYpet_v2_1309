@@ -227,7 +227,7 @@
           </a>
           <button class="btn btn-loc" id="locBtn" type="button">
             <span class="b-ic"><svg class="ic ic-pin"><use href="#i-pin"/></svg><svg class="ic ic-done"><use href="#i-check"/></svg></span>
-            <span class="col"><span data-t="sendLoc" id="locLabel">Share location</span><small data-t="locSub" id="locSub">One tap — no app needed</small></span>
+            <span class="col"><span data-t="sendLoc" id="locLabel">Share location</span><small data-t="locSub" id="locSub">Map pin via WhatsApp</small></span>
           </button>
           <div class="hearts" id="hearts" aria-hidden="true"></div>
           <div class="status" id="locStatus" aria-live="polite"></div>
@@ -275,7 +275,7 @@
         owner: 'My owner:', notesTitle: 'Important',
         stale: 'Showing saved info — our server is slow right now, but the contacts work.',
         call: 'Call', wa: 'Send Message', waAria: 'Send a WhatsApp message to my owner', call2: 'Call second contact',
-        sendLoc: 'Share location', sendLocWa: 'Share location via WhatsApp', locSub: 'One tap — no app needed',
+        sendLoc: 'Share location', locSub: 'Map pin via WhatsApp', waLocText: 'Hi! I found {pet} (FindYpet tag #{id}). My location:',
         hint: 'Sharing your location is optional. It goes only to my owner, and only when you tap the button.',
         chipNote: "Can't reach anyone? Any vet or the municipal veterinary service can scan my microchip.",
         waText: 'Hi! I found {pet} (FindYpet tag #{id}).', waHere: "I'm here:",
@@ -296,7 +296,7 @@
         owner: 'הבעלים שלי:', notesTitle: 'חשוב',
         stale: 'מוצגים פרטים שמורים — השרת איטי כרגע, אבל פרטי הקשר עובדים.',
         call: 'התקשרו', wa: 'שלחו הודעה', waAria: 'שלחו הודעת וואטסאפ לבעלים שלי', call2: 'התקשרו לאיש קשר נוסף',
-        sendLoc: 'שתפו מיקום', sendLocWa: 'שתפו מיקום בוואטסאפ', locSub: 'לחיצה אחת — בלי אפליקציה',
+        sendLoc: 'שתפו מיקום', locSub: 'נקודה במפה — בוואטסאפ', waLocText: 'היי! מצאתי את {pet} (תג FindYpet מס׳ {id}). המיקום שלי:',
         hint: 'שיתוף המיקום הוא לא חובה. הוא נשלח רק לבעלים שלי, ורק כשלוחצים על הכפתור.',
         chipNote: 'לא מצליחים ליצור קשר? כל וטרינר או השירות הווטרינרי העירוני יכולים לסרוק את השבב שלי.',
         waText: 'היי! מצאתי את {pet} (תג FindYpet מס׳ {id}).', waHere: 'אני כאן:',
@@ -317,7 +317,7 @@
         owner: 'Мой хозяин:', notesTitle: 'Важно',
         stale: 'Показаны сохранённые данные — сервер сейчас медленный, но контакты работают.',
         call: 'Позвонить', wa: 'Отправить сообщение', waAria: 'Отправить сообщение хозяину в WhatsApp', call2: 'Позвонить второму контакту',
-        sendLoc: 'Передать геолокацию', sendLocWa: 'Передать геолокацию в WhatsApp', locSub: 'Одно нажатие — без приложения',
+        sendLoc: 'Передать геолокацию', locSub: 'Точка на карте — в WhatsApp', waLocText: 'Здравствуйте! Я нашёл(ла) {pet} (жетон FindYpet №{id}). Моё местоположение:',
         hint: 'Делиться геолокацией не обязательно. Она уходит только моему хозяину и только после нажатия кнопки.',
         chipNote: 'Не получается связаться? Любой ветеринар или муниципальная ветслужба могут считать мой микрочип.',
         waText: 'Здравствуйте! Я нашёл(ла) {pet} (жетон FindYpet №{id}).', waHere: 'Я здесь:',
@@ -358,10 +358,11 @@
       catch (e) { return ''; }
     }
 
-    function waLink() {
+    // Средняя кнопка — просто переписка; кнопка геолокации — сообщение с точкой на карте
+    function waLink(loc) {
       if (!pet || !pet.phone) return '#';
-      let text = t('waText').replace('{pet}', pet.pet_name).replace('{id}', pet.tag_id);
-      if (coords) text += ' ' + t('waHere') + ' https://maps.google.com/?q=' + coords.lat.toFixed(6) + ',' + coords.lon.toFixed(6);
+      let text = t(loc ? 'waLocText' : 'waText').replace('{pet}', pet.pet_name).replace('{id}', pet.tag_id);
+      if (loc) text += ' https://maps.google.com/?q=' + loc.lat.toFixed(6) + ',' + loc.lon.toFixed(6);
       return 'https://wa.me/' + pet.phone.replace(/\D/g, '') + '?text=' + encodeURIComponent(text);
     }
 
@@ -399,8 +400,8 @@
         $('call2Btn').classList.remove('hidden');
       }
       // Если владелец не подключил уведомления, отправляем геолокацию через WhatsApp
-      if (!locBtn.classList.contains('done')) $('locLabel').textContent = t(pet.can_notify ? 'sendLoc' : 'sendLocWa');
-      locBtn.classList.toggle('hidden', !pet.can_notify && !pet.phone);
+      if (!locBtn.classList.contains('done')) $('locLabel').textContent = t('sendLoc');
+      locBtn.classList.toggle('hidden', !pet.phone);
     }
 
     function applyLang() {
@@ -488,33 +489,27 @@
       setTimeout(() => { locBtn.disabled = false; }, 15000);
     }
 
+    // Геолокация сразу уходит в WhatsApp владельца (точка на карте).
+    // Если у владельца подключён Telegram, копия тихо уходит и туда — без ошибок для нашедшего.
     locBtn.addEventListener('click', () => {
+      if (!pet || !pet.phone) return;
       if (!('geolocation' in navigator)) return setStatus('unavailable', 'err');
       locBtn.disabled = true;
       setStatus('sending');
-      navigator.geolocation.getCurrentPosition(async (pos) => {
+      navigator.geolocation.getCurrentPosition((pos) => {
         coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-        $('waBtn').href = waLink();
-        if (!pet.can_notify) {
-          // Нет Telegram у владельца → открываем WhatsApp с точкой на карте
-          setStatus('');
-          locBtn.disabled = false;
-          window.location.href = waLink();
-          return;
+        if (pet.can_notify) {
+          try {
+            const body = JSON.stringify({ id_tag: tagId, lat: coords.lat, lon: coords.lon, accuracy: pos.coords.accuracy });
+            const url = `${API}/api/location`;
+            if (!(navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: 'application/json' })))) {
+              fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
+            }
+          } catch (e) {}
         }
-        try {
-          const res = await fetch(`${API}/api/location`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id_tag: tagId, lat: coords.lat, lon: coords.lon, accuracy: pos.coords.accuracy })
-          });
-          const d = await res.json();
-          if (d.success) markSent();
-          else if (d.error === 'not_linked') { locBtn.disabled = false; window.location.href = waLink(); }
-          else { setStatus('netErr', 'err'); locBtn.disabled = false; }
-        } catch (e) {
-          setStatus('netErr', 'err');
-          locBtn.disabled = false;
-        }
+        setStatus('');
+        locBtn.disabled = false;
+        window.location.href = waLink(coords);
       }, (err) => {
         setStatus(err.code === 1 ? 'denied' : 'unavailable', 'err');
         locBtn.disabled = false;

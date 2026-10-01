@@ -18,6 +18,7 @@ await test('landing, tag page, privacy and /t/ short link are served', async () 
   const t = await (await call(env, '/t/101')).text();
   assert.match(t, /Send Message/);
   assert.match(t, /id="i-wa"/);
+  assert.match(t, /waLocText/);
   const home = await (await call(env, '/')).text();
   assert.match(home, /fastest way home/);
   assert.doesNotMatch(home, /precise location/);
