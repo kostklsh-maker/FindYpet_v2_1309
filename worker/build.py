@@ -1,7 +1,7 @@
 """Собирает worker/dist/worker.js — один файл: код Worker'а + встроенный сайт из корня репозитория.
 
 Запуск из любой папки:  python3 worker/build.py
-Заодно обновляет js/plans.js (копия цен для GitHub Pages) из const PLANS в worker/src/worker.js.
+Заодно обновляет js/plans.js (копия цен) из const PRICING в worker/src/worker.js.
 """
 import json, base64, pathlib, re, subprocess
 
@@ -17,14 +17,14 @@ TYPES = {'.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
 src = (here / 'src/worker.js').read_text()
 assert '/*__EMBEDDED__*/null' in src, 'в src/worker.js нет метки /*__EMBEDDED__*/null'
 
-# 1) js/plans.js — копия цен для GitHub Pages
-m = re.search(r'const PLANS = (\{.*?\n\});', src, re.S)
-assert m, 'const PLANS не найден в worker/src/worker.js'
+# 1) js/plans.js — копия цен (на сайте её отдаёт сам Worker)
+m = re.search(r'const PRICING = (\{.*?\});', src, re.S)
+assert m, 'const PRICING не найден в worker/src/worker.js'
 plans = json.loads(subprocess.check_output(['node', '-e', f'process.stdout.write(JSON.stringify({m.group(1)}))']))
 (repo / 'js/plans.js').write_text(
-    '// Сгенерировано worker/build.py из const PLANS в worker/src/worker.js — не редактируйте вручную.\n'
-    '// На основном сайте этот файл отдаёт сам Worker; здесь — копия для GitHub Pages.\n'
-    'const PLANS = ' + json.dumps(plans, ensure_ascii=False, indent=4) + ';\n')
+    '// Сгенерировано worker/build.py из const PRICING в worker/src/worker.js — не редактируйте вручную.\n'
+    '// На сайте этот файл отдаёт сам Worker (/js/plans.js); здесь — копия для локального просмотра.\n'
+    'const PRICING = ' + json.dumps(plans, ensure_ascii=False, indent=4) + ';\n')
 
 # 2) Встраиваем сайт
 files = []

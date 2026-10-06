@@ -1,19 +1,8 @@
-// Сгенерировано worker/build.py из const PLANS в worker/src/worker.js — не редактируйте вручную.
-// На основном сайте этот файл отдаёт сам Worker; здесь — копия для GitHub Pages.
-const PLANS = {
-    "basic": {
-        "price": "49 ₪",
-        "name": "Basic",
-        "tags": 1
-    },
-    "smart": {
-        "price": "79 ₪",
-        "name": "Special",
-        "tags": 1
-    },
-    "family": {
-        "price": "199 ₪",
-        "name": "Family (3 tags)",
-        "tags": 3
-    }
+// Сгенерировано worker/build.py из const PRICING в worker/src/worker.js — не редактируйте вручную.
+// На сайте этот файл отдаёт сам Worker (/js/plans.js); здесь — копия для локального просмотра.
+const PRICING = {
+    "tag": 49,
+    "currency": "₪",
+    "bundle": 3,
+    "care": 29
 };

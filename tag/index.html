@@ -417,7 +417,7 @@
         $('phoneText').textContent = pet.phone_display || pet.phone;
         $('callBtn').classList.remove('hidden');
         $('waBtn').href = waLink();
-        // Telegram — только если хозяин подключил бота (тариф Смарт/Семейный): бот сам пишет ему
+        // Telegram — только если хозяин подключил бота: бот сам пишет ему
         $('tgBtn').classList.toggle('hidden', !pet.can_notify);
         $('msgRow').classList.toggle('one', !pet.can_notify);
         $('msgRow').classList.remove('hidden');
