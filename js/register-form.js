@@ -21,14 +21,27 @@
     }
     const selectedPlan = () => (form.querySelector('input[name="plan"]:checked') || {}).value || "smart";
 
-    // Кнопки "Выбрать" в карточках тарифов → отмечаем тариф в форме и переходим к ней
+    // Форма заказа скрыта, пока не выбран тариф: «Выбрать» в карточке → форма раскрывается под тарифами
+    const orderSec = document.getElementById("order");
+    function markChosen(plan) {
+        document.querySelectorAll(".plan").forEach(function (p) { p.classList.toggle("chosen", p.dataset.plan === plan); });
+    }
+    function openOrder(plan) {
+        orderSec.classList.remove("closed");
+        if (plan) {
+            const r = form.querySelector('input[name="plan"][value="' + plan + '"]');
+            if (r) { r.checked = true; r.dispatchEvent(new Event("change", { bubbles: true })); }
+        }
+        markChosen(selectedPlan());
+    }
     document.querySelectorAll(".choose").forEach(function (b) {
         b.addEventListener("click", function () {
-            const r = form.querySelector('input[name="plan"][value="' + b.dataset.plan + '"]');
-            if (r) { r.checked = true; r.dispatchEvent(new Event("change", { bubbles: true })); }
-            document.getElementById("order").scrollIntoView({ behavior: "smooth" });
+            openOrder(b.dataset.plan);
+            requestAnimationFrame(function () { orderSec.scrollIntoView({ behavior: "smooth" }); });
         });
     });
+    form.querySelectorAll('input[name="plan"]').forEach(function (r) { r.addEventListener("change", function () { markChosen(selectedPlan()); }); });
+    if (location.hash === "#order") openOrder();
 
     let lastOrder = null;
     function renderDone() {
