@@ -27,7 +27,7 @@ await test('landing, tag page, privacy and /t/ short link are served', async () 
   assert.doesNotMatch(home, /100 ₪/);
   assert.match(home, /id="plans"/);
   const plans = await (await call(env, '/js/plans.js')).text();
-  assert.match(plans, /const PRICING = \{"tag":49,"currency":"₪","bundle":3,"care":39\}/);
+  assert.match(plans, /const PRICING = \{"tag":49,"currency":"₪","bundle":4,"care":39\}/);
 });
 
 await test('register requires consent; validates phone2', async () => {
@@ -161,7 +161,7 @@ await test('cannot control someone else\'s tag', async () => {
   assert.match(lastTg('sendMessage').payload.text, /not linked to your Telegram/);
 });
 
-await test('bot registration: 2 + 1 → 2 pets + 1 spare, one order, production sheet', async () => {
+await test('bot registration: 3 + 1 → 2 pets + 2 spares (one each), one order, production sheet', async () => {
   const C = '7007';
   await tgUpdate(env, msg(C, '/register'));
   await tgUpdate(env, msg(C, 'Anna'));
@@ -171,21 +171,25 @@ await test('bot registration: 2 + 1 → 2 pets + 1 spare, one order, production 
   const planMsg = lastTg('sendMessage').payload;
   assert.match(planMsg.text, /How many tags\?/);
   assert.match(planMsg.text, /Lost mode, a second contact and notes/);
-  assert.deepEqual(planMsg.reply_markup.inline_keyboard.map((r) => r[0].text), ['1 tag — 49 ₪', '3 tags (2 + 1 free) — 98 ₪']);
-  await tgUpdate(env, cb(C, 'qty_3'));
+  assert.match(planMsg.text, /3 \+ 1 free — 147 ₪ for 4 tags/);
+  assert.deepEqual(planMsg.reply_markup.inline_keyboard.map((r) => [r[0].text, r[0].callback_data]),
+    [['1 tag — 49 ₪', 'qty_1'], ['2 tags — 98 ₪', 'qty_2'], ['4 tags (3 + 1 free) — 147 ₪', 'qty_4']]);
+  await tgUpdate(env, cb(C, 'qty_4'));
   const q = lastTg('sendMessage').payload;
-  assert.match(q.text, /3 tags \(2 \+ 1 free\)/);
-  assert.equal(q.reply_markup.inline_keyboard.length, 3);
+  assert.match(q.text, /4 tags \(3 \+ 1 free\)/);
+  assert.deepEqual(q.reply_markup.inline_keyboard.map((r) => r[0].text),
+    ['1 pet: Rex (+3 spare)', '2 pets (+2 spare)', '3 pets (+1 spare)', '4 pets']);
   await tgUpdate(env, cb(C, 'fam_n_2'));
   assert.match(lastTg('sendMessage').payload.text, /Name of pet #2/);
   await tgUpdate(env, msg(C, 'Mika'));
-  const sp = lastTg('sendMessage').payload;
-  assert.match(sp.text, /spare tag — for which pet/);
+  assert.match(lastTg('sendMessage').payload.text, /Spare tag 1 of 2 — for which pet/);
   await tgUpdate(env, cb(C, 'fam_sp_0'));
+  assert.match(lastTg('sendMessage').payload.text, /Spare tag 2 of 2 — for which pet/);
+  await tgUpdate(env, cb(C, 'fam_sp_1'));
   const conf = lastTg('sendMessage').payload.text;
   assert.match(conf, /Rex — 2 tags \(1 spare\)/);
-  assert.match(conf, /• Mika/);
-  assert.match(conf, /3 tags \(2 \+ 1 free\) — 98 ₪ · one-time/);
+  assert.match(conf, /Mika — 2 tags \(1 spare\)/);
+  assert.match(conf, /4 tags \(3 \+ 1 free\) — 147 ₪ · one-time/);
   assert.match(conf, /Privacy policy/);
   const n = state.tags.length;
   await tgUpdate(env, cb(C, 'reg_ok'));
@@ -194,18 +198,46 @@ await test('bot registration: 2 + 1 → 2 pets + 1 spare, one order, production 
   assert.ok(created.every((t) => t.telegram_chat_id === C && t.phone === '+972541112222' && t.address === 'Tel Aviv'));
   const rx = await KV.get(`x:${created[0].tag_id}`, 'json');
   assert.equal(rx.copies, 2); assert.equal(rx.order_id, `FY${created[0].tag_id}`);
-  assert.equal((await KV.get(`x:${created[1].tag_id}`, 'json')).copies, 1);
+  assert.equal((await KV.get(`x:${created[1].tag_id}`, 'json')).copies, 2);
   const order = await KV.get(`o:FY${created[0].tag_id}`, 'json');
   assert.equal(order.chat_id, C);
-  assert.equal(order.items.reduce((s, i) => s + i.copies, 0), 3);
+  assert.equal(order.items.reduce((s, i) => s + i.copies, 0), 4);
+  assert.deepEqual([order.tags_total, order.free, order.price], [4, 1, 147]);
   const admin = [...state.tg].reverse().find((c) => c.payload.chat_id === 'admin').payload.text;
-  assert.match(admin, /3 tags \(2 \+ 1\) · 98 ₪ — <b>3 physical tags<\/b>/);
-  assert.match(admin, /Tag 2 of 3 — #\d+ \(spare\)/);
+  assert.match(admin, /4 tags \(3 \+ 1\) · 147 ₪ — <b>4 physical tags<\/b>/);
+  assert.match(admin, /Tag 4 of 4 — #\d+ \(spare\)/);
   assert.match(admin, /Engrave front: <b>MIKA<\/b>/);
   const reg = state.tg.filter((c) => c.payload.chat_id === C && c.method === 'sendMessage').at(-2).payload.text;
-  assert.match(reg, /Order <b>FY\d+<\/b> · 3 tags \(2 \+ 1\) · 98 ₪/);
+  assert.match(reg, /Order <b>FY\d+<\/b> · 4 tags \(3 \+ 1\) · 147 ₪/);
   assert.match(reg, /\/care — FindYpet Care, coming soon/);
   assert.match(reg, /Rex<\/b> — tag #\d+ · 2 tags \(incl. 1 spare\)/);
+});
+
+await test('bot: 2 tags for one pet → a spare without questions, 98 ₪; old 2 + 1 button (qty_3) → 3 + 1', async () => {
+  const reg = async (C, pet, qtyBtn) => {
+    await tgUpdate(env, msg(C, '/register'));
+    for (const t of ['Gil', '054-121-2121', pet, 'Netanya']) await tgUpdate(env, msg(C, t));
+    await tgUpdate(env, cb(C, qtyBtn));
+  };
+  await reg('7101', 'Kiki', 'qty_2');
+  let q = lastTg('sendMessage').payload;
+  assert.match(q.text, /<b>2 tags\.<\/b> How many pets/);
+  assert.deepEqual(q.reply_markup.inline_keyboard.map((r) => r[0].text), ['1 pet: Kiki (+1 spare)', '2 pets']);
+  await tgUpdate(env, cb('7101', 'fam_n_1'));
+  let conf = lastTg('sendMessage').payload.text;
+  assert.match(conf, /Kiki — 2 tags \(1 spare\)/);
+  assert.match(conf, /💳 2 tags — 98 ₪ · one-time/);
+  await tgUpdate(env, cb('7101', 'reg_again'));
+  await tgUpdate(env, msg('7101', '/cancel'));
+  // кнопка из сообщения, отправленного до перехода на 3 + 1
+  await reg('7102', 'Momo', 'qty_3');
+  q = lastTg('sendMessage').payload;
+  assert.match(q.text, /4 tags \(3 \+ 1 free\)/);
+  await tgUpdate(env, cb('7102', 'fam_n_1'));
+  conf = lastTg('sendMessage').payload.text;
+  assert.match(conf, /Momo — 4 tags \(3 spare\)/);
+  assert.match(conf, /4 tags \(3 \+ 1 free\) — 147 ₪/);
+  await tgUpdate(env, msg('7102', '/cancel'));
 });
 
 await test('Telegram blocked → SMS fallback for location', async () => {
@@ -242,18 +274,18 @@ await test('setup reports KV status', async () => {
   assert.equal(d.setMyCommands.ok, true);
 });
 
-await test('site: 2 + 1 with 1 pet → one tag ×3 (2 spares), 98 ₪', async () => {
+await test('site: 3 + 1 with 1 pet → one tag ×4 (3 spares), 147 ₪', async () => {
   const n = state.tags.length;
   const d = await (await call(env, '/api/register', { method: 'POST', body: {
-    owner_name: 'Dana Levi', phone: '052-999-8877', pet_name: 'Luna', address: 'Haifa', consent: true, tags: 3 } })).json();
+    owner_name: 'Dana Levi', phone: '052-999-8877', pet_name: 'Luna', address: 'Haifa', consent: true, tags: 4 } })).json();
   assert.equal(d.success, true);
   assert.equal(state.tags.length, n + 1);
-  assert.equal(d.total_tags, 3); assert.equal(d.price, 98);
-  assert.deepEqual(d.tags.map((t) => [t.pet_name, t.copies]), [['Luna', 3]]);
+  assert.equal(d.total_tags, 4); assert.equal(d.price, 147);
+  assert.deepEqual(d.tags.map((t) => [t.pet_name, t.copies]), [['Luna', 4]]);
 });
 
 let famTokenTagIds;
-await test('site (old page sends plan=family): 3 pets → 3 rows, same owner data, one order', async () => {
+await test('site (old page sends plan=family): 3 pets + the free spare → 3 rows, same owner data, one order', async () => {
   const n = state.tags.length;
   const d = await (await call(env, '/api/register', { method: 'POST', body: {
     owner_name: 'Olga K', phone: '053-222-3344', pet_name: 'Tom', address: 'Ashdod, Herzl 5', consent: true, plan: 'family',
@@ -263,7 +295,8 @@ await test('site (old page sends plan=family): 3 pets → 3 rows, same owner dat
   assert.deepEqual(rows.map((t) => t.pet_name), ['Tom', 'Jerry', 'Spike']);
   assert.ok(rows.every((t) => t.owner_name === 'Olga K' && t.phone === '+972532223344' && t.address === 'Ashdod, Herzl 5'));
   assert.equal(new Set(rows.map((t) => t.tag_id)).size, 3);
-  assert.deepEqual(d.tags.map((t) => t.copies), [1, 1, 1]);
+  assert.deepEqual(d.tags.map((t) => t.copies), [2, 1, 1]);
+  assert.equal(d.total_tags, 4); assert.equal(d.price, 147);
   // второй контакт — для всех, заметки — только для первого питомца
   const x = await Promise.all(rows.map((t) => KV.get(`x:${t.tag_id}`, 'json')));
   assert.ok(x.every((e) => e.phone2 === '+972530001111' && e.order_id === d.order_id));
@@ -271,21 +304,34 @@ await test('site (old page sends plan=family): 3 pets → 3 rows, same owner dat
   famTokenTagIds = { token: d.telegram_link.split('start=')[1], ids: rows.map((t) => t.tag_id), order: d.order_id };
 });
 
-await test('site: 2 + 1 with 2 pets, spare for pet #2', async () => {
-  const d = await (await call(env, '/api/register', { method: 'POST', body: {
-    owner_name: 'Ron', phone: '054-555-6666', pet_name: 'Max', address: 'Eilat', consent: true, tags: 3,
-    pets: ['Bim'], spare_for: [1] } })).json();
-  assert.deepEqual(d.tags.map((t) => [t.pet_name, t.copies]), [['Max', 1], ['Bim', 2]]);
+await test('site: 3 + 1 with 2 pets, spares for pet #2 and pet #1; 4 pets — no spares', async () => {
+  let d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Ron', phone: '054-555-6666', pet_name: 'Max', address: 'Eilat', consent: true, tags: 4,
+    pets: ['Bim'], spare_for: [1, 0] } })).json();
+  assert.deepEqual(d.tags.map((t) => [t.pet_name, t.copies]), [['Max', 2], ['Bim', 2]]);
+  d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Ron', phone: '054-555-6666', pet_name: 'A1', address: 'Eilat', consent: true, tags: 4,
+    pets: ['A2', 'A3', 'A4', 'A5'] } })).json();
+  assert.deepEqual(d.tags.map((t) => [t.pet_name, t.copies]), [['A1', 1], ['A2', 1], ['A3', 1], ['A4', 1]]); // 5-й — в отдельный заказ
+  assert.equal(d.total_tags, 4); assert.equal(d.price, 147);
 });
 
-await test('site: 1 tag ignores extra pets; 2 tags become 2 + 1 (3 tags, 98 ₪)', async () => {
+await test('site: 1 tag ignores extra pets; 2 tags = 98 ₪ (no gift); 3 tags (old 2 + 1 page) become 3 + 1', async () => {
   let d = await (await call(env, '/api/register', { method: 'POST', body: {
     owner_name: 'Ron', phone: '054-555-6666', pet_name: 'Solo', address: 'Eilat', consent: true, tags: 1, pets: ['X', 'Y'] } })).json();
   assert.equal(d.tags.length, 1); assert.equal(d.total_tags, 1); assert.equal(d.price, 49);
   d = await (await call(env, '/api/register', { method: 'POST', body: {
     owner_name: 'Ron', phone: '054-555-6666', pet_name: 'Duo', address: 'Eilat', consent: true, tags: 2, pets: ['Trio'] } })).json();
-  assert.equal(d.total_tags, 3); assert.equal(d.price, 98);
-  assert.deepEqual(d.tags.map((t) => [t.pet_name, t.copies]), [['Duo', 2], ['Trio', 1]]);
+  assert.equal(d.total_tags, 2); assert.equal(d.price, 98);
+  assert.deepEqual(d.tags.map((t) => [t.pet_name, t.copies]), [['Duo', 1], ['Trio', 1]]);
+  d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Ron', phone: '054-555-6666', pet_name: 'Uno', address: 'Eilat', consent: true, tags: 2 } })).json();
+  assert.deepEqual(d.tags.map((t) => [t.pet_name, t.copies]), [['Uno', 2]]);
+  assert.equal((await KV.get(`o:${d.order_id}`, 'json')).free, 0);
+  d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Ron', phone: '054-555-6666', pet_name: 'Old', address: 'Eilat', consent: true, tags: 3, pets: ['Page'], spare_for: [1] } })).json();
+  assert.equal(d.total_tags, 4); assert.equal(d.price, 147);
+  assert.deepEqual(d.tags.map((t) => [t.pet_name, t.copies]), [['Old', 2], ['Page', 2]]);
 });
 
 await test('one Start links ALL tags of the order to Telegram', async () => {
@@ -349,6 +395,10 @@ await test('every tag has everything — old Basic orders too: alerts, second co
   await KV.put('o:FY1', JSON.stringify(legacy));
   await tgUpdate(env, msg('admin', '/orders'));
   assert.match(lastTg('sendMessage').payload.text, /FY1<\/b> · Special · 79 ₪/);
+  // заказ 06–07.10 по акции 2 + 1 — тоже как был
+  await KV.put('o:FY2', JSON.stringify({ ...legacy, order_id: 'FY2', plan: undefined, tags_total: 3, free: 1, price: 98 }));
+  await tgUpdate(env, msg('admin', '/orders'));
+  assert.match(lastTg('sendMessage').payload.text, /FY2<\/b> · 3 tags \(2 \+ 1\) · 98 ₪/);
 });
 
 await test('FindYpet Care: /care, waitlist sign-up (once), /start care, site checkbox reaches the admin', async () => {
@@ -372,13 +422,13 @@ await test('FindYpet Care: /care, waitlist sign-up (once), /start care, site che
   assert.match(lastTg('sendMessage').payload.text, /Wants to hear when FindYpet Care launches/);
 });
 
-await test('Family: each pet gets its own second contact and notes; spare tag copies the chosen pet', async () => {
+await test('several pets: each gets its own second contact and notes; spare tags copy the chosen pet', async () => {
   const d = await (await call(env, '/api/register', { method: 'POST', body: {
-    owner_name: 'Fam Fay', phone: '050-222-3333', pet_name: 'Alfa', address: 'Haifa', consent: true, plan: 'family',
-    pets: ['Beta'], spare_for: [1],
+    owner_name: 'Fam Fay', phone: '050-222-3333', pet_name: 'Alfa', address: 'Haifa', consent: true, tags: 4,
+    pets: ['Beta'], spare_for: [1, 1],
     pet_extras: [{ phone2: '052-111-0001', notes: 'Alfa notes' }, { phone2: '052-111-0002', notes: 'Beta notes' }] } })).json();
   assert.equal(d.success, true);
-  assert.deepEqual(d.tags.map((t) => [t.pet_name, t.copies]), [['Alfa', 1], ['Beta', 2]]);
+  assert.deepEqual(d.tags.map((t) => [t.pet_name, t.copies]), [['Alfa', 1], ['Beta', 3]]);
   const [xa, xb] = await Promise.all(d.tags.map((t) => KV.get(`x:${t.id_tag}`, 'json')));
   assert.equal(xa.phone2, '+972521110001'); assert.equal(xa.notes, 'Alfa notes');
   assert.equal(xb.phone2, '+972521110002'); assert.equal(xb.notes, 'Beta notes');
@@ -502,9 +552,9 @@ await test('test site: orders go to the test DB (KV), never to the Google Sheet'
   const sheetRows = state.tags.length;
   const d = await (await call(tenv, '/api/register', { method: 'POST', body: {
     owner_name: 'Test Owner', phone: '050-999-0000', pet_name: 'Testy', address: 'Haifa', consent: true,
-    plan: 'family', pets: ['Bonny'], spare_for: [0] } })).json();
+    tags: 4, pets: ['Bonny'], spare_for: [0, 1] } })).json();
   assert.equal(d.success, true);
-  assert.deepEqual(d.tags.map((t) => [t.id_tag, t.copies]), [['9001', 2], ['9002', 1]]);
+  assert.deepEqual(d.tags.map((t) => [t.id_tag, t.copies]), [['9001', 2], ['9002', 2]]);
   assert.equal(d.order_id, 'FY9001');
   assert.equal(d.tag_url, 'https://test.findy-pet.com/t/9001');
   assert.match(d.telegram_link, /^https:\/\/t\.me\/FindYpetTestBot\?start=[a-f0-9]{24}$/);
@@ -540,6 +590,52 @@ await test('test site: no scheduled reminders', async () => {
   await worker.scheduled({}, tenv, { waitUntil: (p) => pending.push(p) });
   await Promise.all(pending);
   assert.equal(state.tg.length, before);
+});
+
+await test('switch to 3 + 1: bot dialog started under 2 + 1 re-confirms the new price; double tap; old page warns admin', async () => {
+  // диалог дошёл до «Confirm» ещё при 2 + 1 (slots: 3, «3 tags — 98 ₪»)
+  const C = '7303';
+  state.states[C] = { step: 'confirm', owner_name: 'Old', phone: '+972541110000', pet_name: 'Bella',
+    address: 'Haifa', slots: 3, pets: ['Bella', 'Rex'], spare_for: [1] };
+  const n = state.tags.length;
+  await tgUpdate(env, cb(C, 'reg_ok'));
+  assert.equal(state.tags.length, n, 'no order yet — the customer has not seen 147 ₪');
+  const msgs = state.tg.filter((c) => c.payload.chat_id === C && c.method === 'sendMessage').slice(-2).map((c) => c.payload);
+  assert.match(msgs[0].text, /offer has changed: now <b>3 \+ 1 — 4 tags for 147 ₪/);
+  assert.match(msgs[1].text, /Spare tag 2 of 2 — for which pet/);
+  assert.deepEqual(msgs[1].reply_markup.inline_keyboard.map((r) => r[0].callback_data), ['fam_sp_1_0', 'fam_sp_1_1']);
+  await tgUpdate(env, cb(C, 'fam_sp_1_0'));
+  const before = state.tg.length;
+  await tgUpdate(env, cb(C, 'fam_sp_1_1'));            // второе нажатие по тому же вопросу — молча игнорируем
+  assert.equal(state.tg.filter((c, i) => i >= before && c.method === 'sendMessage').length, 0);
+  const conf = lastTg('sendMessage').payload.text;
+  assert.match(conf, /Bella — 2 tags \(1 spare\)/); assert.match(conf, /Rex — 2 tags \(1 spare\)/);
+  assert.match(conf, /4 tags \(3 \+ 1 free\) — 147 ₪/);
+  await tgUpdate(env, cb(C, 'reg_ok'));
+  assert.equal(state.tags.length, n + 2);
+  // заказ со страницы 2 + 1, открытой до обновления (tags: 3) → 3 + 1, админ видит предупреждение
+  const d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Tab', phone: '050-404-4040', pet_name: 'Lulu', address: 'Acre', consent: true, tags: 3 } })).json();
+  assert.equal(d.price, 147);
+  assert.match(lastTg('sendMessage').payload.text, /page opened before 3 \+ 1 \(it showed 3 tags for 98 ₪\)/);
+  await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'New', phone: '050-404-4041', pet_name: 'Lala', address: 'Acre', consent: true, tags: 4 } });
+  assert.doesNotMatch(lastTg('sendMessage').payload.text, /page opened before/);
+});
+
+await test('landing: 3 + 1 everywhere (1 / 2 / 4 tags in the form), no 2 + 1 left on the site', async () => {
+  const home = await (await call(env, '/')).text();
+  const i18n = await (await call(env, '/js/i18n.js')).text();
+  const app = await (await call(env, '/js/app.js')).text();
+  for (const [name, body] of [['index.html', home], ['i18n.js', i18n], ['app.js', app]]) {
+    assert.doesNotMatch(body, /2 \+ 1|3rd tag|третий в подарок|השלישי במתנה|data-price="three"|trioPer/, name);
+  }
+  assert.deepEqual([...home.matchAll(/name="qty" value="(\d)"/g)].map((m) => m[1]), ['1', '2', '4']);
+  assert.match(home, /class="btn btn-primary btn-block choose" data-qty="4"/);
+  assert.equal([...home.matchAll(/class="ftag" data-i="\d"/g)].length, 4);
+  assert.match(home, /data-i="3">\s*<div class="ft-head">.*class="ft-spare-chk" checked/); // 4-й (подарок) — запасной по умолчанию
+  assert.doesNotMatch(home, /data-i="2">\s*<div class="ft-head">.*class="ft-spare-chk" checked/);
+  for (const l of ['bundleBadge: "4th tag free"', 'bundleBadge: "התג הרביעי במתנה"', 'bundleBadge: "Четвёртый в подарок"']) assert.ok(i18n.includes(l), l);
 });
 
 // Проверки после выкладки (deploy-worker.yml) ищут строки в ответах Worker'а.

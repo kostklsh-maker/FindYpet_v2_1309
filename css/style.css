@@ -642,9 +642,17 @@ h2 { letter-spacing: -.01em; }
 .registration.closed { display: none; }
 .plan.chosen { border-color: var(--cta); box-shadow: 0 0 0 4px rgba(255,119,19,.55), var(--shadow-lg); }
 
-/* v11: один жетон + 2 + 1 + «Забота» (скоро) */
-.qty-pick { grid-template-columns: repeat(2, 1fr); }
-.qty-pick .pp-free { font-size: 12px; font-weight: 700; color: var(--cta); }
+/* v11/v13: один жетон, 2 жетона, 3 + 1 и «Забота» (скоро) */
+.qty-pick { grid-template-columns: repeat(3, 1fr); margin-bottom: 12px; }
+.qty-pick .pp-free { font-size: 12px; font-weight: 700; color: var(--cta); line-height: 1.2; }
+.upsell { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; background: #FFF5EC; border: 1.5px dashed #FFC59A; color: #7A3A06; border-radius: 12px; padding: 10px 12px; margin: 0 0 16px; font-size: 14px; font-weight: 500; line-height: 1.4; }
+.upsell[hidden] { display: none; }
+.upsell-btn { border: 0; background: var(--cta); color: #fff; font: inherit; font-weight: 700; font-size: 13.5px; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+.upsell-btn:hover { filter: brightness(1.05); }
+.ftag[hidden] { display: none; }
+.ft-gift { font-size: 12px; font-weight: 700; color: var(--cta); background: #FFF5EC; border-radius: 999px; padding: 2px 8px; margin-inline-start: 4px; margin-inline-end: auto; }
+.ft-gift[hidden] { display: none; }
+.fb-more { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
 .plan-care { opacity: .96; }
 .plan-care .plan-badge.plan-soon-badge { background: rgba(255,255,255,.14); color: #fff; }
 .plan-care .btn-outline { background: transparent; color: #fff; box-shadow: inset 0 0 0 2px rgba(255,255,255,.55); }
@@ -739,4 +747,17 @@ h2 { letter-spacing: -.01em; }
     .scr.chat .chat-top { margin: -46px -12px 2px; padding: 44px 12px 7px; }
     .scr.chat .bubble { font-size: 11px; line-height: 1.32; padding: 6px 8px; }
     .bubble.map-only .map { height: 72px; }
+}
+
+/* v13: узкие телефоны (320–360 px) — форма заказа не выходит за экран (русские слова длиннее) */
+.order-grid > * { min-width: 0; }
+.ft-head { flex-wrap: wrap; row-gap: 6px; }
+@media (max-width: 380px) {
+    .form-wrap { padding: 16px; }
+    .steps-line { gap: 6px; }
+    .steps-line li { gap: 5px; font-size: 12px; min-width: 0; }
+    .steps-line li span:first-child { width: 20px; height: 20px; flex: none; font-size: 11px; }
+    .family-box { padding: 12px; }
+    .ftag { padding: 10px 10px 2px; }
+    .qty-pick .pp-free { font-size: 11px; }
 }

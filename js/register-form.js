@@ -1,10 +1,10 @@
 // ============================================================
 // Заказ на сайте FindYpet
 // 1) данные → Worker → таблица FindYpetDatabase: по строке (tag_id) на каждого питомца
-//    (1 жетон или 3 по акции 2 + 1: до 3 питомцев; оставшиеся жетоны — запасные копии)
+//    (1, 2 или 4 жетона по акции 3 + 1: до 4 питомцев; оставшиеся жетоны — запасные копии)
 //    + доп. данные (второй телефон, заметки — у каждого питомца свои) → KV Worker'а
 // 2) пользователь нажимает "Open Telegram" → бот привязывает к чату ВСЕ жетоны заказа
-// Тексты — из js/i18n.js (функция t); блок Семейного тарифа — js/app.js (window.FYP_family)
+// Тексты — из js/i18n.js (функция t); карточки жетонов (питомец / запасной) — js/app.js (window.FYP_family)
 // ============================================================
 (function () {
     const form = document.getElementById("registerForm");
@@ -21,17 +21,17 @@
     }
     const selectedQty = () => +((form.querySelector('input[name="qty"]:checked') || {}).value || 1);
 
-    // Форма заказа скрыта, пока не нажали «Заказать» в карточке: 1 жетон или 2 + 1
+    // Форма заказа скрыта, пока не нажали «Заказать» в карточке: 1 жетон или 3 + 1
     const orderSec = document.getElementById("order");
     function markChosen(qty) {
         document.querySelectorAll(".plan").forEach(function (p) {
-            p.classList.toggle("chosen", p.dataset.plan === (qty >= 2 ? "three" : "one"));
+            p.classList.toggle("chosen", p.dataset.plan === (qty >= bundleSize() ? "bundle" : "one"));
         });
     }
     function openOrder(qty) {
         orderSec.classList.remove("closed");
         if (qty) {
-            const r = form.querySelector('input[name="qty"][value="' + (qty >= 2 ? 3 : 1) + '"]');
+            const r = form.querySelector('input[name="qty"][value="' + qty + '"]');
             if (r) { r.checked = true; r.dispatchEvent(new Event("change", { bubbles: true })); }
         }
         markChosen(selectedQty());

@@ -110,10 +110,10 @@
     const lostToggle = $("#lostToggle"), mini = $("#miniPage");
     lostToggle.addEventListener("change", function () { mini.classList.toggle("lost", lostToggle.checked); });
 
-    // ---------- Цены: 2 + 1 — сколько выходит за жетон ----------
+    // ---------- Цены: 3 + 1 — сколько выходит за жетон ----------
     function renderPricing() {
-        const per = priceOf("three") / 3;
-        $("#trioPer").textContent = per ? t("trioPer", { each: money(per) }) : "";
+        const n = bundleSize(), per = priceOf("bundle") / n;
+        $("#bundlePer").textContent = per ? t("bundlePer", { n: n, each: money(per), tag: money(priceOf("tag")) }) : "";
     }
 
     // ---------- Заказ: живой превью жетона и итог ----------
@@ -125,18 +125,29 @@
         $("#pvPhone").textContent = ph || "050-123-4567";
         $("#pvName").classList.toggle("long", (name || "BELLA").length > 8);
     }
-    // ---------- Заказ: 1 жетон или 2 + 1 ----------
+    // ---------- Заказ: 1, 2 или 4 (3 + 1) жетона ----------
     const qty = function () { const r = $('input[name="qty"]:checked'); return r ? +r.value : 1; };
     const multi = function () { return qty() >= 2; };
+    const range = function (a, b) { const r = []; for (let i = a; i < b; i++) r.push(i); return r; };
     function renderSummary() {
-        $("#sumPrice").textContent = money(orderTotal(qty()));
-        $("#sumFreeRow").hidden = !multi();
+        const q = qty();
+        $("#sumPrice").textContent = money(orderTotal(q));
+        $("#sumFreeRow").hidden = q < bundleSize();
         $$(".plan-pick label").forEach(function (l) { l.classList.toggle("on", l.querySelector("input").checked); });
+        // 2 жетона: ещё один за 49 ₪ — и четвёртый в подарок
+        const up = $("#upsell");
+        up.hidden = q !== 2;
+        $("#upsellText").textContent = t("upsell", { tag: money(priceOf("tag")), n: bundleSize(), bundle: money(priceOf("bundle")) });
     }
-    // 2 + 1: 3 карточки «Метка 1/2/3». Метка 1 — питомец из поля «Кличка». Метки 2 и 3 — свой питомец
+    $("#upsellBtn").addEventListener("click", function () {
+        const r = $('input[name="qty"][value="' + bundleSize() + '"]');
+        if (r) { r.checked = true; r.dispatchEvent(new Event("change", { bubbles: true })); }
+    });
+    // 2 или 4 карточки «Метка 1…4». Метка 1 — питомец из поля «Кличка». Остальные — свой питомец
     // (кличка, второй контакт, заметки) или галочка «Запасная» + для какого питомца.
+    // По умолчанию в 3 + 1 метка 4 (подарок) — запасная.
     const ftags = $$(".ftag");
-    const isSpare = function (i) { return i > 0 && multi() && ftags[i].querySelector(".ft-spare-chk").checked; };
+    const isSpare = function (i) { return i > 0 && i < qty() && ftags[i].querySelector(".ft-spare-chk").checked; };
     const cardName = function (i) {
         const v = i === 0 ? petIn.value.trim() : ftags[i].querySelector(".ft-name").value.trim();
         return v || t("petN", { i: i + 1 });
@@ -144,14 +155,15 @@
     // Состав заказа для register-form.js
     function famData() {
         if (!multi()) return { pets: [], spare_for: [], pet_extras: [], missing: false, items: [{ name: petIn.value.trim() || t("petN", { i: 1 }), copies: 1 }] };
-        const petCards = [0, 1, 2].filter(function (i) { return !isSpare(i); });
+        const n = qty();
+        const petCards = range(0, n).filter(function (i) { return !isSpare(i); });
         const items = petCards.map(function (i) {
             const c = ftags[i];
             return { name: cardName(i), copies: 1, card: i,
                 phone2: c.querySelector(".ft-phone2").value.trim(), notes: c.querySelector(".ft-notes").value.trim() };
         });
         const spareFor = [];
-        [1, 2].forEach(function (i) {
+        range(1, n).forEach(function (i) {
             if (!isSpare(i)) return;
             const want = +ftags[i].querySelector(".ft-for-sel").value || 0;
             const idx = Math.max(petCards.indexOf(want), 0);
@@ -168,12 +180,16 @@
     }
     window.FYP_family = famData;
     function renderOrder() {
-        const fam = multi();
+        const fam = multi(), n = qty();
         $("#familyBox").hidden = !fam;
-        $("#moreBox").hidden = fam;   // при 3 жетонах второй контакт и заметки — в карточке каждой метки
-        const petCards = [0, 1, 2].filter(function (i) { return !isSpare(i); });
+        $("#moreBox").hidden = fam;   // при нескольких жетонах второй контакт и заметки — в карточке каждой метки
+        $("#famTitle").textContent = t("famQ", { n: n });
+        const petCards = range(0, n).filter(function (i) { return !isSpare(i); });
         ftags.forEach(function (c, i) {
+            c.hidden = i >= n;
             c.querySelector(".ft-n").textContent = t("tagN", { n: i + 1 });
+            const gift = c.querySelector(".ft-gift");
+            if (gift) gift.hidden = n < bundleSize();
             if (i === 0) { $("#ft0Name").textContent = petIn.value.trim(); return; }
             const spare = isSpare(i);
             c.classList.toggle("is-spare", spare);
@@ -186,7 +202,8 @@
                 o.value = String(pi); o.textContent = cardName(pi);
                 sel.appendChild(o);
             });
-            sel.value = petCards.indexOf(+keep) >= 0 ? keep : "0";
+            // при первом показе keep = "" → выбираем питомца 1 (иначе поле выглядит пустым)
+            sel.value = keep !== "" && petCards.indexOf(+keep) >= 0 ? keep : "0";
         });
         const d = famData();
         const ul = $("#famSummary");
@@ -197,7 +214,7 @@
             ul.appendChild(li);
         });
         // Итог и превью: сколько физических жетонов
-        const total = fam ? 3 : 1;
+        const total = n;
         $("#sumTags").textContent = String(total);
         const cnt = $("#pvCount");
         cnt.hidden = total < 2;
@@ -220,7 +237,21 @@
 
     petIn.addEventListener("input", renderPreview);
     phoneIn.addEventListener("input", renderPreview);
-    $$('input[name="qty"]').forEach(function (r) { r.addEventListener("change", function () { renderSummary(); renderOrder(); }); });
+    // 1 жетон ↔ несколько: второй контакт и заметки переезжают между общим блоком и карточкой «Метка 1»
+    let wasMulti = multi();
+    function carryExtras() {
+        const now = multi();
+        if (now === wasMulti) return;
+        const c0 = ftags[0], pairs = [["#phone2", ".ft-phone2"], ["#notes", ".ft-notes"]];
+        pairs.forEach(function (p) {
+            const one = $(p[0]), card = c0.querySelector(p[1]);
+            const from = now ? one : card, to = now ? card : one;
+            if (from.value.trim() && !to.value.trim()) to.value = from.value;
+        });
+        if (now && (c0.querySelector(".ft-phone2").value || c0.querySelector(".ft-notes").value)) c0.querySelector(".ft-more").open = true;
+        wasMulti = now;
+    }
+    $$('input[name="qty"]').forEach(function (r) { r.addEventListener("change", function () { carryExtras(); renderSummary(); renderOrder(); }); });
     // Кнопки «Выбрать» (логика выбора — в register-form.js), тут только обновляем итог
     $$(".choose").forEach(function (b) { b.addEventListener("click", function () { setTimeout(function () { renderSummary(); renderOrder(); }, 0); }); });
 

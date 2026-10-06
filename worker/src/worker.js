@@ -6,7 +6,7 @@
  *   • отдаёт сайт — главная, страница метки /tag/?id=101 (и короткая /t/101),
  *     политика конфиденциальности /privacy/
  *   • API для сайта:
- *        POST /api/register   — заказ с сайта: 1 жетон или 3 (2 + 1: питомцы + запасные)
+ *        POST /api/register   — заказ с сайта: 1, 2 или 4 жетона (3 + 1: питомцы + запасные)
  *        GET  /api/tag?id=101 — данные питомца для страницы метки (с резервным кэшем)
  *        POST /api/scan       — "метку отсканировали" (уведомление владельцу)
  *        POST /api/location   — геолокация от нашедшего → владельцу
@@ -97,31 +97,44 @@ const BTN_SKIP = '➡️ Skip';
 const REMINDER_DAYS = 180;
 
 // ---------------------------------------------------------------
-// Цены (с 06.10.2026). ЕДИНСТВЕННОЕ место, где они задаются: отсюда их берут сайт
+// Цены (с 07.10.2026). ЕДИНСТВЕННОЕ место, где они задаются: отсюда их берут сайт
 // (/js/plans.js → const PRICING) и бот.
 //  • tag    — один жетон, разовая оплата; в каждом жетоне ВСЕ функции (см. feats)
-//  • 2 + 1  — в заказе на выбор: 1 жетон или 3 жетона по цене двух (третий в подарок:
-//             для третьего питомца или запасная копия жетона одного из питомцев)
+//  • bundle — акция 3 + 1: 4 жетона по цене трёх (четвёртый в подарок: для четвёртого питомца
+//             или запасная копия жетона одного из питомцев). В заказе на выбор 1, 2 или 4 жетона.
 //  • care   — программа «Забота», ₪ в месяц за ВЛАДЕЛЬЦА (все его питомцы). Пока НЕ продаётся — только лист ожидания
 //             (/care в боте, галочка в форме заказа), пока нет сервисов и онлайн-оплаты.
+// Заказы 06.10–07.10.2026 были по акции 2 + 1 (3 жетона за 98 ₪) — у них в заказе сохранены
+// tags_total / free / price, поэтому они и дальше показываются как «3 tags (2 + 1) · 98 ₪».
 // ---------------------------------------------------------------
-const PRICING = { tag: 49, currency: '₪', bundle: 3, care: 39 };
-/** 1 или 3 жетона: два жетона стоят столько же, сколько три, поэтому 2 превращается в 2 + 1. */
-function normQty(n) { return Number(n) >= 2 ? PRICING.bundle : 1; }
+const PRICING = { tag: 49, currency: '₪', bundle: 4, care: 39 };
+/**
+ * Сколько жетонов в заказе: 1, 2 или 4 (3 + 1). Три жетона стоят столько же, сколько четыре,
+ * поэтому 3 (и больше) превращается в 3 + 1. Старая страница 2 + 1 присылала 3 — тоже 3 + 1.
+ */
+function normQty(n) {
+  const v = Math.floor(Number(n)) || 1;
+  if (v >= PRICING.bundle - 1) return PRICING.bundle;
+  return v >= 2 ? 2 : 1;
+}
 function orderPrice(n) {
   const tags = normQty(n);
-  const free = Math.floor(tags / 3);
+  const free = tags === PRICING.bundle ? 1 : 0;
   return { tags, free, paid: tags - free, total: (tags - free) * PRICING.tag };
 }
 function ils(n) { return `${n} ${PRICING.currency}`; }
 function qtyLabel(n) {
   const p = orderPrice(n);
-  return p.tags === 1 ? `1 tag — ${ils(p.total)}` : `${p.tags} tags (2 + 1 free) — ${ils(p.total)}`;
+  if (p.tags === 1) return `1 tag — ${ils(p.total)}`;
+  return `${p.tags} tags${p.free ? ` (${p.paid} + ${p.free} free)` : ''} — ${ils(p.total)}`;
 }
 // Заказы до 06.10.2026 были по тарифам — показываем их как раньше
 const LEGACY_PLANS = { basic: 'Basic · 49 ₪', smart: 'Special · 79 ₪', family: 'Family · 199 ₪' };
 function orderLabel(o) {
-  if (o && o.price) return `${o.tags_total} tag${o.tags_total > 1 ? 's' : ''}${o.free ? ' (2 + 1)' : ''} · ${ils(o.price)}`;
+  if (o && o.price) {
+    const t = Number(o.tags_total) || 1, f = Number(o.free) || 0;
+    return `${t} tag${t > 1 ? 's' : ''}${f ? ` (${t - f} + ${f})` : ''} · ${ils(o.price)}`;
+  }
   return (o && LEGACY_PLANS[o.plan]) || '—';
 }
 
@@ -258,8 +271,8 @@ async function apiRegister(request, env, url, ctx) {
   if (!phone) return json({ success: false, error: 'Please enter a valid phone number.', error_code: 'phone' }, env, 400);
   if (phone2Raw && !phone2) return json({ success: false, error: 'Second phone is not valid.', error_code: 'phone2' }, env, 400);
   if (b.consent !== true) return json({ success: false, error: 'Consent is required.', error_code: 'consent' }, env, 400);
-  // 1 жетон или 3 (2 + 1). Старая страница могла прислать plan — Семейный = 3 жетона.
-  const qty = normQty(b.tags !== undefined ? b.tags : (b.plan === 'family' ? 3 : 1));
+  // 1, 2 или 4 (3 + 1) жетона. Очень старая страница могла прислать plan — Семейный = набор.
+  const qty = normQty(b.tags !== undefined ? b.tags : (b.plan === 'family' ? PRICING.bundle : 1));
   const lang = ['en', 'he', 'ru'].includes(b.lang) ? b.lang : 'en';
 
   const items = orderItems(qty, pet, b.pets, b.spare_for);
@@ -277,6 +290,8 @@ async function apiRegister(request, env, url, ctx) {
   const res = await createOrder(env, url, {
     source: 'site', qty, lang, owner_name: owner, phone, address, items, phone2, notes,
     care_interest: b.care === true,
+    // 3 жетона присылала только страница 2 + 1, открытая до 07.10 (там было «98 ₪») — админ уточнит цену
+    old_offer: Number(b.tags) === 3,
   });
   if (!res.ok) return json({ success: false, error: 'Database error. Please try again.', error_code: 'db' }, env, 502);
   ctx.waitUntil(Promise.all(res.tags.map((t) => cachePublic(env, t))));
@@ -323,7 +338,7 @@ function orderItems(qty, firstPet, morePets, spareFor) {
  * отправляет админу один лист производства. o: { source, qty, lang, owner_name, phone,
  * address, items, phone2?, notes?, chat_id?, care_interest? }
  */
-async function createOrder(env, url, o) {
+async function createOrder(env, url, o) { // + old_offer?: заказ со страницы, открытой до 3 + 1
   const tags = [];
   for (let i = 0; i < o.items.length; i++) {
     let r = await db(env, 'register', {
@@ -361,6 +376,7 @@ async function createOrder(env, url, o) {
     order_id, created_at: now, source: o.source, lang: o.lang || 'en',
     ...(() => { const pr = orderPrice(o.qty); return { tags_total: pr.tags, free: pr.free, price: pr.total }; })(),
     ...(o.care_interest ? { care_interest: true } : {}),
+    ...(o.old_offer ? { old_offer: true } : {}),
     owner_name: o.owner_name, phone: o.phone, address: o.address,
     items, missing, chat_id: o.chat_id || '',
     tokens: Object.fromEntries(tags.map((t) => [String(t.tag_id), t.link_token || ''])),
@@ -742,6 +758,7 @@ async function handleUpdate(update, env, url) {
   }
   if (st.step === 'f_pet') {
     if (!text || text === BTN_CANCEL) return send(env, chatId, `🐾 Name of pet #${st.pets.length + 1}?`, cancelKb());
+    st.slots = normQty(st.slots || 1); // диалог мог начаться до 3 + 1 (slots: 3)
     st.pets.push(str(text, 40));
     if (st.pets.length < st.fam_n) {
       await db(env, 'setState', { chat_id: chatId, state: st });
@@ -757,13 +774,15 @@ async function handleUpdate(update, env, url) {
 }
 
 function askQty(env, chatId) {
+  const b = orderPrice(PRICING.bundle);
   return send(env, chatId,
     '🏷 <b>How many tags?</b> One-time payment, no subscription needed.\n\n' +
     `• <b>1 tag — ${ils(orderPrice(1).total)}</b>\n` +
-    `• <b>2 + 1 free — ${ils(orderPrice(3).total)} for 3 tags</b>: for 2–3 pets, or a spare copy of a pet's tag\n\n` +
+    `• <b>2 tags — ${ils(orderPrice(2).total)}</b>: for 2 pets, or a pet and a spare copy of its tag\n` +
+    `• <b>${b.paid} + ${b.free} free — ${ils(b.total)} for ${b.tags} tags</b>: for 3–4 pets, or fewer pets plus spare tags\n\n` +
     'Every tag includes everything: call, WhatsApp and Telegram from the page, scan and location alerts, ' +
     'Lost mode, a second contact and notes for the finder.',
-    { inline_keyboard: [[{ text: qtyLabel(1), callback_data: 'qty_1' }], [{ text: qtyLabel(3), callback_data: 'qty_3' }]] });
+    { inline_keyboard: [1, 2, PRICING.bundle].map((n) => [{ text: qtyLabel(n), callback_data: `qty_${n}` }]) });
 }
 
 function confirmMessage(env, chatId, st, url) {
@@ -807,21 +826,21 @@ async function handleCallback(cq, env, url) {
     }
   }
 
-  // --- регистрация: 1 жетон или 2 + 1 (plan_* — кнопки из старых сообщений) ---
+  // --- регистрация: 1, 2 или 4 (3 + 1) жетона (qty_3 и plan_* — кнопки из старых сообщений) ---
   const qm = /^(?:qty_(\d)|plan_(\w+))$/.exec(data);
   if (qm) {
     const st = (await db(env, 'getState', { chat_id: chatId })).state;
     if (!st || (st.step !== 'qty' && st.step !== 'plan')) return send(env, chatId, 'Session expired. Tap /register to start again.', mainMenu());
     await tg(env, 'editMessageReplyMarkup', { chat_id: chatId, message_id: cq.message.message_id, reply_markup: { inline_keyboard: [] } });
-    st.slots = normQty(qm[1] ? Number(qm[1]) : (qm[2] === 'family' ? 3 : 1));
+    st.slots = normQty(qm[1] ? Number(qm[1]) : (qm[2] === 'family' ? PRICING.bundle : 1));
     st.pets = [st.pet_name];
     st.spare_for = [];
     if (st.slots > 1) {
       st.step = 'f_count';
       await db(env, 'setState', { chat_id: chatId, state: st });
-      const n = st.slots;
+      const n = st.slots, pr = orderPrice(n);
       return send(env, chatId,
-        `🏷 <b>${n} tags (2 + 1 free).</b> How many pets will wear them?\n\n` +
+        `🏷 <b>${n} tags${pr.free ? ` (${pr.paid} + ${pr.free} free)` : ''}.</b> How many pets will wear them?\n\n` +
         'Each pet gets its own tag and page. Tags left over become <b>spare tags</b> — an exact copy of a pet\'s tag ' +
         '(same page and link), handy if one gets lost.',
         { inline_keyboard: Array.from({ length: n }, (_, k) => k + 1).map((c) =>
@@ -835,14 +854,19 @@ async function handleCallback(cq, env, url) {
   // --- «Забота»: записаться в лист ожидания ---
   if (data === 'care_yes') return careJoin(chatId, env, cq.from);
 
-  // --- 3 жетона: сколько питомцев / для кого запасной ---
-  const fm = /^fam_(n|sp)_(\d)$/.exec(data);
+  // --- 2 или 4 жетона: сколько питомцев / для кого каждый запасной ---
+  // fam_sp_<k>_<i>: ответ на k-й вопрос о запасном (fam_sp_<i> — кнопки из старых сообщений)
+  const fm = /^fam_(n|sp)_(\d)(?:_(\d))?$/.exec(data);
   if (fm) {
     const st = (await db(env, 'getState', { chat_id: chatId })).state;
     const want = fm[1] === 'n' ? 'f_count' : 'f_spare';
+    if (st && fm[1] === 'sp' && (st.step === 'confirm' || (st.step === want && fm[3] !== undefined && Number(fm[2]) !== (st.spare_for || []).length))) {
+      return; // на этот вопрос уже ответили (двойное нажатие или старое сообщение)
+    }
     if (!st || st.step !== want) return send(env, chatId, 'Session expired. Tap /register to start again.', mainMenu());
     await tg(env, 'editMessageReplyMarkup', { chat_id: chatId, message_id: cq.message.message_id, reply_markup: { inline_keyboard: [] } });
-    const v = Number(fm[2]);
+    st.slots = normQty(st.slots || 1); // диалог мог начаться до 3 + 1 (slots: 3)
+    const v = Number(fm[3] !== undefined ? fm[3] : fm[2]);
     if (fm[1] === 'n') {
       st.fam_n = Math.min(Math.max(v, 1), st.slots || 1);
       if (st.fam_n > 1) {
@@ -852,10 +876,8 @@ async function handleCallback(cq, env, url) {
       }
       return afterFamilyPets(env, chatId, st, url);
     }
-    st.spare_for = [v < st.pets.length ? v : 0];
-    st.step = 'confirm';
-    await db(env, 'setState', { chat_id: chatId, state: st });
-    return confirmMessage(env, chatId, st, url);
+    st.spare_for = [...(st.spare_for || []), v < st.pets.length ? v : 0];
+    return askSpareOrConfirm(env, chatId, st, url);
   }
 
   // --- админ: статус заказа ---
@@ -875,6 +897,14 @@ async function handleCallback(cq, env, url) {
 
   const st = (await db(env, 'getState', { chat_id: chatId })).state;
   if (!st || st.step !== 'confirm') return send(env, chatId, 'Session expired. Tap /register to start again.', mainMenu());
+  // Подтверждение, показанное до 07.10 (2 + 1: «3 tags — 98 ₪»): сначала новые условия, потом снова «Confirm»
+  if ((st.slots || 1) !== normQty(st.slots || 1)) {
+    st.slots = normQty(st.slots);
+    const b = orderPrice(st.slots);
+    await send(env, chatId, `ℹ️ Our offer has changed: now <b>${b.paid} + ${b.free} — ${b.tags} tags for ${ils(b.total)}</b>. ` +
+      'Your order gets one more tag — please check the details once more.');
+    return askSpareOrConfirm(env, chatId, st, url);
+  }
 
   const qty = st.slots || 1;
   const res = await createOrder(env, url, {
@@ -888,16 +918,22 @@ async function handleCallback(cq, env, url) {
   await sendRegistered(chatId, res.tags, env, url, res.order);
 }
 
-/** После ввода кличек: спросить, для кого запасной (если питомцев 2), иначе — подтверждение. */
+/** После ввода кличек: для кого каждый запасной жетон (если питомцев несколько), затем подтверждение. */
 async function afterFamilyPets(env, chatId, st, url) {
+  st.spare_for = [];
+  return askSpareOrConfirm(env, chatId, st, url);
+}
+async function askSpareOrConfirm(env, chatId, st, url) {
   const spares = (st.slots || 1) - st.pets.length;
-  if (spares > 0 && st.pets.length > 1) {
+  const done = (st.spare_for || []).length;
+  // один питомец — все запасные его, спрашивать не о чем
+  if (spares > 0 && st.pets.length > 1 && done < spares) {
     st.step = 'f_spare';
     await db(env, 'setState', { chat_id: chatId, state: st });
-    return send(env, chatId, '🏷 The spare tag — for which pet? It will be an exact copy of that pet\'s tag.',
-      { inline_keyboard: st.pets.map((n, i) => [{ text: `🐾 ${n}`, callback_data: `fam_sp_${i}` }]) });
+    const q = spares === 1 ? '🏷 The spare tag — for which pet?' : `🏷 Spare tag ${done + 1} of ${spares} — for which pet?`;
+    return send(env, chatId, `${q} It will be an exact copy of that pet's tag.`,
+      { inline_keyboard: st.pets.map((n, i) => [{ text: `🐾 ${n}`, callback_data: `fam_sp_${done}_${i}` }]) });
   }
-  st.spare_for = [];
   st.step = 'confirm';
   await db(env, 'setState', { chat_id: chatId, state: st });
   return confirmMessage(env, chatId, st, url);
@@ -963,7 +999,7 @@ async function turnLostOn(chatId, id, area, env, url) {
 
   await send(env, chatId,
     `🚨 <b>Lost mode is ON for ${esc(tag.pet_name)}.</b>\n\n` +
-    `The tag page now says "My family has reported me missing"` + (area ? ` and shows the area: ${esc(area)}` : '') + '.\n' +
+    `The tag page has turned red: "I'm lost 😢 — My family is looking for me"` + (area ? `, last seen: ${esc(area)}` : '') + '.\n' +
     `Every scan will be reported to you immediately.\n\n` +
     `📣 <b>Forward this to local groups</b> (neighbours, dog owners, lost pets groups):\n\n` +
     `<code>${esc(share)}</code>\n\n` +
@@ -1147,7 +1183,8 @@ async function notifyAdmin(env, url, order) {
       `👤 ${esc(order.owner_name)} · 📱 ${esc(prettyPhone(normalizePhone(order.phone)))}\n` +
       `🏠 ${esc(order.address)}\n` +
       `Telegram: ${order.chat_id ? '✅ linked' : '⏳ not yet (updates will go to Telegram once linked)'}\n` +
-      (order.care_interest ? '💚 Wants to hear when FindYpet Care launches\n' : '') + '\n' +
+      (order.care_interest ? '💚 Wants to hear when FindYpet Care launches\n' : '') +
+      (order.old_offer ? '⚠️ Ordered from a page opened before 3 + 1 (it showed 3 tags for 98 ₪) — agree the price with the customer.\n' : '') + '\n' +
       blocks.join('\n\n') + missing +
       `\n\nSet the status when it changes — the customer gets a message:`,
     reply_markup: { inline_keyboard: [[
