@@ -63,7 +63,7 @@ jobs:
           page=$(curl -fsS "$base/")
           echo "$page" | grep -q 'fastest way home'
           if echo "$page" | grep -q 'fyp-test-banner'; then echo "::error::production shows the TEST banner"; exit 1; fi
-          curl -fsS "$base/js/plans.js" | grep -q 'PLANS'
+          curl -fsS "$base/js/plans.js" | grep -q 'const PRICING'
           code=$(curl -s -o /dev/null -w '%{http_code}' "$base/t/1")
           test "$code" = "200"
           echo "workers.dev is up ✅"
@@ -93,6 +93,7 @@ jobs:
           echo "$page" | grep -q 'fastest way home'
           echo "$page" | grep -q 'fyp-test-banner'
           curl -fsSI "$base/" | grep -qi '^x-robots-tag: noindex'
+          curl -fsS "$base/js/plans.js" | grep -q 'const PRICING'
           curl -fsS "$base/api/tag?id=1" | grep -q '"found":false'
           echo "staging workers.dev is up ✅"
           # Свой адрес: при первом подключении сертификат выпускается несколько минут
