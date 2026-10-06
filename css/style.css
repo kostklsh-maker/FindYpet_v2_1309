@@ -589,11 +589,12 @@ h2 { letter-spacing: -.01em; }
 
 /* Тарифы: Смарт на тёмном */
 .plan { border-width: 1px; }
-.plan.featured { background: var(--deep); border-color: var(--deep); color: #fff; box-shadow: var(--shadow-lg); }
-.plan.featured .plan-for, .plan.featured .plan-per { color: #A9C7C6; }
-.plan.featured .checks li::before { background: rgba(255,255,255,.12) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FF7713' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center/12px no-repeat; }
+/* v10: все три тарифа одного цвета — тёмно-зелёные */
+.plan, .plan.featured { background: var(--deep); border-color: var(--deep); color: #fff; box-shadow: var(--shadow-lg); }
+.plan .plan-for, .plan .plan-per { color: #A9C7C6; }
+.plan .checks li::before { background: rgba(255,255,255,.12) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FF7713' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center/12px no-repeat; }
 .plan.recommended { border-color: var(--cta); }
-.plan.featured.recommended { box-shadow: 0 0 0 4px rgba(255,119,19,.35), var(--shadow-lg); }
+.plan.recommended, .plan.featured.recommended { box-shadow: 0 0 0 4px rgba(255,119,19,.35), var(--shadow-lg); }
 .plan-badge { background: var(--cta); color: var(--ink); }
 .plan-save { background: var(--cta); color: var(--ink); }
 .plan-pick .pp { color: var(--brand2); }
@@ -635,4 +636,8 @@ h2 { letter-spacing: -.01em; }
 }
 /* Узкие телефоны: полный логотип вместо кнопки в шапке (заказ — в первом экране и в нижней панели) */
 @media (max-width: 480px) { .header-cta { display: none; } }
-.plan.featured .plan-soon { background: rgba(255,255,255,.1); color: rgba(255,255,255,.85); }
+.plan .plan-soon { background: rgba(255,255,255,.1); color: rgba(255,255,255,.85); }
+
+/* v10: форма заказа скрыта, пока не выбран тариф; выбранная карточка подсвечена */
+.registration.closed { display: none; }
+.plan.chosen { border-color: var(--cta); box-shadow: 0 0 0 4px rgba(255,119,19,.55), var(--shadow-lg); }
