@@ -462,8 +462,19 @@ input[type="text"]:focus, input[type="tel"]:focus, textarea:focus { outline: non
 /* ---------- v7: заказ из нескольких жетонов, экран «что дальше» ---------- */
 .family-box { background: var(--soft); border: 1.5px solid #CFE7E5; border-radius: 16px; padding: 16px; margin: 2px 0 16px; }
 .fb-title { display: block; font-weight: 700; font-size: 15px; margin-bottom: 10px; }
-.family-box .seg { background: #fff; }
-.family-box .seg button.on { background: var(--brand); color: #fff; }
+.ftag { background: #fff; border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 14px 4px; margin-bottom: 10px; }
+.ftag.is-spare { background: transparent; border-style: dashed; padding-bottom: 2px; }
+.ft-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.ft-head .ft-n { font-size: 14px; color: var(--brand2); }
+.ft-pet { font-weight: 700; font-size: 15px; }
+.family-box .ft-spare { display: flex !important; align-items: center; gap: 8px; margin: 0 !important; font-size: 14px; font-weight: 600; cursor: pointer; }
+.family-box .ft-spare > span { display: inline !important; margin: 0 !important; }
+.ft-spare input { width: 20px; height: 20px; accent-color: var(--brand); }
+.ft-more { margin: 0 0 8px; }
+.ft-more summary { cursor: pointer; color: var(--brand2); font-weight: 600; font-size: 14px; margin-bottom: 10px; list-style: none; }
+.ft-more summary::-webkit-details-marker { display: none; }
+.ft-for select { width: 100%; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px; font-size: 16px; font-family: inherit; background: #fff; color: var(--ink); }
+.plan-soon { font-size: 13px; color: var(--muted); background: var(--soft); border-radius: 12px; padding: 10px 12px; margin: -4px 0 16px; line-height: 1.45; }
 .fb-hint { font-size: 13px; color: var(--muted); margin: 10px 0 12px; }
 .family-box label { display: block; margin-bottom: 12px; }
 .family-box label > span:first-child { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
@@ -624,3 +635,4 @@ h2 { letter-spacing: -.01em; }
 }
 /* Узкие телефоны: полный логотип вместо кнопки в шапке (заказ — в первом экране и в нижней панели) */
 @media (max-width: 480px) { .header-cta { display: none; } }
+.plan.featured .plan-soon { background: rgba(255,255,255,.1); color: rgba(255,255,255,.85); }

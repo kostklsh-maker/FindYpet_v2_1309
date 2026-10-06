@@ -320,16 +320,17 @@
                 </div>
                 <div class="plan featured reveal" data-plan="smart">
                     <span class="plan-badge" data-t="popular">Most popular</span>
-                    <h3 data-t="planSmart">Smart</h3>
+                    <h3 data-t="planSmart">Special</h3>
                     <p class="plan-for" data-t="smartFor">You hear the moment they're found</p>
                     <div class="plan-price ltr" data-price="smart"></div>
                     <div class="plan-per" data-t="oneTime">one-time payment</div>
                     <ul class="checks">
                         <li data-t="ps1">Everything in Basic</li>
-                        <li data-t="ps2">Instant scan and location alerts</li>
-                        <li data-t="ps3">“Lost” mode in one command</li>
-                        <li data-t="ps4">Second contact and important notes</li>
+                        <li data-t="ps2">Second contact phone</li>
+                        <li data-t="ps3">Important notes: allergies, meds, “don't chase”</li>
+                        <li data-t="ps4">“Lost” mode in one command</li>
                     </ul>
+                    <p class="plan-soon" data-t="psSoon">Coming soon: special services for the Special and Family plans.</p>
                     <button type="button" class="btn btn-primary btn-block choose" data-plan="smart" data-t="choose">Choose</button>
                 </div>
                 <div class="plan reveal" data-plan="family">
@@ -337,13 +338,14 @@
                     <h3 data-t="planFamily">Family</h3>
                     <p class="plan-for" data-t="familyFor">For a home with several pets</p>
                     <div class="plan-price ltr" data-price="family"></div>
-                    <div class="plan-per" data-t="familyPer">3 Smart tags</div>
+                    <div class="plan-per" data-t="familyPer">3 NFC tags</div>
                     <ul class="checks">
-                        <li data-t="pf1">3 tags with all Smart features</li>
+                        <li data-t="pf1">Everything in Special</li>
                         <li data-t="pf2">One per pet — or spares for one pet</li>
                         <li data-t="pf4">You choose how to use them when ordering</li>
                         <li data-t="pf3">Lowest price per tag</li>
                     </ul>
+                    <p class="plan-soon" data-t="psSoon">Coming soon: special services for the Special and Family plans.</p>
                     <button type="button" class="btn btn-outline btn-block choose" data-plan="family" data-t="choose">Choose</button>
                 </div>
             </div>
@@ -394,7 +396,7 @@
                         <fieldset class="plan-pick">
                             <legend data-t="lblPlan">Plan</legend>
                             <label><input type="radio" name="plan" value="basic"><span class="pp-name" data-t="planBasic">Basic</span><span class="ltr pp" data-price="basic"></span></label>
-                            <label><input type="radio" name="plan" value="smart" checked><span class="pp-name" data-t="planSmart">Smart</span><span class="ltr pp" data-price="smart"></span></label>
+                            <label><input type="radio" name="plan" value="smart" checked><span class="pp-name" data-t="planSmart">Special</span><span class="ltr pp" data-price="smart"></span></label>
                             <label><input type="radio" name="plan" value="family"><span class="pp-name" data-t="planFamily">Family</span><span class="ltr pp" data-price="family"></span></label>
                         </fieldset>
                         <div class="row2">
@@ -404,19 +406,50 @@
                                 <input type="text" id="ownerName" data-t-ph="phOwner" placeholder="Owner full name" autocomplete="name" required></label>
                         </div>
                         <div class="family-box" id="familyBox" hidden>
-                            <span class="fb-title" data-t="famQ">How many pets will wear the 3 tags?</span>
-                            <div class="seg seg-sm" id="famSeg">
-                                <button type="button" class="on" data-n="1">1</button>
-                                <button type="button" data-n="2">2</button>
-                                <button type="button" data-n="3">3</button>
+                            <span class="fb-title" data-t="famQ">3 tags — fill in each one</span>
+                            <p class="fb-hint" data-t="famHint">Each pet gets its own tag and page, with its own second contact and notes. Tick “Spare tag” to make an exact copy of one pet's tag.</p>
+                            <div class="ftag" data-i="0">
+                                <div class="ft-head"><b class="ft-n"></b><span class="ft-pet" id="ft0Name"></span></div>
+                                <details class="ft-more">
+                                    <summary data-t="ftMore">+ Second contact and notes (optional)</summary>
+                                    <label><span data-t="lblPhone2">Second phone (family member)</span>
+                                        <input type="tel" class="ft-phone2" data-t-ph="phPhone2" placeholder="052-765-4321"></label>
+                                    <label><span data-t="lblNotes">Important notes for the finder</span>
+                                        <textarea class="ft-notes" rows="2" maxlength="200" data-t-ph="phNotes" placeholder="E.g.: allergic to chicken; scared of people — don't chase"></textarea></label>
+                                </details>
                             </div>
-                            <p class="fb-hint" data-t="famHint">Each pet gets its own tag and page. Tags left over are spares — an exact copy of a pet's tag.</p>
-                            <label class="fam-pet" data-i="1" hidden><span data-t="lblPet2">Second pet's name</span>
-                                <input type="text" id="pet2" maxlength="16" data-t-ph="phPet" placeholder="Pet's name"></label>
-                            <label class="fam-pet" data-i="2" hidden><span data-t="lblPet3">Third pet's name</span>
-                                <input type="text" id="pet3" maxlength="16" data-t-ph="phPet" placeholder="Pet's name"></label>
-                            <label class="spare-row" id="spareRow" hidden><span data-t="lblSpareFor">The spare tag is for</span>
-                                <select id="spareFor"><option value="0"></option><option value="1"></option></select></label>
+                            <div class="ftag" data-i="1">
+                                <div class="ft-head"><b class="ft-n"></b><label class="ft-spare"><input type="checkbox" class="ft-spare-chk"><span data-t="spareChk">Spare tag</span></label></div>
+                                <div class="ft-pet-box">
+                                    <label><span data-t="lblPetName">Pet's name</span>
+                                        <input type="text" class="ft-name" maxlength="16" data-t-ph="phPet" placeholder="Pet's name"></label>
+                                <details class="ft-more">
+                                    <summary data-t="ftMore">+ Second contact and notes (optional)</summary>
+                                    <label><span data-t="lblPhone2">Second phone (family member)</span>
+                                        <input type="tel" class="ft-phone2" data-t-ph="phPhone2" placeholder="052-765-4321"></label>
+                                    <label><span data-t="lblNotes">Important notes for the finder</span>
+                                        <textarea class="ft-notes" rows="2" maxlength="200" data-t-ph="phNotes" placeholder="E.g.: allergic to chicken; scared of people — don't chase"></textarea></label>
+                                </details>
+                                </div>
+                                <label class="ft-for" hidden><span data-t="lblSpareFor">The spare tag is for</span>
+                                    <select class="ft-for-sel"></select></label>
+                            </div>
+                            <div class="ftag" data-i="2">
+                                <div class="ft-head"><b class="ft-n"></b><label class="ft-spare"><input type="checkbox" class="ft-spare-chk"><span data-t="spareChk">Spare tag</span></label></div>
+                                <div class="ft-pet-box">
+                                    <label><span data-t="lblPetName">Pet's name</span>
+                                        <input type="text" class="ft-name" maxlength="16" data-t-ph="phPet" placeholder="Pet's name"></label>
+                                <details class="ft-more">
+                                    <summary data-t="ftMore">+ Second contact and notes (optional)</summary>
+                                    <label><span data-t="lblPhone2">Second phone (family member)</span>
+                                        <input type="tel" class="ft-phone2" data-t-ph="phPhone2" placeholder="052-765-4321"></label>
+                                    <label><span data-t="lblNotes">Important notes for the finder</span>
+                                        <textarea class="ft-notes" rows="2" maxlength="200" data-t-ph="phNotes" placeholder="E.g.: allergic to chicken; scared of people — don't chase"></textarea></label>
+                                </details>
+                                </div>
+                                <label class="ft-for" hidden><span data-t="lblSpareFor">The spare tag is for</span>
+                                    <select class="ft-for-sel"></select></label>
+                            </div>
                             <ul class="fam-summary" id="famSummary"></ul>
                         </div>
                         <label><span data-t="lblPhone">Your phone — the finder will call it</span>

@@ -21,18 +21,22 @@ async def main():
             # Базовый: доп. поля скрыты, есть пояснение
             await pg.click('.choose[data-plan="basic"]'); await pg.wait_for_timeout(200)
             basic = (await pg.is_visible('#basicNote'), await pg.is_visible('#moreBox'), await pg.is_visible('#familyBox'))
-            # Цены: 2 питомца → подсвечен Семейный, в форме сразу 2 питомца
+            # Цены: 2 питомца → подсвечен Семейный; в форме метка 2 — питомец, метка 3 — запасная
             await pg.click('#petsSeg button[data-pets="2"]')
             rec = await pg.evaluate("document.querySelector('.plan.recommended').dataset.plan")
             await pg.click('.choose[data-plan="family"]'); await pg.wait_for_timeout(200)
-            fam_n = await pg.evaluate("document.querySelector('#famSeg .on').dataset.n")
+            fam_n = await pg.evaluate("[...document.querySelectorAll('.ft-spare-chk')].map(c => c.checked)")
             a, c = PETS[lang]
             await pg.fill('#petName', a); await pg.fill('#ownerName', 'Kostya')
             await pg.fill('#ownerPhone', '050-123-4567'); await pg.fill('#shippingAddress', 'Haifa')
             await pg.check('#consent')
             await pg.click('#orderBtn'); await pg.wait_for_timeout(200)
             err = await pg.inner_text('#formError')          # нет клички второго питомца
-            await pg.fill('#pet2', c); await pg.select_option('#spareFor', '1')
+            tag2 = pg.locator('.ftag[data-i="1"]'); tag3 = pg.locator('.ftag[data-i="2"]')
+            await tag2.locator('.ft-name').fill(c)
+            await tag2.locator('summary').click()
+            await tag2.locator('.ft-phone2').fill('052-765-4321'); await tag2.locator('.ft-notes').fill('Shy')
+            await tag3.locator('.ft-for-sel').select_option('1')
             summ = await pg.inner_text('#famSummary'); tags = await pg.inner_text('#sumTags'); pv = await pg.inner_text('#pvList')
             await pg.locator('#order').screenshot(path=f'{OUT}/order_family_{lang}.png')
             await pg.click('#orderBtn'); await pg.wait_for_timeout(900)

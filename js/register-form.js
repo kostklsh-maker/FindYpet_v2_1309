@@ -67,18 +67,20 @@
             phone: val("ownerPhone"),
             pet_name: val("petName"),
             address: val("shippingAddress"),
-            phone2: plan === "basic" ? "" : val("phone2"),
-            notes: plan === "basic" ? "" : val("notes"),
+            phone2: plan === "smart" ? val("phone2") : "",
+            notes: plan === "smart" ? val("notes") : "",
             consent: document.getElementById("consent").checked,
             plan: plan,
             pets: plan === "family" ? fam.pets : [],
             spare_for: plan === "family" ? fam.spare_for : [],
+            pet_extras: plan === "family" ? fam.pet_extras : [],
             lang: currentLang
         };
         if (!payload.owner_name || !payload.phone || !payload.pet_name || !payload.address) return showError("errFill");
         if (plan === "family" && fam.missing) return showError("errPet2");
         if (!looksLikePhone(payload.phone)) return showError("errPhone");
         if (payload.phone2 && !looksLikePhone(payload.phone2)) return showError("errPhone2");
+        if (plan === "family" && fam.pet_extras.some(function (e) { return e.phone2 && !looksLikePhone(e.phone2); })) return showError("errPhone2");
         if (!payload.consent) return showError("errConsent");
 
         btn.disabled = true;
