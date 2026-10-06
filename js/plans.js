@@ -13,7 +13,7 @@ const PLANS = {
     },
     "family": {
         "price": "199 ₪",
-        "name": "Family (3 Special tags)",
+        "name": "Family (3 tags)",
         "tags": 3
     }
 };

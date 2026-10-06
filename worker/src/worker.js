@@ -102,13 +102,13 @@ const REMINDER_DAYS = 180;
 const PLANS = {
   basic: { price: '49 ₪', name: 'Basic', tags: 1 },
   smart: { price: '79 ₪', name: 'Special', tags: 1 },   // id 'smart' не менять — он записан в старых заказах
-  family: { price: '199 ₪', name: 'Family (3 Special tags)', tags: 3 },
+  family: { price: '199 ₪', name: 'Family (3 tags)', tags: 3 },
 };
 const DEFAULT_PLAN = 'smart';
 function planLabel(id) { const p = PLANS[id]; return p ? `${p.name} · ${p.price}` : '—'; }
 
 // Функции по тарифу (с 06.10.2026):
-//  Базис (basic) — жетон, страница, звонок, WhatsApp, Telegram: сообщение и геолокация нашедшего
+//  Базовый (basic) — жетон, страница, звонок, WhatsApp, Telegram: сообщение и геолокация нашедшего
 //                  приходят хозяину (уведомления о скане и кнопка Telegram — во всех тарифах).
 //  Специальный (smart) и Семейный (family) — + второй контакт, важные заметки, режим «Потерялся»
 //                  (в будущем — мед. карта, скидки у партнёров).
@@ -721,9 +721,10 @@ async function handleUpdate(update, env, url) {
       '💳 <b>Choose your plan</b> (one-time payment, no subscription):\n\n' +
       `• <b>Basic — ${PLANS.basic.price}</b>: tag with phone, QR and NFC; pet page; call, WhatsApp and Telegram; ` +
       `the finder's message and location come to you here\n` +
-      `• <b>Special — ${PLANS.smart.price}</b>: + second contact, important notes, Lost mode (and new services coming: ` +
-      `vet health card, partner discounts)\n` +
-      `• <b>Family — ${PLANS.family.price}</b>: 3 Special tags — for up to 3 pets, or 2 pets + a spare`,
+      `• <b>Special — ${PLANS.smart.price}</b>: + second contact, important notes, Lost mode\n` +
+      `• <b>Family — ${PLANS.family.price}</b>: everything in Special, 3 NFC tags — for up to 3 pets, or 2 pets + a spare; ` +
+      `each pet with its own second contact and notes\n\n` +
+      `✨ Coming soon: special services for the Special and Family plans.`,
       { inline_keyboard: Object.keys(PLANS).map((id) => [{ text: planLabel(id), callback_data: `plan_${id}` }]) });
   }
   if (st.step === 'plan') {
