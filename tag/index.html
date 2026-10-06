@@ -109,6 +109,11 @@
     .btn-msg:hover { background: var(--soft); }
     .btn-wa .ic { color: var(--wa); font-size: 24px; }
     .btn-tg .ic { color: var(--tg); font-size: 24px; }
+    .row2.one { grid-template-columns: 1fr; }
+    .ic-done { display: none; }
+    .btn-tg.done { background: #f0fdf4; box-shadow: inset 0 0 0 1.5px #bbf7d0; }
+    .btn-tg.done .ic-tg { display: none; }
+    .btn-tg.done .ic-done { display: block; color: var(--ok); }
     .btn-outline { background: #fff; box-shadow: inset 0 0 0 1.5px var(--line); font-size: 16px; min-height: 52px; justify-content: flex-start; }
     .btn-outline .ic { color: var(--brand2); }
 
@@ -228,9 +233,9 @@
             <a class="btn btn-msg btn-wa" id="waBtn" href="#" rel="noopener">
               <svg class="ic ic-fill"><use href="#i-wa"/></svg><span>WhatsApp</span>
             </a>
-            <a class="btn btn-msg btn-tg" id="tgBtn" href="#" rel="noopener">
-              <svg class="ic ic-fill"><use href="#i-tg"/></svg><span>Telegram</span>
-            </a>
+            <button class="btn btn-msg btn-tg hidden" id="tgBtn" type="button">
+              <svg class="ic ic-fill ic-tg"><use href="#i-tg"/></svg><svg class="ic ic-done"><use href="#i-check"/></svg><span>Telegram</span>
+            </button>
           </div>
           <label class="geo hidden" id="geoRow">
             <input type="checkbox" id="geoChk">
@@ -284,8 +289,9 @@
         stale: 'Showing saved info — our server is slow right now, but the contacts work.',
         call: 'Call my owner', call2: 'Call second contact',
         allowLoc: 'Allow sharing my location', allowLocSub: 'My owner gets a pin on the map',
-        locReady: 'Your location will be added to the WhatsApp or Telegram message.',
-        tgCopied: 'Message copied — paste it into the Telegram chat.',
+        locReady: 'Your location will be added to your WhatsApp message.',
+        tgSending: 'Sending a message to my owner…', tgSent: 'Done! My owner got a message in Telegram. ❤️',
+        tgFail: 'Could not send it. Please call my owner or write on WhatsApp.',
         hint: 'Your location is shared only if you tick the box, and only with my owner.',
         chipNote: "Can't reach anyone? Any vet or the municipal veterinary service can scan my microchip.",
         waText: 'Hi! I found {pet} (FindYpet tag #{id}).', waHere: "I'm here:",
@@ -307,8 +313,9 @@
         stale: 'מוצגים פרטים שמורים — השרת איטי כרגע, אבל פרטי הקשר עובדים.',
         call: 'התקשרו לבעלים', call2: 'התקשרו לאיש קשר נוסף',
         allowLoc: 'אפשרו שיתוף מיקום', allowLocSub: 'הבעלים יקבל נקודה במפה',
-        locReady: 'המיקום שלכם יצורף להודעה בוואטסאפ או בטלגרם.',
-        tgCopied: 'ההודעה הועתקה — הדביקו אותה בצ׳אט בטלגרם.',
+        locReady: 'המיקום שלכם יצורף להודעה בוואטסאפ.',
+        tgSending: 'שולחים הודעה לבעלים שלי…', tgSent: 'נשלח! הבעלים שלי קיבל הודעה בטלגרם. ❤️',
+        tgFail: 'לא הצלחנו לשלוח. התקשרו לבעלים שלי או כתבו בוואטסאפ.',
         hint: 'המיקום משותף רק אם מסמנים את התיבה, ורק עם הבעלים שלי.',
         chipNote: 'לא מצליחים ליצור קשר? כל וטרינר או השירות הווטרינרי העירוני יכולים לסרוק את השבב שלי.',
         waText: 'היי! מצאתי את {pet} (תג FindYpet מס׳ {id}).', waHere: 'אני כאן:',
@@ -330,8 +337,9 @@
         stale: 'Показаны сохранённые данные — сервер сейчас медленный, но контакты работают.',
         call: 'Позвонить хозяину', call2: 'Позвонить второму контакту',
         allowLoc: 'Разрешить передачу геолокации', allowLocSub: 'Хозяин получит точку на карте',
-        locReady: 'Ваше местоположение будет добавлено в сообщение WhatsApp или Telegram.',
-        tgCopied: 'Сообщение скопировано — вставьте его в чат Telegram.',
+        locReady: 'Ваше местоположение будет добавлено в сообщение WhatsApp.',
+        tgSending: 'Отправляем сообщение хозяину…', tgSent: 'Готово! Хозяин получил сообщение в Telegram. ❤️',
+        tgFail: 'Не удалось отправить. Позвоните хозяину или напишите в WhatsApp.',
         hint: 'Геолокация передаётся, только если отмечена галочка, и только моему хозяину.',
         chipNote: 'Не получается связаться? Любой ветеринар или муниципальная ветслужба могут считать мой микрочип.',
         waText: 'Здравствуйте! Я нашёл(ла) {pet} (жетон FindYpet №{id}).', waHere: 'Я здесь:',
@@ -359,6 +367,7 @@
     const $ = id => document.getElementById(id);
     const geoChk = $('geoChk'), statusEl = $('locStatus');
     let locSent = false;     // точка уже ушла хозяину в Telegram
+    let lastPos = null;      // последний ответ геолокации (для точности)
 
     function t(k) { return (I18N[lang] && I18N[lang][k]) || I18N.en[k] || k; }
 
@@ -381,8 +390,6 @@
     }
     const digits = () => String(pet.phone || '').replace(/\D/g, '');
     function waLink() { return pet && pet.phone ? 'https://wa.me/' + digits() + '?text=' + encodeURIComponent(msgText()) : '#'; }
-    // Telegram открывает чат по номеру телефона (t.me/+972…); текст подставить нельзя — копируем его
-    function tgLink() { return pet && pet.phone ? 'https://t.me/+' + digits() : '#'; }
 
     function render() {
       if (!pet) return;
@@ -410,7 +417,9 @@
         $('phoneText').textContent = pet.phone_display || pet.phone;
         $('callBtn').classList.remove('hidden');
         $('waBtn').href = waLink();
-        $('tgBtn').href = tgLink();
+        // Telegram — только если хозяин подключил бота (тариф Смарт/Семейный): бот сам пишет ему
+        $('tgBtn').classList.toggle('hidden', !pet.can_notify);
+        $('msgRow').classList.toggle('one', !pet.can_notify);
         $('msgRow').classList.remove('hidden');
         $('geoRow').classList.remove('hidden');
       }
@@ -518,6 +527,7 @@
       navigator.geolocation.getCurrentPosition((pos) => {
         if (!geoChk.checked) return;
         coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        lastPos = pos;
         render();
         if (sendLocToOwner(pos) || locSent) {
           setStatus('sent', 'ok');
@@ -532,10 +542,29 @@
       }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
     });
 
-    // Telegram: ссылка открывает чат с хозяином, а готовый текст (с точкой на карте) — в буфере обмена
-    $('tgBtn').addEventListener('click', () => {
-      if (!pet || !pet.phone) return;
-      try { if (navigator.clipboard) { navigator.clipboard.writeText(msgText()).catch(() => {}); setStatus('tgCopied', 'ok'); } } catch (e) {}
+    // Telegram: бот сам отправляет хозяину «питомец найден» (+ точку на карте, если галочка отмечена
+    // и точка ещё не уходила). Нашедшему ничего не нужно копировать или открывать.
+    $('tgBtn').addEventListener('click', async () => {
+      const b = $('tgBtn');
+      if (!pet || b.disabled) return;
+      b.disabled = true;
+      setStatus('tgSending');
+      const body = { id_tag: tagId };
+      if (coords && !locSent) Object.assign(body, { lat: coords.lat, lon: coords.lon, accuracy: lastPos ? lastPos.coords.accuracy : undefined });
+      try {
+        const res = await fetch(`${API}/api/found`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const d = await res.json();
+        if (!d.success) throw new Error(d.error || 'fail');
+        if (body.lat !== undefined) locSent = true;
+        b.classList.add('done');
+        setStatus('tgSent', 'ok');
+        hearts();
+        if (navigator.vibrate) navigator.vibrate(60);
+        setTimeout(() => { b.disabled = false; }, 60000);
+      } catch (e) {
+        setStatus('tgFail', 'err');
+        b.disabled = false;
+      }
     });
 
     load();
