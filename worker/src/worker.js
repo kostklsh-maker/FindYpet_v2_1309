@@ -421,7 +421,7 @@ async function apiScan(request, env, url) {
       disable_web_page_preview: true,
       text:
         `👀 <b>${esc(tag.pet_name)}'s tag was just scanned!</b> (${fmtTime(env)})\n` +
-        `Someone opened ${esc(tag.pet_name)}'s page. They can call you or write to you on WhatsApp — keep your phone close.\n` +
+        `Someone opened ${esc(tag.pet_name)}'s page. They can call you, write on WhatsApp or press Telegram — keep your phone close.\n` +
         `If they share their location, I will send it to you right here.`,
       reply_markup: { inline_keyboard: kb },
     });

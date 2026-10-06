@@ -444,6 +444,33 @@ await test('Telegram button: the bot messages the owner (with map pin when share
   assert.equal(state.tg.slice(before).filter((c) => c.payload.chat_id === '9191').length, 1);
 });
 
+await test('landing demo shows the real bot messages and the real tag page (kept in sync)', async () => {
+  const home = await (await call(env, '/')).text();
+  // сообщение о скане — дословно как шлёт бот
+  const C = 'demo1';
+  const d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Demo', phone: '050-123-4567', pet_name: 'Bella', address: 'Haifa', consent: true, tags: 1 } })).json();
+  state.tags.find((t) => t.tag_id === String(d.id_tag)).telegram_chat_id = C;
+  await new Promise((r) => setTimeout(r, 1100));
+  await call(env, '/api/scan', { method: 'POST', body: { id_tag: d.id_tag } });
+  const alert = [...state.tg].reverse().find((c) => c.payload.chat_id === C).payload;
+  const body = alert.text.replace(/<[^>]+>/g, '').split('\n').slice(1).join(' ');
+  for (const line of body.split('. ')) assert.ok(home.includes(line.trim()), 'demo is missing: ' + line);
+  assert.ok(home.includes(alert.reply_markup.inline_keyboard[0][0].text));
+  assert.match(home, /Bella's tag was just scanned!/);
+  // сообщение с геолокацией
+  await call(env, '/api/location', { method: 'POST', body: { id_tag: d.id_tag, lat: 32.79, lon: 34.99, accuracy: 12 } });
+  const loc = [...state.tg].reverse().find((c) => c.payload.chat_id === C && c.method === 'sendMessage').payload.text;
+  assert.match(loc, /Bella has been found!/); assert.match(home, /🚨📍 <b>Bella has been found!<\/b>/);
+  assert.match(loc, /accuracy ±12 m/); assert.match(home, /accuracy ±12 m/);
+  assert.match(loc, /Open in Google Maps/); assert.match(home, /Open in Google Maps/);
+  // страница жетона: те же кнопки и подписи, что в демо
+  const tag = await (await call(env, '/t/101')).text();
+  for (const s of ['Hi! My name is', 'Found me? 👋', 'Call my owner', 'Allow sharing my location', 'Telegram', 'WhatsApp']) {
+    assert.ok(tag.includes(s), 'tag page: ' + s); assert.ok(home.includes(s), 'demo: ' + s);
+  }
+});
+
 // ---- Тестовый сайт (окружение staging: test.findy-pet.com) ----
 const testEnv = () => ({ STAGE: 'test', TEST_DB: '1', SITE_URL: 'https://test.findy-pet.com', BOT_USERNAME: 'FindYpetTestBot',
   BOT_TOKEN: 'T', WEBHOOK_SECRET: 'sec', ADMIN_CHAT_ID: 'admin', TIMEZONE: 'Asia/Jerusalem', FYP_KV: makeKV() });
