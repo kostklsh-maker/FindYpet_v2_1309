@@ -362,6 +362,41 @@ await test('www → apex redirect; links use SITE_URL (findy-pet.com)', async ()
   assert.match(admin, new RegExp(`NFC \\+ 🔳 QR: <code>https://findy-pet.com/t/${d.id_tag}</code>`));
 });
 
+await test('Telegram button: the bot messages the owner (with map pin when shared), no duplicates; Basic gets nothing', async () => {
+  const tenv = { ...makeEnv(), FYP_KV: makeKV() };
+  const reg = async (plan) => (await (await call(tenv, '/api/register', { method: 'POST', body: {
+    owner_name: 'Tg Owner', phone: '050-777-8888', pet_name: 'Tuzik', address: 'Haifa', consent: true, plan } })).json());
+  const d = await reg('smart');
+  const tag = state.tags.find((t) => t.tag_id === String(d.id_tag));
+  tag.telegram_chat_id = '9090';
+  let before = state.tg.length;
+  let r = await (await call(tenv, '/api/found', { method: 'POST', body: { id_tag: d.id_tag } })).json();
+  assert.equal(r.success, true);
+  const msgs = state.tg.slice(before).filter((c) => c.payload.chat_id === '9090');
+  assert.equal(msgs.length, 1);
+  assert.match(msgs[0].payload.text, /Tuzik has been found!/);
+  assert.match(msgs[0].payload.text, /did not share their location/);
+  // повтор в течение минуты — без второго сообщения
+  before = state.tg.length;
+  r = await (await call(tenv, '/api/found', { method: 'POST', body: { id_tag: d.id_tag } })).json();
+  assert.equal(r.repeat, true);
+  assert.equal(state.tg.slice(before).length, 0);
+  // с геолокацией — ссылки на карту и точка
+  before = state.tg.length;
+  r = await (await call(tenv, '/api/found', { method: 'POST', body: { id_tag: d.id_tag, lat: 32.79, lon: 34.99, accuracy: 12 } })).json();
+  assert.equal(r.success, true);
+  const withLoc = state.tg.slice(before);
+  assert.match(withLoc[0].payload.text, /maps\.google\.com\/\?q=32\.79,34\.99/);
+  assert.equal(withLoc[1].method, 'sendLocation');
+  // Базовый тариф — бот не пишет
+  const b = await reg('basic');
+  state.tags.find((t) => t.tag_id === String(b.id_tag)).telegram_chat_id = '9191';
+  before = state.tg.length;
+  r = await (await call(tenv, '/api/found', { method: 'POST', body: { id_tag: b.id_tag } })).json();
+  assert.equal(r.error, 'not_linked');
+  assert.equal(state.tg.slice(before).filter((c) => c.payload.chat_id === '9191').length, 0);
+});
+
 // ---- Тестовый сайт (окружение staging: test.findy-pet.com) ----
 const testEnv = () => ({ STAGE: 'test', TEST_DB: '1', SITE_URL: 'https://test.findy-pet.com', BOT_USERNAME: 'FindYpetTestBot',
   BOT_TOKEN: 'T', WEBHOOK_SECRET: 'sec', ADMIN_CHAT_ID: 'admin', TIMEZONE: 'Asia/Jerusalem', FYP_KV: makeKV() });

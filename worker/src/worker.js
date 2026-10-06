@@ -10,6 +10,7 @@
  *        GET  /api/tag?id=101 — данные питомца для страницы метки (с резервным кэшем)
  *        POST /api/scan       — "метку отсканировали" (уведомление владельцу)
  *        POST /api/location   — геолокация от нашедшего → владельцу
+ *        POST /api/found      — кнопка «Telegram» на странице: бот пишет владельцу «питомец найден» (+ точка)
  *   • Telegram-бот @YourPetLocatorBot (webhook: POST /telegram)
  *        /register /mytags /lost /found /settings /cancel /help /id; для админа /orders и
  *        кнопки статуса заказа (Оплачен → Изготовлен → Отправлен) — клиенту уходит сообщение
@@ -173,6 +174,7 @@ async function route(request, env, ctx) {
     if (path === '/api/tag' && request.method === 'GET') return await apiTag(url, env, ctx);
     if (path === '/api/scan' && request.method === 'POST') return await apiScan(request, env, url);
     if (path === '/api/location' && request.method === 'POST') return await apiLocation(request, env);
+    if (path === '/api/found' && request.method === 'POST') return await apiFound(request, env);
     if (path.startsWith('/api/')) return json({ success: false, error: 'not_found' }, env, 404);
 
     // ---- Короткая ссылка /t/101 (для QR на жетоне) → та же страница метки ----
@@ -395,6 +397,43 @@ async function apiScan(request, env, url) {
       `FindYpet: ${tag.pet_name}'s tag was just scanned. The finder may call you or write on WhatsApp. ${shortUrl(env, url, id)}`);
   }
   return json({ success: true }, env);
+}
+
+/**
+ * Кнопка «Telegram» на странице жетона: бот сам пишет владельцу, что питомца нашли.
+ * Если нашедший разрешил геолокацию — в том же сообщении ссылки на карту и точка.
+ * Telegram ID владельца берётся из таблицы (telegram_chat_id). Повтор в течение минуты не дублирует сообщение.
+ */
+async function apiFound(request, env) {
+  const b = await request.json().catch(() => ({}));
+  const id = String(b.id_tag || b.id || '');
+  if (!/^\d{1,9}$/.test(id)) return json({ success: false, error: 'bad_request' }, env, 400);
+  const lat = Number(b.lat), lon = Number(b.lon), acc = Number(b.accuracy);
+  const hasLoc = b.lat !== undefined && b.lon !== undefined && isFinite(lat) && isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+  const r = await db(env, 'logScan', hasLoc ? { id, lat, lon } : { id });
+  if (!r.ok) return json({ success: false, error: 'temp_error' }, env, 502);
+  if (!r.found) return json({ success: false, error: 'not_found' }, env);
+  const tag = r.tag;
+  if (!feats(await getExtras(env, id)).alerts || !tag.telegram_chat_id) return json({ success: false, error: 'not_linked' }, env);
+
+  const key = `f:${id}`;
+  if (kvOn(env) && !hasLoc && (await env.FYP_KV.get(key))) return json({ success: true, repeat: true }, env);
+
+  const pet = esc(tag.pet_name);
+  let text = `🐾 <b>${pet} has been found!</b> (${fmtTime(env)})\n` +
+    `The finder is with ${pet} right now and pressed «Telegram» on the tag page.\n`;
+  if (hasLoc) {
+    const maps = `https://maps.google.com/?q=${lat},${lon}`;
+    const waze = `https://waze.com/ul?ll=${lat},${lon}&navigate=yes`;
+    text += `📍 They shared their location` + (isFinite(acc) && acc > 0 ? ` (±${Math.round(acc)} m)` : '') + ':\n' +
+      `🗺 <a href="${maps}">Open in Google Maps</a>  ·  🚗 <a href="${waze}">Waze</a>`;
+  } else {
+    text += `They did not share their location. Call your phone back if you see a missed call, and check WhatsApp.`;
+  }
+  const sent = await tg(env, 'sendMessage', { chat_id: tag.telegram_chat_id, parse_mode: 'HTML', disable_web_page_preview: true, text });
+  if (hasLoc) await tg(env, 'sendLocation', { chat_id: tag.telegram_chat_id, latitude: lat, longitude: lon });
+  if (sent && sent.ok && kvOn(env)) await env.FYP_KV.put(key, '1', { expirationTtl: 60 });
+  return json({ success: !!(sent && sent.ok) }, env);
 }
 
 async function apiLocation(request, env) {
