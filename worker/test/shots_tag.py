@@ -17,13 +17,15 @@ async def main():
             await pg.evaluate(f"localStorage.setItem('fyp_lang','{lang}')")
             await pg.goto(f'http://localhost:8787/t/{tid}')
             await pg.wait_for_timeout(900)
-            vis = {k: await pg.is_visible('#' + k) for k in ['pet', 'notFound', 'tempError', 'missing', 'notesBox', 'call2Btn', 'staleLine', 'waBtn']}
+            vis = {k: await pg.is_visible('#' + k) for k in ['pet', 'notFound', 'tempError', 'missing', 'notesBox', 'call2Btn', 'staleLine', 'waBtn', 'tgBtn', 'geoRow']}
             sw = await pg.evaluate('document.documentElement.scrollWidth')
             print(tid, lang, 'errors:', errs, vis, 'scrollWidth', sw)
             await pg.screenshot(path=f'{OUT}/t{tid}_{lang}.png', full_page=True)
             if tid == '101':
-                await pg.click('#locBtn'); await pg.wait_for_timeout(800)
-                print('  after location:', await pg.inner_text('#locStatus'), '|', await pg.get_attribute('#locBtn', 'class'))
+                print('  wa:', await pg.get_attribute('#waBtn', 'href'), '| tg:', await pg.get_attribute('#tgBtn', 'href'))
+                await pg.click('#geoRow'); await pg.wait_for_timeout(800)
+                print('  after location:', await pg.inner_text('#locStatus'), '| checked', await pg.is_checked('#geoChk'))
+                print('  wa with pin:', await pg.get_attribute('#waBtn', 'href'))
                 await pg.screenshot(path=f'{OUT}/t101_sent.png', full_page=True)
             await ctx.close()
         await b.close()

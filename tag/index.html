@@ -15,10 +15,9 @@
       --brand: #00A2A6; --brand2: #007376; --grad: linear-gradient(150deg, #007C80 0%, #0E3B3D 100%);
       --lost: linear-gradient(135deg, #ff5e57 0%, #c81e3a 100%);
       --ink: #10292A; --muted: #56696A; --line: #DDE8E7; --soft: #F2F8F7; --bg: #F2F8F7;
-      /* Кнопки нашедшего: звонок — фирменный оранжевый, WhatsApp — зелёный WhatsApp, геолокация — синий */
-      --call: #FF7713; --call2: #F2630A; --call-ink: #0B2627;
-      --wa: #25D366; --wa2: #1DAA61; --wa-ink: #0B2627;
-      --loc: linear-gradient(150deg, #2563EB 0%, #1E3F9A 100%); --loc-d: #1D4ED8;
+      /* Кнопки нашедшего — спокойные: звонок фирменным бирюзовым, мессенджеры белые с цветной иконкой */
+      --call: #0F7F82; --call-d: #0B6B6E;
+      --wa: #1FA855; --tg: #229ED9;
       --ok: #116B33; --red: #ef4444; --amber: #f59e0b;
       --font: "Rubik", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     }
@@ -87,40 +86,42 @@
     /* ---------- Buttons ---------- */
     .actions { display: flex; flex-direction: column; gap: 10px; }
     .btn {
-      position: relative; display: flex; align-items: center; gap: 14px; width: 100%; min-height: 64px;
-      border: 0; border-radius: 18px; padding: 12px 16px; text-align: start;
-      font-size: 18px; font-weight: 700; color: #fff; text-decoration: none; cursor: pointer; font-family: inherit;
-      transition: transform .12s ease, box-shadow .2s, opacity .2s, background .3s;
+      position: relative; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 56px;
+      border: 0; border-radius: 16px; padding: 10px 16px; text-align: center;
+      font-size: 17px; font-weight: 600; color: var(--ink); text-decoration: none; cursor: pointer; font-family: inherit;
+      transition: transform .12s ease, background .2s, box-shadow .2s;
     }
     .btn:active { transform: scale(.98); }
     .btn[disabled] { opacity: .7; cursor: default; }
-    .btn .b-ic { flex: none; width: 42px; height: 42px; border-radius: 13px; background: rgba(255,255,255,.2); display: grid; place-items: center; font-size: 22px; }
-    .btn .col { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
-    .btn small { font-weight: 500; font-size: 15px; opacity: .92; margin-top: 2px; }
+    .btn .ic { font-size: 22px; }
     .ic-fill { fill: currentColor; stroke: none; }
+    .btn .col { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; text-align: start; }
+    .btn small { font-weight: 500; font-size: 14px; color: var(--muted); margin-top: 2px; }
 
-    /* Позвонить: только иконка, «Call» и номер */
-    .btn-call { background: linear-gradient(150deg, var(--call) 0%, var(--call2) 100%); color: var(--call-ink); box-shadow: 0 12px 26px -10px rgba(255,119,19,.75); min-height: 76px; font-size: 21px; font-weight: 800; }
-    .btn-call .b-ic { background: rgba(255,255,255,.32); animation: ring 2.4s ease-in-out infinite; }
-    .btn-call .num { font-size: 17.5px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
-    @keyframes ring { 0%, 55%, 100% { transform: rotate(0); } 5%, 15%, 25% { transform: rotate(-12deg); } 10%, 20% { transform: rotate(12deg); } }
-    .btn-call::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 0 rgba(255,119,19,.5); animation: pulse 2.4s ease-out infinite; pointer-events: none; }
-    @keyframes pulse { to { box-shadow: 0 0 0 14px rgba(255,119,19,0); } }
+    /* Позвонить хозяину — во всю ширину */
+    .btn-call { background: var(--call); color: #fff; min-height: 64px; font-size: 18px; box-shadow: 0 6px 16px -10px rgba(11,107,110,.6); }
+    .btn-call:hover { background: var(--call-d); }
+    .btn-call .num { font-size: 15px; font-weight: 500; opacity: .85; margin-top: 2px; font-variant-numeric: tabular-nums; }
 
-    /* WhatsApp: иконка WhatsApp и «Send Message», зелёный WhatsApp */
-    .btn-wa { background: linear-gradient(150deg, var(--wa) 0%, var(--wa2) 100%); color: var(--wa-ink); box-shadow: 0 10px 22px -12px rgba(29,170,97,.85); }
-    .btn-wa .b-ic { background: rgba(255,255,255,.34); font-size: 24px; }
+    /* WhatsApp и Telegram — в одну строку, по половине ширины */
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btn-msg { background: #fff; box-shadow: inset 0 0 0 1.5px var(--line); }
+    .btn-msg:hover { background: var(--soft); }
+    .btn-wa .ic { color: var(--wa); font-size: 24px; }
+    .btn-tg .ic { color: var(--tg); font-size: 24px; }
+    .btn-outline { background: #fff; box-shadow: inset 0 0 0 1.5px var(--line); font-size: 16px; min-height: 52px; justify-content: flex-start; }
+    .btn-outline .ic { color: var(--brand2); }
 
-    /* Передать геолокацию: синий */
-    .btn-loc { background: var(--loc); box-shadow: 0 10px 22px -12px rgba(37,99,235,.85); }
-    .btn-loc.done { background: #EEF4FF; color: var(--loc-d); box-shadow: inset 0 0 0 1.5px #C7D7FE; }
-    .btn-loc.done .b-ic { background: #DCE7FE; }
-    .btn-outline { background: #fff; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--line); font-size: 16.5px; min-height: 58px; }
-    .btn-outline .b-ic { background: var(--soft); color: var(--brand2); width: 38px; height: 38px; font-size: 19px; }
-    .btn-outline small { color: var(--muted); }
-    .ic-done { display: none; }
-    .btn-loc.done .ic-pin { display: none; }
-    .btn-loc.done .ic-done { display: block; }
+    /* Галочка «Разрешить передачу геолокации» */
+    .geo { display: flex; align-items: flex-start; gap: 12px; padding: 12px 4px 2px; cursor: pointer; user-select: none; }
+    .geo input { position: absolute; opacity: 0; pointer-events: none; }
+    .geo .box { flex: none; width: 24px; height: 24px; border-radius: 7px; border: 2px solid #A9C3C2; background: #fff; display: grid; place-items: center; color: #fff; font-size: 16px; transition: background .15s, border-color .15s; margin-top: 1px; }
+    .geo .box .ic { opacity: 0; stroke-width: 3; }
+    .geo input:checked + .box { background: var(--call); border-color: var(--call); }
+    .geo input:checked + .box .ic { opacity: 1; }
+    .geo input:focus-visible + .box { outline: 3px solid rgba(0,162,166,.55); outline-offset: 2px; }
+    .geo .g-t { font-size: 16px; font-weight: 600; line-height: 1.3; }
+    .geo .g-t small { display: block; font-size: 13.5px; font-weight: 400; color: var(--muted); margin-top: 2px; }
 
     .status { font-size: 14.5px; min-height: 0; color: var(--muted); line-height: 1.45; text-align: center; }
     .status:empty { display: none; }
@@ -162,6 +163,8 @@
     <symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
     <!-- WhatsApp glyph: Simple Icons (CC0), simpleicons.org; WhatsApp is a trademark of WhatsApp LLC -->
     <symbol id="i-wa" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></symbol>
+    <!-- Telegram glyph: Simple Icons (CC0); Telegram is a trademark of Telegram FZ-LLC -->
+    <symbol id="i-tg" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></symbol>
     <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
     <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
@@ -218,21 +221,26 @@
 
         <div class="actions">
           <a class="btn btn-call hidden" id="callBtn" href="#">
-            <span class="b-ic"><svg class="ic"><use href="#i-phone"/></svg></span>
-            <span class="col"><span data-t="call">Call</span><span class="num ltr" id="phoneText"></span></span>
+            <svg class="ic"><use href="#i-phone"/></svg>
+            <span class="col"><span data-t="call">Call my owner</span><span class="num ltr" id="phoneText"></span></span>
           </a>
-          <a class="btn btn-wa hidden" id="waBtn" href="#" target="_blank" rel="noopener" aria-label="Send a WhatsApp message to my owner">
-            <span class="b-ic"><svg class="ic ic-fill"><use href="#i-wa"/></svg></span>
-            <span class="col"><span data-t="wa">Send Message</span></span>
-          </a>
-          <button class="btn btn-loc" id="locBtn" type="button">
-            <span class="b-ic"><svg class="ic ic-pin"><use href="#i-pin"/></svg><svg class="ic ic-done"><use href="#i-check"/></svg></span>
-            <span class="col"><span data-t="sendLoc" id="locLabel">Share location</span><small data-t="locSub" id="locSub">One tap — no app needed</small></span>
-          </button>
+          <div class="row2 hidden" id="msgRow">
+            <a class="btn btn-msg btn-wa" id="waBtn" href="#" rel="noopener">
+              <svg class="ic ic-fill"><use href="#i-wa"/></svg><span>WhatsApp</span>
+            </a>
+            <a class="btn btn-msg btn-tg" id="tgBtn" href="#" rel="noopener">
+              <svg class="ic ic-fill"><use href="#i-tg"/></svg><span>Telegram</span>
+            </a>
+          </div>
+          <label class="geo hidden" id="geoRow">
+            <input type="checkbox" id="geoChk">
+            <span class="box"><svg class="ic"><use href="#i-check"/></svg></span>
+            <span class="g-t"><span data-t="allowLoc">Allow sharing my location</span><small data-t="allowLocSub">My owner gets a pin on the map</small></span>
+          </label>
           <div class="hearts" id="hearts" aria-hidden="true"></div>
           <div class="status" id="locStatus" aria-live="polite"></div>
           <a class="btn btn-outline hidden" id="call2Btn" href="#">
-            <span class="b-ic"><svg class="ic"><use href="#i-users"/></svg></span>
+            <svg class="ic"><use href="#i-users"/></svg>
             <span class="col"><span data-t="call2">Call second contact</span><small class="ltr" id="phone2Text"></small></span>
           </a>
         </div>
@@ -253,8 +261,8 @@
         <div class="s-ic"><svg class="ic"><use href="#i-alert"/></svg></div>
         <h1 data-t="errTitle">Temporary problem</h1>
         <p class="msg" data-t="errMsg">Could not load the pet's information right now. Please call the phone number printed on the tag, or try again.</p>
-        <button class="btn btn-loc" id="retryBtn" type="button">
-          <span class="b-ic"><svg class="ic"><use href="#i-refresh"/></svg></span><span data-t="retry">Try again</span>
+        <button class="btn btn-call" id="retryBtn" type="button">
+          <svg class="ic"><use href="#i-refresh"/></svg><span data-t="retry">Try again</span>
         </button>
       </div>
     </div>
@@ -274,13 +282,15 @@
         msg: 'Please help me get home — contact my owner in any way below.',
         owner: 'My owner:', notesTitle: 'Important',
         stale: 'Showing saved info — our server is slow right now, but the contacts work.',
-        call: 'Call', wa: 'Send Message', waAria: 'Send a WhatsApp message to my owner', call2: 'Call second contact',
-        sendLoc: 'Share location', sendLocWa: 'Share location via WhatsApp', locSub: 'One tap — no app needed',
-        hint: 'Sharing your location is optional. It goes only to my owner, and only when you tap the button.',
+        call: 'Call my owner', call2: 'Call second contact',
+        allowLoc: 'Allow sharing my location', allowLocSub: 'My owner gets a pin on the map',
+        locReady: 'Your location will be added to the WhatsApp or Telegram message.',
+        tgCopied: 'Message copied — paste it into the Telegram chat.',
+        hint: 'Your location is shared only if you tick the box, and only with my owner.',
         chipNote: "Can't reach anyone? Any vet or the municipal veterinary service can scan my microchip.",
         waText: 'Hi! I found {pet} (FindYpet tag #{id}).', waHere: "I'm here:",
         sending: 'Getting your location…', sent: 'Location sent to my owner. Thank you! ❤️',
-        sentBtn: 'Location sent', denied: 'Location access was blocked. Allow location for this site in your browser settings — or just call my owner.',
+        denied: 'Location access was blocked. Allow location for this site in your browser settings — or just call my owner.',
         unavailable: 'Could not get your location. Please try again or call my owner.',
         netErr: 'Network error. Please try again or call my owner.',
         nfTitle: 'This tag is not activated yet',
@@ -295,13 +305,15 @@
         msg: 'עזרו לי לחזור הביתה — צרו קשר עם הבעלים שלי בכל דרך שלמטה.',
         owner: 'הבעלים שלי:', notesTitle: 'חשוב',
         stale: 'מוצגים פרטים שמורים — השרת איטי כרגע, אבל פרטי הקשר עובדים.',
-        call: 'התקשרו', wa: 'שלחו הודעה', waAria: 'שלחו הודעת וואטסאפ לבעלים שלי', call2: 'התקשרו לאיש קשר נוסף',
-        sendLoc: 'שתפו מיקום', sendLocWa: 'שתפו מיקום בוואטסאפ', locSub: 'לחיצה אחת — בלי אפליקציה',
-        hint: 'שיתוף המיקום הוא לא חובה. הוא נשלח רק לבעלים שלי, ורק כשלוחצים על הכפתור.',
+        call: 'התקשרו לבעלים', call2: 'התקשרו לאיש קשר נוסף',
+        allowLoc: 'אפשרו שיתוף מיקום', allowLocSub: 'הבעלים יקבל נקודה במפה',
+        locReady: 'המיקום שלכם יצורף להודעה בוואטסאפ או בטלגרם.',
+        tgCopied: 'ההודעה הועתקה — הדביקו אותה בצ׳אט בטלגרם.',
+        hint: 'המיקום משותף רק אם מסמנים את התיבה, ורק עם הבעלים שלי.',
         chipNote: 'לא מצליחים ליצור קשר? כל וטרינר או השירות הווטרינרי העירוני יכולים לסרוק את השבב שלי.',
         waText: 'היי! מצאתי את {pet} (תג FindYpet מס׳ {id}).', waHere: 'אני כאן:',
         sending: 'מאתרים את המיקום…', sent: 'המיקום נשלח לבעלים שלי. תודה! ❤️',
-        sentBtn: 'המיקום נשלח', denied: 'הגישה למיקום נחסמה. אפשרו מיקום לאתר הזה בהגדרות הדפדפן — או פשוט התקשרו לבעלים.',
+        denied: 'הגישה למיקום נחסמה. אפשרו מיקום לאתר הזה בהגדרות הדפדפן — או פשוט התקשרו לבעלים.',
         unavailable: 'לא הצלחנו לאתר את המיקום. נסו שוב או התקשרו לבעלים.',
         netErr: 'שגיאת רשת. נסו שוב או התקשרו לבעלים.',
         nfTitle: 'התג הזה עדיין לא הופעל',
@@ -316,13 +328,15 @@
         msg: 'Помогите мне вернуться домой — свяжитесь с хозяином любым способом ниже.',
         owner: 'Мой хозяин:', notesTitle: 'Важно',
         stale: 'Показаны сохранённые данные — сервер сейчас медленный, но контакты работают.',
-        call: 'Позвонить', wa: 'Отправить сообщение', waAria: 'Отправить сообщение хозяину в WhatsApp', call2: 'Позвонить второму контакту',
-        sendLoc: 'Передать геолокацию', sendLocWa: 'Передать геолокацию в WhatsApp', locSub: 'Одно нажатие — без приложения',
-        hint: 'Делиться геолокацией не обязательно. Она уходит только моему хозяину и только после нажатия кнопки.',
+        call: 'Позвонить хозяину', call2: 'Позвонить второму контакту',
+        allowLoc: 'Разрешить передачу геолокации', allowLocSub: 'Хозяин получит точку на карте',
+        locReady: 'Ваше местоположение будет добавлено в сообщение WhatsApp или Telegram.',
+        tgCopied: 'Сообщение скопировано — вставьте его в чат Telegram.',
+        hint: 'Геолокация передаётся, только если отмечена галочка, и только моему хозяину.',
         chipNote: 'Не получается связаться? Любой ветеринар или муниципальная ветслужба могут считать мой микрочип.',
         waText: 'Здравствуйте! Я нашёл(ла) {pet} (жетон FindYpet №{id}).', waHere: 'Я здесь:',
         sending: 'Определяем местоположение…', sent: 'Геолокация отправлена хозяину. Спасибо! ❤️',
-        sentBtn: 'Геолокация отправлена', denied: 'Доступ к геолокации запрещён. Разрешите его для этого сайта в настройках браузера — или просто позвоните хозяину.',
+        denied: 'Доступ к геолокации запрещён. Разрешите его для этого сайта в настройках браузера — или просто позвоните хозяину.',
         unavailable: 'Не удалось определить местоположение. Попробуйте ещё раз или позвоните хозяину.',
         netErr: 'Ошибка сети. Попробуйте ещё раз или позвоните хозяину.',
         nfTitle: 'Эта метка ещё не активирована',
@@ -343,7 +357,8 @@
     let coords = null;       // координаты нашедшего, если он поделился
 
     const $ = id => document.getElementById(id);
-    const locBtn = $('locBtn'), statusEl = $('locStatus');
+    const geoChk = $('geoChk'), statusEl = $('locStatus');
+    let locSent = false;     // точка уже ушла хозяину в Telegram
 
     function t(k) { return (I18N[lang] && I18N[lang][k]) || I18N.en[k] || k; }
 
@@ -358,12 +373,16 @@
       catch (e) { return ''; }
     }
 
-    function waLink() {
-      if (!pet || !pet.phone) return '#';
+    // Текст для мессенджеров; если нашедший разрешил геолокацию — с точкой на карте
+    function msgText() {
       let text = t('waText').replace('{pet}', pet.pet_name).replace('{id}', pet.tag_id);
       if (coords) text += ' ' + t('waHere') + ' https://maps.google.com/?q=' + coords.lat.toFixed(6) + ',' + coords.lon.toFixed(6);
-      return 'https://wa.me/' + pet.phone.replace(/\D/g, '') + '?text=' + encodeURIComponent(text);
+      return text;
     }
+    const digits = () => String(pet.phone || '').replace(/\D/g, '');
+    function waLink() { return pet && pet.phone ? 'https://wa.me/' + digits() + '?text=' + encodeURIComponent(msgText()) : '#'; }
+    // Telegram открывает чат по номеру телефона (t.me/+972…); текст подставить нельзя — копируем его
+    function tgLink() { return pet && pet.phone ? 'https://t.me/+' + digits() : '#'; }
 
     function render() {
       if (!pet) return;
@@ -391,29 +410,26 @@
         $('phoneText').textContent = pet.phone_display || pet.phone;
         $('callBtn').classList.remove('hidden');
         $('waBtn').href = waLink();
-        $('waBtn').classList.remove('hidden');
+        $('tgBtn').href = tgLink();
+        $('msgRow').classList.remove('hidden');
+        $('geoRow').classList.remove('hidden');
       }
       if (pet.phone2) {
         $('call2Btn').href = 'tel:' + pet.phone2;
         $('phone2Text').textContent = pet.phone2_display || pet.phone2;
         $('call2Btn').classList.remove('hidden');
       }
-      // Если владелец не подключил уведомления, отправляем геолокацию через WhatsApp
-      if (!locBtn.classList.contains('done')) $('locLabel').textContent = t(pet.can_notify ? 'sendLoc' : 'sendLocWa');
-      locBtn.classList.toggle('hidden', !pet.can_notify && !pet.phone);
     }
 
     function applyLang() {
       document.documentElement.lang = lang;
       document.documentElement.dir = lang === 'he' ? 'rtl' : 'ltr';
       document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.dataset.t); });
-      $('waBtn').setAttribute('aria-label', t('waAria'));
       document.querySelectorAll('.langs button').forEach(b => {
         b.classList.toggle('on', b.dataset.lang === lang);
         b.setAttribute('aria-pressed', b.dataset.lang === lang ? 'true' : 'false');
       });
       if (lastStatus.key) setStatus(lastStatus.key, lastStatus.cls);
-      if (locBtn.classList.contains('done')) $('locLabel').textContent = t('sentBtn');
       render();
     }
     document.querySelectorAll('.langs button').forEach(b => b.addEventListener('click', () => {
@@ -478,47 +494,48 @@
       }
     }
 
-    function markSent() {
-      setStatus('sent', 'ok');
-      locBtn.classList.add('done');
-      $('locLabel').textContent = t('sentBtn');
-      $('locSub').classList.add('hidden');
-      hearts();
-      if (navigator.vibrate) navigator.vibrate(60);
-      setTimeout(() => { locBtn.disabled = false; }, 15000);
+    // Точка на карте хозяину в Telegram (если у него подключены уведомления) — один раз
+    function sendLocToOwner(pos) {
+      if (!pet.can_notify || locSent) return false;
+      locSent = true;
+      try {
+        const body = JSON.stringify({ id_tag: tagId, lat: coords.lat, lon: coords.lon, accuracy: pos.coords.accuracy });
+        const url = `${API}/api/location`;
+        if (!(navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: 'application/json' })))) {
+          fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
+        }
+      } catch (e) {}
+      return true;
     }
 
-    locBtn.addEventListener('click', () => {
-      if (!('geolocation' in navigator)) return setStatus('unavailable', 'err');
-      locBtn.disabled = true;
+    // Галочка «Разрешить передачу геолокации»: сразу определяем место, отправляем хозяину
+    // и добавляем точку на карте в сообщения WhatsApp / Telegram. Сняли галочку — точки в сообщениях нет.
+    geoChk.addEventListener('change', () => {
+      if (!pet || !pet.phone) return;
+      if (!geoChk.checked) { coords = null; setStatus(''); render(); return; }
+      if (!('geolocation' in navigator)) { geoChk.checked = false; return setStatus('unavailable', 'err'); }
       setStatus('sending');
-      navigator.geolocation.getCurrentPosition(async (pos) => {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        if (!geoChk.checked) return;
         coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-        $('waBtn').href = waLink();
-        if (!pet.can_notify) {
-          // Нет Telegram у владельца → открываем WhatsApp с точкой на карте
-          setStatus('');
-          locBtn.disabled = false;
-          window.location.href = waLink();
-          return;
-        }
-        try {
-          const res = await fetch(`${API}/api/location`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id_tag: tagId, lat: coords.lat, lon: coords.lon, accuracy: pos.coords.accuracy })
-          });
-          const d = await res.json();
-          if (d.success) markSent();
-          else if (d.error === 'not_linked') { locBtn.disabled = false; window.location.href = waLink(); }
-          else { setStatus('netErr', 'err'); locBtn.disabled = false; }
-        } catch (e) {
-          setStatus('netErr', 'err');
-          locBtn.disabled = false;
+        render();
+        if (sendLocToOwner(pos) || locSent) {
+          setStatus('sent', 'ok');
+          hearts();
+          if (navigator.vibrate) navigator.vibrate(60);
+        } else {
+          setStatus('locReady', 'ok');
         }
       }, (err) => {
+        geoChk.checked = false;
         setStatus(err.code === 1 ? 'denied' : 'unavailable', 'err');
-        locBtn.disabled = false;
       }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+    });
+
+    // Telegram: ссылка открывает чат с хозяином, а готовый текст (с точкой на карте) — в буфере обмена
+    $('tgBtn').addEventListener('click', () => {
+      if (!pet || !pet.phone) return;
+      try { if (navigator.clipboard) { navigator.clipboard.writeText(msgText()).catch(() => {}); setStatus('tgCopied', 'ok'); } } catch (e) {}
     });
 
     load();
