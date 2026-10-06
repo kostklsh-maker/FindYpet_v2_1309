@@ -1,8 +1,8 @@
 // ============================================================
 // Заказ на сайте FindYpet
 // 1) данные → Worker → таблица FindYpetDatabase: по строке (tag_id) на каждого питомца
-//    (Семейный тариф: до 3 питомцев; оставшиеся жетоны — запасные копии)
-//    + доп. данные (второй телефон, заметки — тариф Смарт/Семейный) → KV Worker'а
+//    (1 жетон или 3 по акции 2 + 1: до 3 питомцев; оставшиеся жетоны — запасные копии)
+//    + доп. данные (второй телефон, заметки — у каждого питомца свои) → KV Worker'а
 // 2) пользователь нажимает "Open Telegram" → бот привязывает к чату ВСЕ жетоны заказа
 // Тексты — из js/i18n.js (функция t); блок Семейного тарифа — js/app.js (window.FYP_family)
 // ============================================================
@@ -19,28 +19,30 @@
         errEl.textContent = key ? t(key) : "";
         if (key) errEl.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-    const selectedPlan = () => (form.querySelector('input[name="plan"]:checked') || {}).value || "smart";
+    const selectedQty = () => +((form.querySelector('input[name="qty"]:checked') || {}).value || 1);
 
-    // Форма заказа скрыта, пока не выбран тариф: «Выбрать» в карточке → форма раскрывается под тарифами
+    // Форма заказа скрыта, пока не нажали «Заказать» в карточке: 1 жетон или 2 + 1
     const orderSec = document.getElementById("order");
-    function markChosen(plan) {
-        document.querySelectorAll(".plan").forEach(function (p) { p.classList.toggle("chosen", p.dataset.plan === plan); });
+    function markChosen(qty) {
+        document.querySelectorAll(".plan").forEach(function (p) {
+            p.classList.toggle("chosen", p.dataset.plan === (qty >= 2 ? "three" : "one"));
+        });
     }
-    function openOrder(plan) {
+    function openOrder(qty) {
         orderSec.classList.remove("closed");
-        if (plan) {
-            const r = form.querySelector('input[name="plan"][value="' + plan + '"]');
+        if (qty) {
+            const r = form.querySelector('input[name="qty"][value="' + (qty >= 2 ? 3 : 1) + '"]');
             if (r) { r.checked = true; r.dispatchEvent(new Event("change", { bubbles: true })); }
         }
-        markChosen(selectedPlan());
+        markChosen(selectedQty());
     }
     document.querySelectorAll(".choose").forEach(function (b) {
         b.addEventListener("click", function () {
-            openOrder(b.dataset.plan);
+            openOrder(+b.dataset.qty || 1);
             requestAnimationFrame(function () { orderSec.scrollIntoView({ behavior: "smooth" }); });
         });
     });
-    form.querySelectorAll('input[name="plan"]').forEach(function (r) { r.addEventListener("change", function () { markChosen(selectedPlan()); }); });
+    form.querySelectorAll('input[name="qty"]').forEach(function (r) { r.addEventListener("change", function () { markChosen(selectedQty()); }); });
     if (location.hash === "#order") openOrder();
 
     let lastOrder = null;
@@ -62,9 +64,8 @@
             li.appendChild(b); li.appendChild(a);
             list.appendChild(li);
         });
-        const basic = d.plan === "basic";
         const ct = document.getElementById("connectText");
-        ct.dataset.t = basic ? "connectTgBasic" : "connectTg";
+        ct.dataset.t = "connectTg";
         ct.textContent = t(ct.dataset.t);
     }
     if (typeof onLang === "function") onLang(renderDone);
@@ -73,27 +74,29 @@
         e.preventDefault();
         showError("");
         const val = (id) => (document.getElementById(id).value || "").trim();
-        const plan = selectedPlan();
-        const fam = window.FYP_family ? window.FYP_family() : { pets: [], spare_for: [] };
+        const qty = selectedQty();
+        const fam = window.FYP_family ? window.FYP_family() : { pets: [], spare_for: [], pet_extras: [] };
+        const multi = qty >= 2;
         const payload = {
             owner_name: val("ownerName"),
             phone: val("ownerPhone"),
             pet_name: val("petName"),
             address: val("shippingAddress"),
-            phone2: plan === "smart" ? val("phone2") : "",
-            notes: plan === "smart" ? val("notes") : "",
+            phone2: multi ? "" : val("phone2"),
+            notes: multi ? "" : val("notes"),
             consent: document.getElementById("consent").checked,
-            plan: plan,
-            pets: plan === "family" ? fam.pets : [],
-            spare_for: plan === "family" ? fam.spare_for : [],
-            pet_extras: plan === "family" ? fam.pet_extras : [],
+            tags: qty,
+            care: document.getElementById("careOpt").checked,
+            pets: multi ? fam.pets : [],
+            spare_for: multi ? fam.spare_for : [],
+            pet_extras: multi ? fam.pet_extras : [],
             lang: currentLang
         };
         if (!payload.owner_name || !payload.phone || !payload.pet_name || !payload.address) return showError("errFill");
-        if (plan === "family" && fam.missing) return showError("errPet2");
+        if (multi && fam.missing) return showError("errPet2");
         if (!looksLikePhone(payload.phone)) return showError("errPhone");
         if (payload.phone2 && !looksLikePhone(payload.phone2)) return showError("errPhone2");
-        if (plan === "family" && fam.pet_extras.some(function (e) { return e.phone2 && !looksLikePhone(e.phone2); })) return showError("errPhone2");
+        if (multi && fam.pet_extras.some(function (e) { return e.phone2 && !looksLikePhone(e.phone2); })) return showError("errPhone2");
         if (!payload.consent) return showError("errConsent");
 
         btn.disabled = true;
@@ -108,7 +111,6 @@
             const data = await res.json();
             if (data.success) {
                 lastOrder = data;
-                if (!lastOrder.plan) lastOrder.plan = plan;
                 form.hidden = true;
                 const step = document.getElementById("telegramStep");
                 step.hidden = false;

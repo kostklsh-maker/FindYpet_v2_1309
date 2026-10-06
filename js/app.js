@@ -2,7 +2,7 @@
 // Интерактив главной страницы FindYpet
 // (жетон-перевёртыш, демо «4 шага», вкладки для нашедшего,
 //  переключатель «Потерялся», калькулятор питомцев, живой превью жетона)
-// Зависит от i18n.js (t, onLang, planNum, money)
+// Зависит от i18n.js (t, onLang, money, priceOf, orderTotal)
 // ============================================================
 (function () {
     const $ = (s, r) => (r || document).querySelector(s);
@@ -110,26 +110,11 @@
     const lostToggle = $("#lostToggle"), mini = $("#miniPage");
     lostToggle.addEventListener("change", function () { mini.classList.toggle("lost", lostToggle.checked); });
 
-    // ---------- Тарифы: сколько питомцев ----------
-    const plans = $$(".plan");
-    let pets = 1;
-    function renderPets() {
-        const smart = planNum("smart"), family = planNum("family");
-        const three = smart * 3, save = three - family;
-        let rec = "smart", text;
-        if (pets === 1) text = t("rec1");
-        else if (pets === 2) { rec = "family"; text = t("rec2", { two: money(smart * 2), family: money(family) }); }
-        else { rec = "family"; text = t("rec3", { family: money(family), three: money(three), save: money(save) }); }
-        $("#petsRec").textContent = smart ? text : "";
-        plans.forEach(function (p) { p.classList.toggle("recommended", p.dataset.plan === rec); });
-        const badge = $("#familySave");
-        badge.textContent = save > 0 ? t("saveBadge", { save: money(save) }) : "";
-        badge.hidden = !(save > 0);
+    // ---------- Цены: 2 + 1 — сколько выходит за жетон ----------
+    function renderPricing() {
+        const per = priceOf("three") / 3;
+        $("#trioPer").textContent = per ? t("trioPer", { each: money(per) }) : "";
     }
-    tabs($("#petsSeg"), "pets", function (n) {
-        pets = +n; renderPets();
-        setFamN(pets); // в форме Семейного тарифа сразу стоит то же число питомцев
-    });
 
     // ---------- Заказ: живой превью жетона и итог ----------
     const petIn = $("#petName"), phoneIn = $("#ownerPhone");
@@ -140,31 +125,25 @@
         $("#pvPhone").textContent = ph || "050-123-4567";
         $("#pvName").classList.toggle("long", (name || "BELLA").length > 8);
     }
+    // ---------- Заказ: 1 жетон или 2 + 1 ----------
+    const qty = function () { const r = $('input[name="qty"]:checked'); return r ? +r.value : 1; };
+    const multi = function () { return qty() >= 2; };
     function renderSummary() {
-        const r = $('input[name="plan"]:checked');
-        const id = r ? r.value : "smart";
-        const names = { basic: "planBasic", smart: "planSmart", family: "planFamily" };
-        $("#sumPlan").textContent = t(names[id]);
-        $("#sumPrice").textContent = (typeof PLANS !== "undefined" && PLANS[id]) ? PLANS[id].price : "";
+        $("#sumPrice").textContent = money(orderTotal(qty()));
+        $("#sumFreeRow").hidden = !multi();
         $$(".plan-pick label").forEach(function (l) { l.classList.toggle("on", l.querySelector("input").checked); });
     }
-    // ---------- Заказ: Семейный тариф (питомцы и запасные), Базовый (без доп. полей) ----------
-    const planId = function () { const r = $('input[name="plan"]:checked'); return r ? r.value : "smart"; };
-    const slots = function () {
-        const p = typeof PLANS !== "undefined" && PLANS[planId()];
-        return p && p.tags ? p.tags : (planId() === "family" ? 3 : 1);
-    };
-    // Семейный: 3 карточки «Метка 1/2/3». Метка 1 — питомец из поля «Кличка». Метки 2 и 3 — свой питомец
+    // 2 + 1: 3 карточки «Метка 1/2/3». Метка 1 — питомец из поля «Кличка». Метки 2 и 3 — свой питомец
     // (кличка, второй контакт, заметки) или галочка «Запасная» + для какого питомца.
     const ftags = $$(".ftag");
-    const isSpare = function (i) { return i > 0 && planId() === "family" && ftags[i].querySelector(".ft-spare-chk").checked; };
+    const isSpare = function (i) { return i > 0 && multi() && ftags[i].querySelector(".ft-spare-chk").checked; };
     const cardName = function (i) {
         const v = i === 0 ? petIn.value.trim() : ftags[i].querySelector(".ft-name").value.trim();
         return v || t("petN", { i: i + 1 });
     };
     // Состав заказа для register-form.js
     function famData() {
-        if (planId() !== "family") return { pets: [], spare_for: [], pet_extras: [], missing: false, items: [{ name: petIn.value.trim() || t("petN", { i: 1 }), copies: 1 }] };
+        if (!multi()) return { pets: [], spare_for: [], pet_extras: [], missing: false, items: [{ name: petIn.value.trim() || t("petN", { i: 1 }), copies: 1 }] };
         const petCards = [0, 1, 2].filter(function (i) { return !isSpare(i); });
         const items = petCards.map(function (i) {
             const c = ftags[i];
@@ -188,17 +167,10 @@
         };
     }
     window.FYP_family = famData;
-    // Подсказка «Сколько питомцев?» в разделе цен: 1 → метки 2 и 3 запасные, 2 → метка 3 запасная, 3 → все свои
-    function setFamN(n) {
-        n = Math.min(Math.max(+n || 1, 1), 3);
-        [1, 2].forEach(function (i) { ftags[i].querySelector(".ft-spare-chk").checked = i >= n; });
-        renderOrder();
-    }
     function renderOrder() {
-        const fam = planId() === "family", basic = planId() === "basic";
+        const fam = multi();
         $("#familyBox").hidden = !fam;
-        $("#moreBox").hidden = basic || fam;   // в Семейном второй контакт и заметки — в карточке каждой метки
-        $("#basicNote").hidden = !basic;
+        $("#moreBox").hidden = fam;   // при 3 жетонах второй контакт и заметки — в карточке каждой метки
         const petCards = [0, 1, 2].filter(function (i) { return !isSpare(i); });
         ftags.forEach(function (c, i) {
             c.querySelector(".ft-n").textContent = t("tagN", { n: i + 1 });
@@ -225,7 +197,7 @@
             ul.appendChild(li);
         });
         // Итог и превью: сколько физических жетонов
-        const total = slots();
+        const total = fam ? 3 : 1;
         $("#sumTags").textContent = String(total);
         const cnt = $("#pvCount");
         cnt.hidden = total < 2;
@@ -248,7 +220,7 @@
 
     petIn.addEventListener("input", renderPreview);
     phoneIn.addEventListener("input", renderPreview);
-    $$('input[name="plan"]').forEach(function (r) { r.addEventListener("change", function () { renderSummary(); renderOrder(); }); });
+    $$('input[name="qty"]').forEach(function (r) { r.addEventListener("change", function () { renderSummary(); renderOrder(); }); });
     // Кнопки «Выбрать» (логика выбора — в register-form.js), тут только обновляем итог
     $$(".choose").forEach(function (b) { b.addEventListener("click", function () { setTimeout(function () { renderSummary(); renderOrder(); }, 0); }); });
 
@@ -257,7 +229,7 @@
     new MutationObserver(function () { $("#stTg").classList.toggle("on", !tgStep.hidden); })
         .observe(tgStep, { attributes: true, attributeFilter: ["hidden"] });
 
-    function renderAll() { renderPets(); renderPreview(); renderSummary(); renderOrder(); }
+    function renderAll() { renderPricing(); renderPreview(); renderSummary(); renderOrder(); }
     onLang(renderAll);
     renderAll();
 })();

@@ -75,7 +75,7 @@
                     <a class="btn btn-primary btn-lg" href="#plans"><span data-t="heroCta">Choose your tag</span><svg class="ic flip-rtl"><use href="#i-arrow"/></svg></a>
                     <a class="btn btn-ghost btn-lg" href="#how" data-t="heroCta2">See how it works</a>
                 </div>
-                <p class="hero-price"><span data-t="from">from</span> <b class="ltr" data-price-min></b> <span data-t="heroPriceNote">· pay once, no subscription</span></p>
+                <p class="hero-price"><b class="ltr" data-price-min></b> <span data-t="heroPriceNote">· one-time · 3rd tag free</span></p>
             </div>
 
             <div class="hero-visual reveal" aria-hidden="false">
@@ -294,59 +294,50 @@
                 <p class="sub" data-t="plansSub">Pay once — no subscription, no monthly or yearly fees.</p>
             </div>
 
-            <div class="pets reveal">
-                <span data-t="petsQ">How many pets?</span>
-                <div class="seg seg-sm" id="petsSeg">
-                    <button type="button" class="on" data-pets="1">1</button>
-                    <button type="button" data-pets="2">2</button>
-                    <button type="button" data-pets="3">3</button>
-                </div>
-                <p class="pets-rec" id="petsRec" aria-live="polite"></p>
-            </div>
-
             <div class="plans">
-                <div class="plan reveal" data-plan="basic">
-                    <h3 data-t="planBasic">Basic</h3>
-                    <p class="plan-for" data-t="basicFor">A tag anyone can use</p>
-                    <div class="plan-price ltr" data-price="basic"></div>
+                <div class="plan reveal" data-plan="one">
+                    <h3 data-t="tagName">FindYpet tag</h3>
+                    <p class="plan-for" data-t="tagFor">Everything to get your pet home</p>
+                    <div class="plan-price ltr" data-price="tag"></div>
                     <div class="plan-per" data-t="oneTime">one-time payment</div>
                     <ul class="checks">
-                        <li data-t="pb1">Tag with your phone number, QR and NFC</li>
-                        <li data-t="pb2">Pet page in English, Hebrew and Russian</li>
-                        <li data-t="pb3">Call and WhatsApp straight from the page</li>
-                        <li data-t="pb4">The finder can send you their location via WhatsApp</li>
+                        <li data-t="t1">Tag with your phone number, QR and NFC</li>
+                        <li data-t="t2">Pet page in English, Hebrew and Russian</li>
+                        <li data-t="t3">Call, WhatsApp and Telegram straight from the page</li>
+                        <li data-t="t4">The finder's message and location come to you</li>
+                        <li data-t="t5">“Lost” mode in one command</li>
+                        <li data-t="t6">Second contact and important notes</li>
                     </ul>
-                    <button type="button" class="btn btn-primary btn-block choose" data-plan="basic" data-t="choose">Choose</button>
+                    <button type="button" class="btn btn-primary btn-block choose" data-qty="1" data-t="chooseOne">Order a tag</button>
                 </div>
-                <div class="plan featured reveal" data-plan="smart">
-                    <span class="plan-badge" data-t="popular">Most popular</span>
-                    <h3 data-t="planSmart">Special</h3>
-                    <p class="plan-for" data-t="smartFor">You hear the moment they're found</p>
-                    <div class="plan-price ltr" data-price="smart"></div>
-                    <div class="plan-per" data-t="oneTime">one-time payment</div>
+                <div class="plan featured reveal" data-plan="three">
+                    <span class="plan-badge" data-t="trioBadge">3rd tag free</span>
+                    <h3 data-t="trioName">2 + 1</h3>
+                    <p class="plan-for" data-t="trioFor">For a home with several pets</p>
+                    <div class="plan-price ltr" data-price="three"></div>
+                    <div class="plan-per" id="trioPer"></div>
                     <ul class="checks">
-                        <li data-t="ps1">Everything in Basic</li>
-                        <li data-t="ps2">Second contact phone</li>
-                        <li data-t="ps3">Important notes: allergies, meds, “don't chase”</li>
-                        <li data-t="ps4">“Lost” mode in one command</li>
+                        <li data-t="tr1">For 3 pets — or 2 pets and a spare</li>
+                        <li data-t="tr2">Each pet: its own page, second contact and notes</li>
+                        <li data-t="tr3">A spare is an exact copy of any pet's tag</li>
+                        <li data-t="tr4">Every tag has everything</li>
                     </ul>
-                    <p class="plan-soon" data-t="psSoon">Coming soon: special services for the Special and Family plans.</p>
-                    <button type="button" class="btn btn-primary btn-block choose" data-plan="smart" data-t="choose">Choose</button>
+                    <button type="button" class="btn btn-primary btn-block choose" data-qty="3" data-t="chooseThree">Order 3 tags</button>
                 </div>
-                <div class="plan reveal" data-plan="family">
-                    <span class="plan-save" id="familySave"></span>
-                    <h3 data-t="planFamily">Family</h3>
-                    <p class="plan-for" data-t="familyFor">For a home with several pets</p>
-                    <div class="plan-price ltr" data-price="family"></div>
-                    <div class="plan-per" data-t="familyPer">3 NFC tags</div>
+                <div class="plan plan-care reveal" data-plan="care">
+                    <span class="plan-badge plan-soon-badge" data-t="careBadge">Coming soon</span>
+                    <h3 data-t="careName">FindYpet Care</h3>
+                    <p class="plan-for" data-t="careFor">A monthly program for pet owners</p>
+                    <div class="plan-price ltr" data-price="care"></div>
+                    <div class="plan-per" data-t="carePer">per month · optional, cancel any time</div>
                     <ul class="checks">
-                        <li data-t="pf1">Everything in Special</li>
-                        <li data-t="pf2">One per pet — or spares for one pet</li>
-                        <li data-t="pf4">You choose how to use them when ordering</li>
-                        <li data-t="pf3">Lowest price per tag</li>
+                        <li data-t="c0">One subscription per owner — covers all your pets</li>
+                        <li data-t="c1">Digital health card from your vet</li>
+                        <li data-t="c2">Discounts at pet shops, groomers and pet hotels</li>
+                        <li data-t="c3">Partner bonuses</li>
                     </ul>
-                    <p class="plan-soon" data-t="psSoon">Coming soon: special services for the Special and Family plans.</p>
-                    <button type="button" class="btn btn-primary btn-block choose" data-plan="family" data-t="choose">Choose</button>
+                    <p class="plan-soon" data-t="careNote">Your tag works fully without it — Care is an extra and is never needed to find your pet.</p>
+                    <a class="btn btn-outline btn-block" href="https://t.me/YourPetLocatorBot?start=care" target="_blank" rel="noopener" data-t="careBtn">Notify me at launch</a>
                 </div>
             </div>
         </div>
@@ -373,8 +364,8 @@
                     <p class="preview-hint" data-t="previewHint">Updates as you type</p>
                     <ul class="pv-list" id="pvList" hidden></ul>
                     <div class="summary">
-                        <div><span data-t="lblPlan">Plan</span><b id="sumPlan"></b></div>
                         <div><span data-t="sumTags">Tags</span><b id="sumTags">1</b></div>
+                        <div class="sum-free" id="sumFreeRow" hidden><span data-t="sumFree">incl. 1 free</span><b>🎁</b></div>
                         <div class="total"><span data-t="sumTotal">Total</span><b class="ltr" id="sumPrice"></b></div>
                         <p class="after-title" data-t="asTitle">After you order:</p>
                         <ol class="after-steps">
@@ -388,16 +379,15 @@
 
                 <div class="form-wrap reveal">
                     <ol class="steps-line">
-                        <li class="on"><span>1</span><span data-t="st1">Plan</span></li>
+                        <li class="on"><span>1</span><span data-t="st1">Tags</span></li>
                         <li class="on"><span>2</span><span data-t="st2">Details</span></li>
                         <li id="stTg"><span>3</span><span data-t="st3">Telegram</span></li>
                     </ol>
                     <form id="registerForm" novalidate>
-                        <fieldset class="plan-pick">
-                            <legend data-t="lblPlan">Plan</legend>
-                            <label><input type="radio" name="plan" value="basic"><span class="pp-name" data-t="planBasic">Basic</span><span class="ltr pp" data-price="basic"></span></label>
-                            <label><input type="radio" name="plan" value="smart" checked><span class="pp-name" data-t="planSmart">Special</span><span class="ltr pp" data-price="smart"></span></label>
-                            <label><input type="radio" name="plan" value="family"><span class="pp-name" data-t="planFamily">Family</span><span class="ltr pp" data-price="family"></span></label>
+                        <fieldset class="plan-pick qty-pick">
+                            <legend data-t="lblQty">How many tags</legend>
+                            <label><input type="radio" name="qty" value="1" checked><span class="pp-name" data-t="qtyOne">1 tag</span><span class="ltr pp" data-price="tag"></span></label>
+                            <label><input type="radio" name="qty" value="3"><span class="pp-name" data-t="qtyThree">2 + 1</span><span class="ltr pp" data-price="three"></span><small class="pp-free" data-t="trioBadge">3rd tag free</small></label>
                         </fieldset>
                         <div class="row2">
                             <label><span data-t="lblPet">Pet's name</span>
@@ -435,7 +425,7 @@
                                     <select class="ft-for-sel"></select></label>
                             </div>
                             <div class="ftag" data-i="2">
-                                <div class="ft-head"><b class="ft-n"></b><label class="ft-spare"><input type="checkbox" class="ft-spare-chk"><span data-t="spareChk">Spare tag</span></label></div>
+                                <div class="ft-head"><b class="ft-n"></b><label class="ft-spare"><input type="checkbox" class="ft-spare-chk" checked><span data-t="spareChk">Spare tag</span></label></div>
                                 <div class="ft-pet-box">
                                     <label><span data-t="lblPetName">Pet's name</span>
                                         <input type="text" class="ft-name" maxlength="16" data-t-ph="phPet" placeholder="Pet's name"></label>
@@ -456,7 +446,6 @@
                             <input type="tel" id="ownerPhone" data-t-ph="phPhone" placeholder="050-123-4567" autocomplete="tel" required></label>
                         <label><span data-t="lblAddress">Delivery address</span>
                             <input type="text" id="shippingAddress" data-t-ph="phAddress" placeholder="City, street, apartment" autocomplete="street-address" required></label>
-                        <p class="basic-note" id="basicNote" hidden><svg class="ic"><use href="#i-lock"/></svg><span data-t="basicNote">Second contact, notes, scan alerts and Lost mode come with Smart.</span></p>
                         <details class="more" id="moreBox">
                             <summary data-t="moreFields">+ Second contact and notes (optional)</summary>
                             <label><span data-t="lblPhone2">Second phone (family member)</span>
@@ -465,6 +454,8 @@
                                 <textarea id="notes" rows="2" maxlength="200" data-t-ph="phNotes" placeholder="E.g.: allergic to chicken; scared of people — don't chase"></textarea></label>
                             <p class="small-note" data-t="notesPublic">These details are shown on the public pet page.</p>
                         </details>
+                        <label class="consent care-opt"><input type="checkbox" id="careOpt">
+                            <span data-t="careChk">Tell me when FindYpet Care launches — nothing to pay now</span></label>
                         <label class="consent"><input type="checkbox" id="consent" required>
                             <span><span data-t="consent1">I agree that my first name, phone number and the details above will be shown on my pet's page to whoever scans the tag, as described in the</span> <a href="privacy/" target="_blank" data-t="privacyLink">privacy policy</a>.</span></label>
                         <p class="form-error" id="formError" role="alert"></p>
@@ -508,6 +499,7 @@
                 <details class="faq"><summary data-t="q5">Who sees my details?</summary><p data-t="a5">Whoever scans the tag sees your pet's name, your first name, your phone and the notes you chose to add. Your address is used only for delivery and is never shown. The finder's location is sent only if they press the button.</p></details>
                 <details class="faq"><summary data-t="q6">Does it replace the microchip?</summary><p data-t="a6">No. The microchip is required by law and remains the last backup. FindYpet adds a fast way to reach you without a vet's scanner.</p></details>
                 <details class="faq"><summary data-t="q8">What is a spare tag?</summary><p data-t="a8">An exact copy of your pet's tag — same engraving, same page and link. Keep it at home or put it on a harness. In the Family plan you choose: a tag for each pet, or spares.</p></details>
+                <details class="faq"><summary data-t="q12">What is FindYpet Care?</summary><p data-t="a12">A monthly program we're preparing: a digital health card from your vet, partner discounts and bonuses. Planned price — 39 ₪ a month per owner, covering all your pets; cancel any time. It isn't live yet; join the waitlist in our bot — no payment.</p></details>
                 <details class="faq"><summary data-t="q9">How do I pay, and when will I get the tag?</summary><p data-t="a9">After you order, we message you to confirm the order and arrange payment. Then we engrave the tag, write its NFC and ship it to your address. Each step is announced in Telegram — or we call you.</p></details>
                 <details class="faq"><summary data-t="q10">What if my phone number changes?</summary><p data-t="a10">Write to us in the bot — we update your pet's page right away. The old number stays engraved on the front, so you can order a new tag with the new number.</p></details>
                 <details class="faq"><summary data-t="q7">How do I update my phone or notes?</summary><p data-t="a7">In the Telegram bot: /settings. Keep your contacts up to date — outdated contacts are a common reason a found pet doesn't get home.</p></details>
@@ -533,7 +525,7 @@
 
     <!-- Mobile sticky order bar -->
     <div class="sticky-bar" id="stickyBar" aria-hidden="true">
-        <span><small data-t="barText">Smart tag from</small> <b class="ltr" data-price-min></b></span>
+        <span><small data-t="barText">FindYpet tag</small> <b class="ltr" data-price-min></b></span>
         <a class="btn btn-primary btn-sm" href="#plans" data-t="navCta">Get a tag</a>
     </div>
 

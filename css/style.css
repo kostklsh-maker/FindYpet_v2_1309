@@ -641,3 +641,13 @@ h2 { letter-spacing: -.01em; }
 /* v10: форма заказа скрыта, пока не выбран тариф; выбранная карточка подсвечена */
 .registration.closed { display: none; }
 .plan.chosen { border-color: var(--cta); box-shadow: 0 0 0 4px rgba(255,119,19,.55), var(--shadow-lg); }
+
+/* v11: один жетон + 2 + 1 + «Забота» (скоро) */
+.qty-pick { grid-template-columns: repeat(2, 1fr); }
+.qty-pick .pp-free { font-size: 12px; font-weight: 700; color: var(--cta); }
+.plan-care { opacity: .96; }
+.plan-care .plan-badge.plan-soon-badge { background: rgba(255,255,255,.14); color: #fff; }
+.plan-care .btn-outline { background: transparent; color: #fff; box-shadow: inset 0 0 0 2px rgba(255,255,255,.55); }
+.plan-care .btn-outline:hover { background: rgba(255,255,255,.12); color: #fff; }
+.sum-free { display: flex; justify-content: space-between; font-size: 14px; opacity: .9; }
+.care-opt { color: var(--ink) !important; font-weight: 500; }

@@ -1,4 +1,4 @@
-# Проверка заказа на сайте: Семейный (2 питомца + запасной), Базовый, экран «что дальше».
+# Проверка заказа на сайте (модель v11): жетон 49 ₪, 2 + 1 = 98 ₪ за 3, «Забота» — скоро.
 # Нужен запущенный node worker/test/server.mjs
 import asyncio, os
 from playwright.async_api import async_playwright
@@ -18,14 +18,19 @@ async def main():
             await pg.evaluate(f"localStorage.setItem('fyp_lang','{lang}')")
             await pg.goto('http://localhost:8787/')
             await pg.evaluate("document.querySelectorAll('.reveal').forEach(e=>e.classList.add('in'))")
-            # Базовый: доп. поля скрыты, есть пояснение
-            await pg.click('.choose[data-plan="basic"]'); await pg.wait_for_timeout(200)
-            basic = (await pg.is_visible('#basicNote'), await pg.is_visible('#moreBox'), await pg.is_visible('#familyBox'))
-            # Цены: 2 питомца → подсвечен Семейный; в форме метка 2 — питомец, метка 3 — запасная
-            await pg.click('#petsSeg button[data-pets="2"]')
-            rec = await pg.evaluate("document.querySelector('.plan.recommended').dataset.plan")
-            await pg.click('.choose[data-plan="family"]'); await pg.wait_for_timeout(200)
-            fam_n = await pg.evaluate("[...document.querySelectorAll('.ft-spare-chk')].map(c => c.checked)")
+            hero = await pg.inner_text('.hero-price')
+            prices = await pg.evaluate("[...document.querySelectorAll('.plan .plan-price')].map(e => e.textContent)")
+            trio = await pg.inner_text('#trioPer')
+            care_href = await pg.get_attribute('.plan-care a', 'href')
+            closed = not await pg.is_visible('#order')
+            await pg.locator('#plans').screenshot(path=f'{OUT}/plans_{lang}.png')
+            # 1 жетон: общие доп. контакт и заметки, 49 ₪
+            await pg.click('.choose[data-qty="1"]'); await pg.wait_for_timeout(250)
+            one = (await pg.is_visible('#moreBox'), await pg.is_visible('#familyBox'), await pg.inner_text('#sumPrice'), await pg.inner_text('#sumTags'))
+            # 2 + 1: три карточки, метка 3 запасная по умолчанию, 98 ₪
+            await pg.click('.qty-pick label:nth-of-type(2)'); await pg.wait_for_timeout(200)
+            three = (await pg.is_visible('#moreBox'), await pg.is_visible('#familyBox'), await pg.inner_text('#sumPrice'), await pg.inner_text('#sumTags'), await pg.is_visible('#sumFreeRow'))
+            chosen = await pg.evaluate("document.querySelector('.plan.chosen')?.dataset.plan")
             a, c = PETS[lang]
             await pg.fill('#petName', a); await pg.fill('#ownerName', 'Kostya')
             await pg.fill('#ownerPhone', '050-123-4567'); await pg.fill('#shippingAddress', 'Haifa')
@@ -37,13 +42,15 @@ async def main():
             await tag2.locator('summary').click()
             await tag2.locator('.ft-phone2').fill('052-765-4321'); await tag2.locator('.ft-notes').fill('Shy')
             await tag3.locator('.ft-for-sel').select_option('1')
-            summ = await pg.inner_text('#famSummary'); tags = await pg.inner_text('#sumTags'); pv = await pg.inner_text('#pvList')
+            await pg.check('#careOpt')
+            summ = await pg.inner_text('#famSummary'); pv = await pg.inner_text('#pvList')
             await pg.locator('#order').screenshot(path=f'{OUT}/order_family_{lang}.png')
             await pg.click('#orderBtn'); await pg.wait_for_timeout(900)
             done = await pg.inner_text('#doneTags')
             sw = await pg.evaluate('document.documentElement.scrollWidth')
-            print(lang, '| errs', errs, '| basic note/more/fam', basic, '| rec', rec, 'famN', fam_n,
-                  '| err:', err, '| summary:', summ.replace('\n', ' / '), '| tags', tags, '| pv', pv.replace('\n', ' '),
+            print(lang, '| errs', errs, '| hero', hero.replace('\n', ' '), '| prices', prices, '| trio', trio, '| care', care_href,
+                  '| order closed', closed, '| one(more,fam,sum,tags)', one, '| three(more,fam,sum,tags,free)', three, '| chosen', chosen,
+                  '| err:', err, '| summary:', summ.replace('\n', ' / '), '| pv', pv.replace('\n', ' '),
                   '| done:', done.replace('\n', ' / '), '| sw', sw)
             await pg.locator('#order').screenshot(path=f'{OUT}/order_done_{lang}.png')
             await ctx.close()
