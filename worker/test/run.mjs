@@ -542,4 +542,25 @@ await test('test site: no scheduled reminders', async () => {
   assert.equal(state.tg.length, before);
 });
 
+// Проверки после выкладки (deploy-worker.yml) ищут строки в ответах Worker'а.
+// Если строка в сайте поменялась, а в проверке — нет, выкладка в main «падает» уже после деплоя.
+await test('deploy smoke checks look for strings the worker really serves', async () => {
+  const { readFileSync } = await import('node:fs');
+  const yml = readFileSync(new URL('../../.github/workflows/deploy-worker.yml', import.meta.url), 'utf8');
+  const step = (name) => yml.split(/\n\s*- name: /).find((s) => s.startsWith(name)) || '';
+  const checks = (body) => [
+    // только строки-утверждения (не «if … grep» — это проверки, что чего-то НЕТ)
+    ...[...body.matchAll(/^\s*echo "\$page" \| grep -q '([^']+)'/gm)].map((m) => ['/', m[1]]),
+    ...[...body.matchAll(/^\s*curl -fsS "\$base(\/[^"]*)" \| grep -q '([^']+)'/gm)].map((m) => [m[1], m[2]]),
+  ];
+  for (const [name, e] of [['Smoke test (workers.dev)', makeEnv({ SITE_URL: 'https://findy-pet.com' })], ['Smoke test (test site)', testEnv()]]) {
+    const list = checks(step(name));
+    assert.ok(list.length >= 2, `${name}: checks not found in workflow`);
+    for (const [path, needle] of list) {
+      const body = await (await call(e, path)).text();
+      assert.ok(body.includes(needle), `${name}: ${path} does not contain '${needle}'`);
+    }
+  }
+});
+
 console.log(`\n${passed} tests passed`);
