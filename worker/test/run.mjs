@@ -16,9 +16,11 @@ await test('landing, tag page, privacy and /t/ short link are served', async () 
     assert.equal(r.status, 200, p);
   }
   const t = await (await call(env, '/t/101')).text();
-  assert.match(t, /Send Message/);
+  assert.match(t, /Call my owner/);
+  assert.match(t, /id="tgBtn"/);
+  assert.match(t, /Allow sharing my location/);
   assert.match(t, /id="i-wa"/);
-  assert.match(t, /waLocText/);
+  assert.match(t, /maps.google.com\/\?q=/);  // точка на карте в сообщении, если нашедший разрешил геолокацию
   const home = await (await call(env, '/')).text();
   assert.match(home, /fastest way home/);
   assert.doesNotMatch(home, /precise location/);
