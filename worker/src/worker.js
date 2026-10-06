@@ -101,26 +101,28 @@ const REMINDER_DAYS = 180;
 // ---------------------------------------------------------------
 const PLANS = {
   basic: { price: '49 ₪', name: 'Basic', tags: 1 },
-  smart: { price: '79 ₪', name: 'Smart', tags: 1 },
-  family: { price: '199 ₪', name: 'Family (3 Smart tags)', tags: 3 },
+  smart: { price: '79 ₪', name: 'Special', tags: 1 },   // id 'smart' не менять — он записан в старых заказах
+  family: { price: '199 ₪', name: 'Family (3 Special tags)', tags: 3 },
 };
 const DEFAULT_PLAN = 'smart';
 function planLabel(id) { const p = PLANS[id]; return p ? `${p.name} · ${p.price}` : '—'; }
 
-// Функции по тарифу. Базовый: жетон, страница, звонок и WhatsApp (геолокацию нашедший
-// отправляет через WhatsApp). Смарт и Семейный: + уведомления о скане и геолокации в Telegram,
-// режим «Потерялся», второй контакт и заметки.
-// Жетоны без записанного тарифа (зарегистрированы до v6) считаются Смарт.
-// false — выключить ограничения: все жетоны получают функции Смарт.
+// Функции по тарифу (с 06.10.2026):
+//  Базис (basic) — жетон, страница, звонок, WhatsApp, Telegram: сообщение и геолокация нашедшего
+//                  приходят хозяину (уведомления о скане и кнопка Telegram — во всех тарифах).
+//  Специальный (smart) и Семейный (family) — + второй контакт, важные заметки, режим «Потерялся»
+//                  (в будущем — мед. карта, скидки у партнёров).
+// Жетоны без записанного тарифа (зарегистрированы до v6) считаются Специальным.
+// false — выключить ограничения: все жетоны получают функции Специального.
 const ENFORCE_PLAN_FEATURES = true;
 function planOf(x) { return x && PLANS[x.plan] ? x.plan : DEFAULT_PLAN; }
 function feats(x) {
-  const smart = !ENFORCE_PLAN_FEATURES || planOf(x) !== 'basic';
-  return { alerts: smart, lost: smart, extras: smart };
+  const special = !ENFORCE_PLAN_FEATURES || planOf(x) !== 'basic';
+  return { alerts: true, lost: special, extras: special };
 }
 const T_UPGRADE =
-  '🔒 This is part of the <b>Smart</b> plan (scan & location alerts, Lost mode, second contact and notes).\n' +
-  'Your tag is on <b>Basic</b> — finders can call you or write to you on WhatsApp.\n' +
+  '🔒 This is part of the <b>Special</b> plan (second contact, important notes and Lost mode).\n' +
+  'Your tag is on <b>Basic</b> — finders can call you, write on WhatsApp or Telegram and send you their location.\n' +
   'Want to upgrade? Just write to us here or at findypet0926@gmail.com.';
 
 // ---------------------------------------------------------------
@@ -246,6 +248,17 @@ async function apiRegister(request, env, url, ctx) {
   const lang = ['en', 'he', 'ru'].includes(b.lang) ? b.lang : 'en';
 
   const items = orderItems(plan, pet, b.pets, b.spare_for);
+  // Семейный: у каждого питомца свой второй контакт и заметки (pet_extras[i] — для i-го питомца)
+  if (feats({ plan }).extras && Array.isArray(b.pet_extras)) {
+    for (let i = 0; i < items.length; i++) {
+      const e = b.pet_extras[i] || {};
+      const raw = str(e.phone2, 30);
+      const p2 = raw ? normalizePhone(raw) : '';
+      if (raw && !p2) return json({ success: false, error: 'Second phone is not valid.', error_code: 'phone2' }, env, 400);
+      items[i].phone2 = p2;
+      items[i].notes = str(e.notes, 200);
+    }
+  }
   const res = await createOrder(env, url, {
     source: 'site', plan, lang, owner_name: owner, phone, address, items,
     phone2: feats({ plan }).extras ? phone2 : '',
@@ -321,8 +334,13 @@ async function createOrder(env, url, o) {
     await putExtras(env, tags[i].tag_id, {
       plan: o.plan, order_id, copies: items[i].copies, lang: o.lang || 'en',
       consent_at: now, consent_via: o.source,
-      ...(o.phone2 ? { phone2: o.phone2 } : {}),
-      ...(o.notes && i === 0 ? { notes: o.notes } : {}),
+      ...(() => {
+        // свои данные питомца (Семейный) — иначе общий второй контакт и заметки первого питомца
+        const it = o.items[i];
+        const p2 = it.phone2 !== undefined ? it.phone2 : o.phone2;
+        const nt = it.notes !== undefined ? it.notes : (i === 0 ? o.notes : '');
+        return { ...(p2 ? { phone2: p2 } : {}), ...(nt ? { notes: nt } : {}) };
+      })(),
     });
   }
   const order = {
@@ -701,9 +719,11 @@ async function handleUpdate(update, env, url) {
     await send(env, chatId, '👌', { remove_keyboard: true });
     return send(env, chatId,
       '💳 <b>Choose your plan</b> (one-time payment, no subscription):\n\n' +
-      `• <b>Basic — ${PLANS.basic.price}</b>: tag with phone, QR and NFC; pet page; call & WhatsApp\n` +
-      `• <b>Smart — ${PLANS.smart.price}</b>: + instant scan & location alerts, Lost mode, 2nd contact & notes\n` +
-      `• <b>Family — ${PLANS.family.price}</b>: 3 Smart tags`,
+      `• <b>Basic — ${PLANS.basic.price}</b>: tag with phone, QR and NFC; pet page; call, WhatsApp and Telegram; ` +
+      `the finder's message and location come to you here\n` +
+      `• <b>Special — ${PLANS.smart.price}</b>: + second contact, important notes, Lost mode (and new services coming: ` +
+      `vet health card, partner discounts)\n` +
+      `• <b>Family — ${PLANS.family.price}</b>: 3 Special tags — for up to 3 pets, or 2 pets + a spare`,
       { inline_keyboard: Object.keys(PLANS).map((id) => [{ text: planLabel(id), callback_data: `plan_${id}` }]) });
   }
   if (st.step === 'plan') {
@@ -1011,14 +1031,13 @@ async function sendRegistered(chatId, tagsIn, env, url, order) {
         `<b>What happens next:</b> we contact you to confirm the order and payment → we engrave the tag and write the NFC → ` +
         `we ship it to your address. I'll keep you posted right here.\n\n`
       : '') +
-    (f.alerts
-      ? `When someone scans a tag, I'll alert you here, and they can call you, write on WhatsApp ` +
-        `or send you their location. Keep notifications for this chat turned on 🔔\n\n` +
-        `<b>Useful commands</b>\n` +
+    `When someone scans a tag, I'll alert you here, and they can call you, write on WhatsApp or Telegram ` +
+    `and send you their location. Keep notifications for this chat turned on 🔔\n\n` +
+    (f.extras
+      ? `<b>Useful commands</b>\n` +
         `⚙️ /settings — second contact and notes (allergies, "don't chase me")\n` +
         `🚨 /lost — if ${names} goes missing\n`
-      : `Your plan is <b>Basic</b>: finders call you or write to you on WhatsApp straight from the pet page. ` +
-        `Scan alerts and Lost mode are part of Smart — write to us here to upgrade.\n`) +
+      : `Second contact, notes and Lost mode are part of <b>Special</b> — write to us here to upgrade.\n`) +
     `📲 When the tag arrives: scan the QR or hold your phone to it — it must open the pet page.`,
     { inline_keyboard: [
       [{ text: '👀 Preview pet page', url: shortUrl(env, url, first.tag_id) }],

@@ -154,45 +154,72 @@
         const p = typeof PLANS !== "undefined" && PLANS[planId()];
         return p && p.tags ? p.tags : (planId() === "family" ? 3 : 1);
     };
-    let famN = 1;
-    // Состав заказа для register-form.js: доп. клички, для кого запасные, не пустые ли клички
+    // Семейный: 3 карточки «Метка 1/2/3». Метка 1 — питомец из поля «Кличка». Метки 2 и 3 — свой питомец
+    // (кличка, второй контакт, заметки) или галочка «Запасная» + для какого питомца.
+    const ftags = $$(".ftag");
+    const isSpare = function (i) { return i > 0 && planId() === "family" && ftags[i].querySelector(".ft-spare-chk").checked; };
+    const cardName = function (i) {
+        const v = i === 0 ? petIn.value.trim() : ftags[i].querySelector(".ft-name").value.trim();
+        return v || t("petN", { i: i + 1 });
+    };
+    // Состав заказа для register-form.js
     function famData() {
-        const n = planId() === "family" ? Math.min(famN, slots()) : 1;
-        const names = [petIn.value.trim(), $("#pet2").value.trim(), $("#pet3").value.trim()].slice(0, n);
-        const items = names.map(function (name, i) { return { name: name || t("petN", { i: i + 1 }), copies: 1 }; });
-        const spares = Math.max(slots() - n, 0);
-        const spareTo = n === 2 ? +$("#spareFor").value : 0;
-        for (let k = 0; k < spares; k++) items[Math.min(spareTo, items.length - 1)].copies++;
+        if (planId() !== "family") return { pets: [], spare_for: [], pet_extras: [], missing: false, items: [{ name: petIn.value.trim() || t("petN", { i: 1 }), copies: 1 }] };
+        const petCards = [0, 1, 2].filter(function (i) { return !isSpare(i); });
+        const items = petCards.map(function (i) {
+            const c = ftags[i];
+            return { name: cardName(i), copies: 1, card: i,
+                phone2: c.querySelector(".ft-phone2").value.trim(), notes: c.querySelector(".ft-notes").value.trim() };
+        });
+        const spareFor = [];
+        [1, 2].forEach(function (i) {
+            if (!isSpare(i)) return;
+            const want = +ftags[i].querySelector(".ft-for-sel").value || 0;
+            const idx = Math.max(petCards.indexOf(want), 0);
+            spareFor.push(idx);
+            items[idx].copies++;
+        });
         return {
-            pets: names.slice(1),
-            spare_for: Array(spares).fill(spareTo),
-            missing: names.slice(1).some(function (x) { return !x; }),
+            pets: petCards.slice(1).map(function (i) { return ftags[i].querySelector(".ft-name").value.trim(); }),
+            spare_for: spareFor,
+            pet_extras: items.map(function (it) { return { phone2: it.phone2, notes: it.notes }; }),
+            missing: petCards.slice(1).some(function (i) { return !ftags[i].querySelector(".ft-name").value.trim(); }),
             items: items
         };
     }
     window.FYP_family = famData;
+    // Подсказка «Сколько питомцев?» в разделе цен: 1 → метки 2 и 3 запасные, 2 → метка 3 запасная, 3 → все свои
     function setFamN(n) {
-        famN = Math.min(Math.max(+n || 1, 1), 3);
-        $$("#famSeg button").forEach(function (x) {
-            x.classList.toggle("on", +x.dataset.n === famN);
-            x.setAttribute("aria-selected", +x.dataset.n === famN ? "true" : "false");
-        });
+        n = Math.min(Math.max(+n || 1, 1), 3);
+        [1, 2].forEach(function (i) { ftags[i].querySelector(".ft-spare-chk").checked = i >= n; });
         renderOrder();
     }
     function renderOrder() {
         const fam = planId() === "family", basic = planId() === "basic";
         $("#familyBox").hidden = !fam;
-        $("#moreBox").hidden = basic;
+        $("#moreBox").hidden = basic || fam;   // в Семейном второй контакт и заметки — в карточке каждой метки
         $("#basicNote").hidden = !basic;
-        $$(".fam-pet").forEach(function (l) { l.hidden = !(fam && +l.dataset.i < famN); });
-        $("#spareRow").hidden = !(fam && famN === 2);
-        const d = famData();
-        $$("#spareFor option").forEach(function (o, i) {
-            o.textContent = (i === 0 ? petIn.value.trim() : $("#pet2").value.trim()) || t("petN", { i: i + 1 });
+        const petCards = [0, 1, 2].filter(function (i) { return !isSpare(i); });
+        ftags.forEach(function (c, i) {
+            c.querySelector(".ft-n").textContent = t("tagN", { n: i + 1 });
+            if (i === 0) { $("#ft0Name").textContent = petIn.value.trim(); return; }
+            const spare = isSpare(i);
+            c.classList.toggle("is-spare", spare);
+            c.querySelector(".ft-pet-box").hidden = spare;
+            c.querySelector(".ft-for").hidden = !spare;
+            const sel = c.querySelector(".ft-for-sel"), keep = sel.value;
+            sel.textContent = "";
+            petCards.forEach(function (pi) {
+                const o = document.createElement("option");
+                o.value = String(pi); o.textContent = cardName(pi);
+                sel.appendChild(o);
+            });
+            sel.value = petCards.indexOf(+keep) >= 0 ? keep : "0";
         });
+        const d = famData();
         const ul = $("#famSummary");
         ul.textContent = "";
-        d.items.forEach(function (it) {
+        if (fam) d.items.forEach(function (it) {
             const li = document.createElement("li");
             li.textContent = it.copies > 1 ? t("fsMany", { name: it.name, n: it.copies, s: it.copies - 1 }) : t("fsOne", { name: it.name });
             ul.appendChild(li);
@@ -212,9 +239,11 @@
             pv.appendChild(li);
         });
     }
-    tabs($("#famSeg"), "n", function (n) { setFamN(n); });
-    ["#pet2", "#pet3"].forEach(function (sel) { $(sel).addEventListener("input", renderOrder); });
-    $("#spareFor").addEventListener("change", renderOrder);
+    ftags.forEach(function (c) {
+        c.querySelectorAll("input, select, textarea").forEach(function (el) {
+            el.addEventListener(el.tagName === "SELECT" || el.type === "checkbox" ? "change" : "input", renderOrder);
+        });
+    });
     petIn.addEventListener("input", renderOrder);
 
     petIn.addEventListener("input", renderPreview);

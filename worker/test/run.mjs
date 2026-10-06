@@ -57,7 +57,7 @@ await test('register with phone2 + notes stores extras in KV and returns short l
   assert.equal(admin.payload.chat_id, 'admin');
   assert.match(admin.payload.text, /QR/);
   assert.match(admin.payload.text, /New order FY\d+/);
-  assert.match(admin.payload.text, /Smart · 79 ₪ — <b>1 physical tag<\/b>/);
+  assert.match(admin.payload.text, /Special · 79 ₪ — <b>1 physical tag<\/b>/);
   assert.match(admin.payload.text, /Engrave front: <b>BELLA<\/b> · 050-123-4567/);
   assert.equal(admin.payload.reply_markup.inline_keyboard[0][2].callback_data, `ord:FY${tagId}:shipped`);
 });
@@ -319,26 +319,44 @@ await test('/orders for admin lists open orders; ignored for others', async () =
   assert.doesNotMatch(lastTg('sendMessage').payload.text, /Open orders/);
 });
 
-await test('Basic plan: no scan alerts, location goes via WhatsApp, Lost mode offers upgrade', async () => {
+await test('Basic plan: scan and location alerts in Telegram; no second contact, notes or Lost mode', async () => {
   const d = await (await call(env, '/api/register', { method: 'POST', body: {
     owner_name: 'Basic Ben', phone: '050-777-8888', pet_name: 'Pip', address: 'Holon', consent: true, plan: 'basic',
     phone2: '050-111-1111', notes: 'secret' } })).json();
   const id = d.id_tag, C = '4004';
   const x = await KV.get(`x:${id}`, 'json');
-  assert.equal(x.phone2, undefined); assert.equal(x.notes, undefined); // доп. поля — только в Смарт
+  assert.equal(x.phone2, undefined); assert.equal(x.notes, undefined); // доп. поля — только в Специальном
   await tgUpdate(env, msg(C, '/start ' + d.telegram_link.split('start=')[1]));
   const reg = state.tg.filter((c) => c.payload.chat_id === C).at(-2).payload.text;
-  assert.match(reg, /Your plan is <b>Basic<\/b>/);
+  assert.match(reg, /part of <b>Special<\/b>/);
   const t = await (await call(env, `/api/tag?id=${id}`)).json();
-  assert.equal(t.can_notify, false);
+  assert.equal(t.can_notify, true);
   const n = state.tg.length;
   await new Promise((r) => setTimeout(r, 1100));
   await call(env, '/api/scan', { method: 'POST', body: { id_tag: id } });
-  assert.equal(state.tg.slice(n).filter((c) => c.payload.chat_id === C).length, 0);
+  assert.equal(state.tg.slice(n).filter((c) => c.payload.chat_id === C).length, 1);
   const loc = await (await call(env, '/api/location', { method: 'POST', body: { id_tag: id, lat: 32, lon: 34.8 } })).json();
-  assert.equal(loc.error, 'not_linked');
+  assert.equal(loc.success, true);
   await tgUpdate(env, msg(C, '/lost'));
-  assert.match(lastTg('sendMessage').payload.text, /part of the <b>Smart<\/b> plan/);
+  assert.match(lastTg('sendMessage').payload.text, /part of the <b>Special<\/b> plan/);
+  await tgUpdate(env, msg(C, '/settings'));
+  assert.match(lastTg('sendMessage').payload.text, /part of the <b>Special<\/b> plan/);
+});
+
+await test('Family: each pet gets its own second contact and notes; spare tag copies the chosen pet', async () => {
+  const d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Fam Fay', phone: '050-222-3333', pet_name: 'Alfa', address: 'Haifa', consent: true, plan: 'family',
+    pets: ['Beta'], spare_for: [1],
+    pet_extras: [{ phone2: '052-111-0001', notes: 'Alfa notes' }, { phone2: '052-111-0002', notes: 'Beta notes' }] } })).json();
+  assert.equal(d.success, true);
+  assert.deepEqual(d.tags.map((t) => [t.pet_name, t.copies]), [['Alfa', 1], ['Beta', 2]]);
+  const [xa, xb] = await Promise.all(d.tags.map((t) => KV.get(`x:${t.id_tag}`, 'json')));
+  assert.equal(xa.phone2, '+972521110001'); assert.equal(xa.notes, 'Alfa notes');
+  assert.equal(xb.phone2, '+972521110002'); assert.equal(xb.notes, 'Beta notes');
+  const bad = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Fam Fay', phone: '050-222-3333', pet_name: 'Alfa', address: 'Haifa', consent: true, plan: 'family',
+    pets: ['Beta', 'Gama'], pet_extras: [{}, { phone2: '12' }] } })).json();
+  assert.equal(bad.error_code, 'phone2');
 });
 
 await test('old tags without a plan keep Smart features', async () => {
@@ -362,7 +380,7 @@ await test('www → apex redirect; links use SITE_URL (findy-pet.com)', async ()
   assert.match(admin, new RegExp(`NFC \\+ 🔳 QR: <code>https://findy-pet.com/t/${d.id_tag}</code>`));
 });
 
-await test('Telegram button: the bot messages the owner (with map pin when shared), no duplicates; Basic gets nothing', async () => {
+await test('Telegram button: the bot messages the owner (with map pin when shared), no duplicates; Basic gets it too', async () => {
   const tenv = { ...makeEnv(), FYP_KV: makeKV() };
   const reg = async (plan) => (await (await call(tenv, '/api/register', { method: 'POST', body: {
     owner_name: 'Tg Owner', phone: '050-777-8888', pet_name: 'Tuzik', address: 'Haifa', consent: true, plan } })).json());
@@ -393,8 +411,8 @@ await test('Telegram button: the bot messages the owner (with map pin when share
   state.tags.find((t) => t.tag_id === String(b.id_tag)).telegram_chat_id = '9191';
   before = state.tg.length;
   r = await (await call(tenv, '/api/found', { method: 'POST', body: { id_tag: b.id_tag } })).json();
-  assert.equal(r.error, 'not_linked');
-  assert.equal(state.tg.slice(before).filter((c) => c.payload.chat_id === '9191').length, 0);
+  assert.equal(r.success, true);  // Базис тоже получает сообщение в Telegram
+  assert.equal(state.tg.slice(before).filter((c) => c.payload.chat_id === '9191').length, 1);
 });
 
 // ---- Тестовый сайт (окружение staging: test.findy-pet.com) ----
