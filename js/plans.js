@@ -4,5 +4,5 @@ const PRICING = {
     "tag": 49,
     "currency": "₪",
     "bundle": 3,
-    "care": 29
+    "care": 39
 };

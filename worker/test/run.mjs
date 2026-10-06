@@ -27,7 +27,7 @@ await test('landing, tag page, privacy and /t/ short link are served', async () 
   assert.doesNotMatch(home, /100 ₪/);
   assert.match(home, /id="plans"/);
   const plans = await (await call(env, '/js/plans.js')).text();
-  assert.match(plans, /const PRICING = \{"tag":49,"currency":"₪","bundle":3,"care":29\}/);
+  assert.match(plans, /const PRICING = \{"tag":49,"currency":"₪","bundle":3,"care":39\}/);
 });
 
 await test('register requires consent; validates phone2', async () => {
@@ -355,7 +355,7 @@ await test('FindYpet Care: /care, waitlist sign-up (once), /start care, site che
   const C = '5151';
   await tgUpdate(env, msg(C, '/care'));
   let m = lastTg('sendMessage').payload;
-  assert.match(m.text, /FindYpet Care — coming soon/); assert.match(m.text, /29 ₪\/month/);
+  assert.match(m.text, /FindYpet Care — coming soon/); assert.match(m.text, /39 ₪\/month per owner, covering all your pets/);
   assert.equal(m.reply_markup.inline_keyboard[0][0].callback_data, 'care_yes');
   await tgUpdate(env, cb(C, 'care_yes'));
   assert.ok(await KV.get(`care:${C}`));

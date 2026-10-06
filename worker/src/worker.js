@@ -102,10 +102,10 @@ const REMINDER_DAYS = 180;
 //  • tag    — один жетон, разовая оплата; в каждом жетоне ВСЕ функции (см. feats)
 //  • 2 + 1  — в заказе на выбор: 1 жетон или 3 жетона по цене двух (третий в подарок:
 //             для третьего питомца или запасная копия жетона одного из питомцев)
-//  • care   — программа «Забота», ₪ в месяц. Пока НЕ продаётся — только лист ожидания
+//  • care   — программа «Забота», ₪ в месяц за ВЛАДЕЛЬЦА (все его питомцы). Пока НЕ продаётся — только лист ожидания
 //             (/care в боте, галочка в форме заказа), пока нет сервисов и онлайн-оплаты.
 // ---------------------------------------------------------------
-const PRICING = { tag: 49, currency: '₪', bundle: 3, care: 29 };
+const PRICING = { tag: 49, currency: '₪', bundle: 3, care: 39 };
 /** 1 или 3 жетона: два жетона стоят столько же, сколько три, поэтому 2 превращается в 2 + 1. */
 function normQty(n) { return Number(n) >= 2 ? PRICING.bundle : 1; }
 function orderPrice(n) {
@@ -132,7 +132,7 @@ function feats() { return { alerts: true, lost: true, extras: true }; }
 
 const T_CARE =
   '💚 <b>FindYpet Care — coming soon</b>\n\n' +
-  `A monthly program for pet owners (planned: ${PRICING.care} ₪/month, cancel any time):\n` +
+  `A monthly program for pet owners — planned ${PRICING.care} ₪/month per owner, covering all your pets; cancel any time:\n` +
   '• a digital health card from your vet clinic\n' +
   '• discounts at pet shops, groomers and pet hotels\n' +
   '• partner bonuses\n\n' +
