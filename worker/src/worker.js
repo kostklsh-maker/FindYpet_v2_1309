@@ -206,6 +206,10 @@ async function route(request, env, ctx) {
     if (path === '/api/found' && request.method === 'POST') return await apiFound(request, env);
     if (path.startsWith('/api/')) return json({ success: false, error: 'not_found' }, env, 404);
 
+    // ---- QR на напечатанном медальоне: HTTPS://FINDY-PET.COM/T/101 (заглавные буквы — QR на 15 % меньше) ----
+    const upper = /^\/T\/(\d{1,9})$/.exec(path);
+    if (upper) return Response.redirect(`${url.origin}/t/${upper[1]}`, 301);
+
     // ---- Короткая ссылка /t/101 (для QR на жетоне) → та же страница метки ----
     if (/^\/t\/\d{1,9}$/.test(path)) {
       const tagReq = new Request(new URL('/tag/index.html', url.origin), request);
