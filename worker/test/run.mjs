@@ -457,6 +457,13 @@ await test('www → apex redirect; links use SITE_URL (findy-pet.com)', async ()
   assert.equal(d.tag_url, `https://findy-pet.com/t/${d.id_tag}`);
   const admin = lastTg('sendMessage').payload.text;
   assert.match(admin, new RegExp(`NFC \\+ 🔳 QR: <code>https://findy-pet.com/t/${d.id_tag}</code>`));
+  // QR на напечатанном медальоне — заглавными (HTTPS://FINDY-PET.COM/T/101): ведёт на ту же страницу
+  const up = await worker.fetch(new Request('https://findy-pet.com/T/101'), domEnv, { waitUntil: (p) => pending.push(p) });
+  assert.equal(up.status, 301);
+  assert.equal(up.headers.get('Location'), 'https://findy-pet.com/t/101');
+  const upWww = await worker.fetch(new Request('https://WWW.FINDY-PET.COM/T/101'), domEnv, { waitUntil: (p) => pending.push(p) });
+  assert.equal(upWww.status, 301);
+  assert.match(upWww.headers.get('Location'), /^https:\/\/findy-pet\.com\/[tT]\/101$/);
 });
 
 await test('Telegram button: the bot messages the owner (with map pin when shared), no duplicates; Basic gets it too', async () => {
