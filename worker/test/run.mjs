@@ -968,13 +968,13 @@ const loadI18n = async () => {
     'const document={documentElement:{},querySelectorAll(){return []}};';
   return new Function(stub + src + '; return I18N;')();
 };
-await test('landing: real tag (glow), why-a-chip table, 2 price cards + specs + Care strip, new FAQ; finder block after FAQ', async () => {
+await test('landing: real tag (glow), why-a-chip table, 2 price cards + specs grid + Care announcement, new FAQ; finder block after FAQ', async () => {
   const home = await (await call(env, '/')).text();
   assert.match(home, /<symbol id="tag-art"/); assert.match(home, /id="glowBtn"/);
   assert.doesNotMatch(home, /flipTag|flip-tag|scr-dog|🐕/);
   assert.match(home, /<table class="compare/);
-  assert.doesNotMatch(home, /data-plan="care"/); assert.match(home, /class="care-strip/);
-  for (const k of ['sp1', 'sp2', 'sp3', 'sp4', 'sp5', 'qBat', 'qWater', 'qFit', 'qSpam']) assert.match(home, new RegExp(`data-t="${k}"`));
+  assert.doesNotMatch(home, /data-plan="care"/); assert.match(home, /class="care-ann/); assert.doesNotMatch(home, /care-strip/);
+  for (const k of ['sp1', 'sp2', 'sp3', 'sp4', 'sp5', 'sp6', 'sp6s', 'careTitle', 'care1', 'care3s', 'careNote', 'qBat', 'qWater', 'qFit', 'qSpam']) assert.match(home, new RegExp(`data-t="${k}"`));
   assert.ok(home.indexOf('id="faq"') < home.indexOf('id="finder"'), 'finder block goes after FAQ');
   assert.ok(home.indexOf('id="why"') < home.indexOf('id="plans"'));
   assert.match(home, /class="btn btn-primary btn-sm choose" data-qty="1"/); // нижняя панель сразу открывает форму

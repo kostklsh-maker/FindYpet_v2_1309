@@ -39,6 +39,7 @@
             <symbol id="i-chip" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></symbol>
             <symbol id="i-note" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M10 9H8M16 13H8M16 17H8"/></symbol>
             <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18M7 6h1v4M16.71 13.88l.7.71-2.82 2.82"/></symbol>
+            <symbol id="i-gift" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7M7.5 8a2.5 2.5 0 0 1 0-5C9.5 3 12 8 12 8s2.5-5 4.5-5a2.5 2.5 0 0 1 0 5"/></symbol>
             <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
             <!-- WhatsApp и Telegram: Simple Icons (CC0); товарные знаки их владельцев -->
             <symbol id="i-wa" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></symbol>
@@ -290,18 +291,47 @@
                     <button type="button" class="btn btn-primary btn-block choose" data-qty="4" data-t="chooseBundle">Order 4 tags</button>
                 </div>
             </div>
-            <ul class="specs reveal" data-t-aria="specsAria" aria-label="What every tag has">
-                <li><svg class="ic"><use href="#i-moon"/></svg><span data-t="sp1">Glows in the dark</span></li>
-                <li><svg class="ic"><use href="#i-drop"/></svg><span data-t="sp2">Rain and swimming are fine</span></li>
-                <li><svg class="ic"><use href="#i-nfc"/></svg><span data-t="sp3">QR + NFC — no battery, nothing to charge</span></li>
-                <li><svg class="ic"><use href="#i-ruler"/></svg><span data-t="sp4">34 × 40 mm, slides onto collars up to 25 mm</span></li>
-                <li><svg class="ic"><use href="#i-shield"/></svg><span data-t="sp5">Broke? We'll replace it for free</span></li>
-            </ul>
-            <div class="care-strip reveal">
-                <span class="cs-badge" data-t="careBadge">Coming soon</span>
-                <p><b data-t="careName">FindYpet Care</b> <span data-t="careStrip">— services for pet owners: vet health card and partner discounts</span></p>
-                <a class="btn btn-outline btn-sm" href="https://t.me/YourPetLocatorBot?start=care" target="_blank" rel="noopener" data-t="careBtn">Notify me at launch</a>
+            <div class="specs-box reveal">
+                <h3 class="specs-h" id="specsH" data-t="specsAria">In every tag</h3>
+                <ul class="specs" aria-labelledby="specsH">
+                    <li><span class="sp-ic"><svg class="ic"><use href="#i-moon"/></svg></span><span class="sp-tx"><b data-t="sp1">Glows in the dark</b><small data-t="sp1s">Easy to spot at night</small></span></li>
+                    <li><span class="sp-ic"><svg class="ic"><use href="#i-drop"/></svg></span><span class="sp-tx"><b data-t="sp2">Rain &amp; swim proof</b><small data-t="sp2s">Water doesn't hurt it</small></span></li>
+                    <li><span class="sp-ic"><svg class="ic"><use href="#i-nfc"/></svg></span><span class="sp-tx"><b data-t="sp3">No battery</b><small data-t="sp3s">QR + NFC, nothing to charge</small></span></li>
+                    <li><span class="sp-ic"><svg class="ic"><use href="#i-ruler"/></svg></span><span class="sp-tx"><b data-t="sp4">34 × 40 mm</b><small data-t="sp4s">For collars up to 25 mm</small></span></li>
+                    <li><span class="sp-ic"><svg class="ic"><use href="#i-shield"/></svg></span><span class="sp-tx"><b data-t="sp5">Free replacement</b><small data-t="sp5s">If the tag breaks</small></span></li>
+                    <li><span class="sp-ic"><svg class="ic"><use href="#i-coin"/></svg></span><span class="sp-tx"><b data-t="sp6">Pay once</b><small data-t="sp6s">No subscription</small></span></li>
+                </ul>
             </div>
+
+            <!-- FindYpet Care: анонс будущего сервиса (без цены) -->
+            <aside class="care-ann reveal" aria-labelledby="careH">
+                <div class="ca-top">
+                    <div class="ca-copy">
+                        <div class="ca-kicker"><span class="ca-badge"><i class="ca-dot" aria-hidden="true"></i><span data-t="careBadge">Coming soon</span></span><span class="ca-name" data-t="careName">FindYpet Care</span></div>
+                        <h3 id="careH" data-t="careTitle">Care for your pet — beyond the tag</h3>
+                        <p class="ca-lead" data-t="careLead">FindYpet Care is coming: one place for your pet's health and everyday savings. Be the first to know.</p>
+                    </div>
+                    <div class="ca-art" aria-hidden="true">
+                        <div class="ca-card">
+                            <div class="cc-head"><span class="cc-ava"><svg class="ic"><use href="#i-paw"/></svg></span><span class="cc-bars"><i></i><i></i></span><svg class="ic cc-heart"><use href="#i-heart"/></svg></div>
+                            <div class="cc-row"><svg class="ic"><use href="#i-check"/></svg><i></i></div>
+                            <div class="cc-row"><svg class="ic"><use href="#i-check"/></svg><i></i></div>
+                            <div class="cc-row"><svg class="ic"><use href="#i-check"/></svg><i></i></div>
+                        </div>
+                        <span class="ca-chip c1"><svg class="ic"><use href="#i-coin"/></svg>%</span>
+                        <span class="ca-chip c2"><svg class="ic"><use href="#i-gift"/></svg></span>
+                    </div>
+                </div>
+                <ul class="ca-list">
+                    <li><span class="ca-ic"><svg class="ic"><use href="#i-heart"/></svg></span><b data-t="care1">Digital health card</b><small data-t="care1s">Vaccinations and vet visits from your clinic, always in your phone</small></li>
+                    <li><span class="ca-ic"><svg class="ic"><use href="#i-coin"/></svg></span><b data-t="care2">Partner discounts</b><small data-t="care2s">Pet shops, groomers and pet hotels</small></li>
+                    <li><span class="ca-ic"><svg class="ic"><use href="#i-gift"/></svg></span><b data-t="care3">Partner bonuses</b><small data-t="care3s">Gifts and perks from pet businesses near you</small></li>
+                </ul>
+                <div class="ca-foot">
+                    <a class="btn ca-btn" href="https://t.me/YourPetLocatorBot?start=care" target="_blank" rel="noopener"><svg class="ic"><use href="#i-bell"/></svg><span data-t="careBtn">Notify me at launch</span></a>
+                    <p class="ca-note" data-t="careNote">Your tag works fully without it — Care is an extra, never needed to find your pet.</p>
+                </div>
+            </aside>
         </div>
     </section>
 
