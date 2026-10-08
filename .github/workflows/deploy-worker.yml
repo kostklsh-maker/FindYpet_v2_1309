@@ -17,6 +17,7 @@ on:
       - 'assets/logo.png'
       - 'assets/mark.png'
       - 'assets/wordmark.png'
+      - 'assets/og.jpg'
       - 'worker/**'
       - '.github/workflows/deploy-worker.yml'
   workflow_dispatch:

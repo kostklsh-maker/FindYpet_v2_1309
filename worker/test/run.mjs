@@ -996,4 +996,50 @@ await test('demo chat on the landing = the real bot messages in each language', 
   assert.ok(home.includes(I18N.en.bub1) && home.includes(I18N.en.bub2), 'HTML default = EN bot text');
 });
 
+// ---- Стадия 2: поиск (SEO) ----
+await test('SEO: /he/ and /ru/ are translated HTML with their own title, canonical, hreflang, OG and JSON-LD; prices without JS', async () => {
+  const e = makeEnv({ SITE_URL: 'https://findy-pet.com' });
+  const pages = {};
+  for (const [l, path] of [['en', '/'], ['he', '/he/'], ['ru', '/ru/']]) {
+    const r = await call(e, path);
+    assert.equal(r.status, 200, path);
+    const html = await r.text(); pages[l] = html;
+    assert.match(html, new RegExp(`<link rel="canonical" href="https://findy-pet.com${path}">`));
+    for (const [hl, hp] of [['en', '/'], ['he', '/he/'], ['ru', '/ru/'], ['x-default', '/']]) {
+      assert.match(html, new RegExp(`<link rel="alternate" hreflang="${hl}" href="https://findy-pet.com${hp}">`), `${path} hreflang ${hl}`);
+    }
+    assert.match(html, /<meta property="og:image" content="https:\/\/findy-pet\.com\/assets\/og\.jpg">/);
+    assert.match(html, /data-price="tag">49 ₪</); assert.match(html, /data-price="bundle">147 ₪</);
+    const ld = JSON.parse(html.match(/<script type="application\/ld\+json">(.*?)<\/script>/s)[1]);
+    const byType = Object.fromEntries(ld['@graph'].map((n) => [n['@type'], n]));
+    assert.deepEqual(byType.Product.offers.map((o) => [o.price, o.priceCurrency]), [['49', 'ILS'], ['147', 'ILS']]);
+    assert.ok(byType.FAQPage.mainEntity.length >= 14);
+    assert.ok(!/delivery|משלוח|доставк/i.test(JSON.stringify(byType.Product)), 'no delivery terms in Product');
+  }
+  assert.match(pages.he, /<html lang="he" dir="rtl" data-lang="he">/); assert.match(pages.ru, /<html lang="ru" dir="ltr" data-lang="ru">/);
+  assert.match(pages.he, /<h1 data-t="heroTitle">חיית המחמד אבדה\?/); assert.match(pages.ru, /<h1 data-t="heroTitle">Питомец потерялся\?/);
+  assert.match(pages.he, /<title>FindYpet — /); assert.match(pages.he, /<meta name="description" content="תג זיהוי זוהר בחושך/);
+  assert.match(pages.he, /href="\/css\/style\.css\?v=\d+"/); assert.match(pages.he, /src="\/js\/i18n\.js\?v=\d+"/);
+  assert.match(pages.he, /href="\/privacy\/\?lang=he"/); assert.doesNotMatch(pages.he, /(href|src)="(css|js|assets)\//);
+  assert.match(pages.he, /aria-label="תג FindYpet על קולר/);
+  assert.match(pages.en, /<html lang="en" dir="ltr" data-lang="en">/); assert.match(pages.en, /fastest way home/);
+  assert.equal((await call(e, '/he')).status, 301);
+  const og = await call(e, '/assets/og.jpg');
+  assert.equal(og.status, 200); assert.equal(og.headers.get('Content-Type'), 'image/jpeg');
+});
+
+await test('SEO: robots.txt and sitemap.xml on the live site; tag pages and posters are noindex', async () => {
+  const e = makeEnv({ SITE_URL: 'https://findy-pet.com' });
+  const robots = await (await call(e, '/robots.txt')).text();
+  assert.match(robots, /^User-agent: \*\nAllow: \//); assert.match(robots, /Disallow: \/api\//);
+  assert.doesNotMatch(robots, /Disallow: \/t\//); // иначе поисковик не увидит noindex
+  assert.match(robots, /Sitemap: https:\/\/findy-pet\.com\/sitemap\.xml/);
+  const sm = await (await call(e, '/sitemap.xml')).text();
+  for (const u of ['https://findy-pet.com/', 'https://findy-pet.com/he/', 'https://findy-pet.com/ru/', 'https://findy-pet.com/privacy/']) assert.ok(sm.includes(`<loc>${u}</loc>`), u);
+  assert.match(sm, /hreflang="he" href="https:\/\/findy-pet\.com\/he\/"/);
+  assert.equal((await call(e, '/t/101')).headers.get('X-Robots-Tag'), 'noindex, nofollow');
+  assert.equal((await call(e, '/tag/?id=101')).headers.get('X-Robots-Tag'), 'noindex, nofollow');
+  assert.equal((await call(e, '/he/')).headers.get('X-Robots-Tag'), null);
+});
+
 console.log(`\n${passed} tests passed`);

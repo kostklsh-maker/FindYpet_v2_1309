@@ -262,7 +262,8 @@ const I18N = {
         aSpam: "Your number is on the tag and on your pet's page — that's how the finder reaches you. The page is hidden from search engines and isn't listed anywhere: it opens from the tag's QR code, NFC or link.",
         notifyOwner: "Notify the owner",
         bub1: "👀 <b>Bella's tag was just scanned!</b> (06 Oct, 14:32)<br>Someone opened Bella's page. They can call you, write on WhatsApp or tap \"Notify the owner\" — keep your phone close.<br>If they share their location, I will send it to you right here.<span class=\"tg-kb\">🚨 My pet is missing — Lost mode on</span>",
-        bub2: "🚨📍 <b>Bella has been found!</b><br>The finder shared their location (06 Oct, 14:33), accuracy ±12 m.<span class=\"tg-links\">🗺 <u>Open in Google Maps</u> · 🚗 <u>Waze</u></span>"
+        bub2: "🚨📍 <b>Bella has been found!</b><br>The finder shared their location (06 Oct, 14:33), accuracy ±12 m.<span class=\"tg-links\">🗺 <u>Open in Google Maps</u> · 🚗 <u>Waze</u></span>",
+        metaDesc: "Glow-in-the-dark pet ID tag with your number, a QR code and NFC. Whoever finds your pet calls you or sends their location — any phone, no app, no subscription."
     },
     he: {
         docTitle: "FindYpet — הדרך המהירה הביתה לחיית מחמד שאבדה",
@@ -522,7 +523,8 @@ const I18N = {
         aSpam: "המספר שלכם מופיע על התג ובדף החיה — כך המוצא משיג אתכם. הדף מוסתר ממנועי חיפוש ולא מופיע באף רשימה: הוא נפתח מקוד ה-QR, מה-NFC או מהקישור של התג.",
         notifyOwner: "להודיע לבעלים",
         bub1: "👀 <b>התג של בלה נסרק עכשיו!</b> (06 באוק׳, 14:32)<br>מישהו פתח את הדף של בלה. הוא יכול להתקשר אליכם, לכתוב בוואטסאפ או ללחוץ \"להודיע לבעלים\" — השאירו את הטלפון קרוב.<br>אם הוא ישתף מיקום, אשלח אותו לכם כאן מיד.<span class=\"tg-kb\">🚨 חיית המחמד נעלמה — הפעלת מצב חיפוש</span>",
-        bub2: "🚨📍 <b>מצאו את בלה!</b><br>מי שמצא שיתף מיקום (06 באוק׳, 14:33), דיוק ±12 מ׳.<span class=\"tg-links\">⁦🗺 <u>Google Maps</u> · 🚗 <u>Waze</u>⁩</span>"
+        bub2: "🚨📍 <b>מצאו את בלה!</b><br>מי שמצא שיתף מיקום (06 באוק׳, 14:33), דיוק ±12 מ׳.<span class=\"tg-links\">⁦🗺 <u>Google Maps</u> · 🚗 <u>Waze</u>⁩</span>",
+        metaDesc: "תג זיהוי זוהר בחושך לחיית מחמד עם המספר שלכם, קוד QR ו-NFC. מי שמוצא את החיה מתקשר אליכם או שולח מיקום — מכל טלפון, בלי אפליקציה ובלי מנוי."
     },
     ru: {
         docTitle: "FindYpet — самый быстрый путь домой для потерявшегося питомца",
@@ -782,11 +784,15 @@ const I18N = {
         aSpam: "Ваш номер есть на жетоне и на странице питомца — так нашедший с вами и свяжется. Страница скрыта от поисковиков и нигде не публикуется: она открывается по QR-коду, NFC или ссылке с жетона.",
         notifyOwner: "Сообщить хозяину",
         bub1: "👀 <b>Жетон питомца Белла только что отсканировали!</b> (06 окт., 14:32)<br>Кто-то открыл страницу питомца. Вам могут позвонить, написать в WhatsApp или нажать «Сообщить хозяину» — держите телефон рядом.<br>Если нашедший поделится геолокацией, я сразу пришлю её сюда.<span class=\"tg-kb\">🚨 Питомец пропал — включить режим поиска</span>",
-        bub2: "🚨📍 <b>Питомца нашли: Белла!</b><br>Нашедший поделился геолокацией (06 окт., 14:33), точность ±12 м.<span class=\"tg-links\">🗺 <u>Открыть в Google Maps</u> · 🚗 <u>Waze</u></span>"
+        bub2: "🚨📍 <b>Питомца нашли: Белла!</b><br>Нашедший поделился геолокацией (06 окт., 14:33), точность ±12 м.<span class=\"tg-links\">🗺 <u>Открыть в Google Maps</u> · 🚗 <u>Waze</u></span>",
+        metaDesc: "Светящийся в темноте жетон-адресник для питомца с вашим номером, QR-кодом и NFC. Нашедший позвонит вам или пришлёт геолокацию — с любого телефона, без приложения и подписки."
     }
 };
 
+// Язык страницы: /he/ и /ru/ (data-lang в <html>, страница уже переведена при сборке) → выбранный ранее → язык браузера
 let currentLang = (function () {
+    const forced = document.documentElement.getAttribute && document.documentElement.getAttribute("data-lang");
+    if (forced && I18N[forced]) return forced;
     try { const s = localStorage.getItem("fyp_lang"); if (s && I18N[s]) return s; } catch (e) {}
     const n = (navigator.language || "en").slice(0, 2).toLowerCase();
     return n === "he" || n === "iw" ? "he" : n === "ru" ? "ru" : "en";
@@ -851,6 +857,12 @@ document.querySelectorAll(".langs button").forEach(function (b) {
     b.addEventListener("click", function () {
         currentLang = b.dataset.lang;
         try { localStorage.setItem("fyp_lang", currentLang); } catch (e) {}
+        // адрес страницы — как у языковой версии (/, /he/, /ru/), чтобы ссылкой делились на нужном языке
+        try {
+            if (/^\/(he\/|ru\/)?$/.test(location.pathname)) {
+                history.replaceState(null, "", (currentLang === "en" ? "/" : "/" + currentLang + "/") + location.search + location.hash);
+            }
+        } catch (e) {}
         applyLang();
     });
 });

@@ -799,8 +799,12 @@ async function route(request, env, ctx) {
     if (/^\/t\/\d{1,9}$/.test(path)) {
       const tagReq = new Request(new URL('/tag/index.html', url.origin), request);
       const res = env.ASSETS ? await env.ASSETS.fetch(tagReq) : serveEmbedded(new URL('/tag/index.html', url.origin), env);
-      return new Response(res.body, { status: res.status, headers: res.headers });
+      return noindex(res);
     }
+
+    // ---- Для поисковиков: robots.txt и карта сайта (лендинг на трёх языках) ----
+    if (path === '/robots.txt') return new Response(robotsTxt(env, url), { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
+    if (path === '/sitemap.xml') return new Response(sitemapXml(env, url), { headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
 
     // ---- Объявление «Потерялся» для групп и печати ----
     const pm = /^\/p\/(\d{1,9})$/.exec(path);
@@ -821,12 +825,34 @@ async function route(request, env, ctx) {
     }
 
     // ---- Статический сайт ----
-    if (env.ASSETS) return env.ASSETS.fetch(request);
-    return serveEmbedded(url, env);
+    const res = env.ASSETS ? await env.ASSETS.fetch(request) : serveEmbedded(url, env);
+    return path.startsWith('/tag') ? noindex(res) : res;
   } catch (err) {
     console.error(err);
     return json({ success: false, error: 'server_error' }, env, 500);
   }
+}
+
+// ---------------------------------------------------------------
+// Поисковики. Индексируются только лендинг (/, /he/, /ru/) и политика. Страницы жетонов и объявления
+// закрыты заголовком noindex (их не блокируем в robots.txt — иначе поисковик не увидит noindex).
+// ---------------------------------------------------------------
+function noindex(res) {
+  const h = new Headers(res.headers);
+  h.set('X-Robots-Tag', 'noindex, nofollow');
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
+}
+function robotsTxt(env, url) {
+  return 'User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /img/\nDisallow: /setup\nDisallow: /telegram\n\n' +
+    `Sitemap: ${siteBase(env, url)}/sitemap.xml\n`;
+}
+function sitemapXml(env, url) {
+  const b = siteBase(env, url);
+  const alt = ['en', 'he', 'ru'].map((l) => `<xhtml:link rel="alternate" hreflang="${l}" href="${b}${l === 'en' ? '/' : `/${l}/`}"/>`).join('') +
+    `<xhtml:link rel="alternate" hreflang="x-default" href="${b}/"/>`;
+  const u = (loc, extra = '') => `<url><loc>${loc}</loc>${extra}</url>`;
+  return '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">' +
+    u(`${b}/`, alt) + u(`${b}/he/`, alt) + u(`${b}/ru/`, alt) + u(`${b}/privacy/`) + '</urlset>\n';
 }
 
 // ---------------------------------------------------------------

@@ -9,7 +9,7 @@ here = pathlib.Path(__file__).resolve().parent
 repo = here.parent
 
 # Что из корня репозитория попадает на сайт внутри Worker'а
-SITE = ['index.html', 'css', 'js', 'tag', 'privacy', 'assets/logo.png', 'assets/mark.png', 'assets/wordmark.png']
+SITE = ['index.html', 'css', 'js', 'tag', 'privacy', 'assets/logo.png', 'assets/mark.png', 'assets/wordmark.png', 'assets/og.jpg']
 TYPES = {'.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
          '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml',
          '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.ico': 'image/x-icon'}
@@ -40,6 +40,13 @@ for f in files:
         E[key] = {'type': t, 'b64': base64.b64encode(f.read_bytes()).decode()}
     else:
         E[key] = {'type': t, 'text': f.read_text().replace('\r\n', '\n')}
+
+# 3) Лендинг на трёх языках для поиска: / (EN), /he/, /ru/ — переведённый HTML, SEO-шапка, JSON-LD, цены
+import sys
+sys.path.insert(0, str(here))
+from seo_pages import build_pages
+for path, page in build_pages(repo, plans).items():
+    E[path] = {'type': TYPES['.html'], 'text': page}
 
 out = src.replace('/*__EMBEDDED__*/null', json.dumps(E, ensure_ascii=False))
 (here / 'dist').mkdir(exist_ok=True)
