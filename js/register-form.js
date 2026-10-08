@@ -19,6 +19,20 @@
         errEl.textContent = key ? t(key) : "";
         if (key) errEl.scrollIntoView({ behavior: "smooth", block: "center" });
     }
+    // Воронка заказа (без личных данных): выбор тарифа → начал заполнять → отправил → открыл Telegram.
+    // Счётчики видит админ в боте командой /stats.
+    function track(e) {
+        try {
+            const body = JSON.stringify({ e: e, lang: typeof currentLang !== "undefined" ? currentLang : "en" });
+            const url = API_URL + "/api/ev";
+            if (!(navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: "application/json" })))) {
+                fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: body, keepalive: true }).catch(function () {});
+            }
+        } catch (err) { /* аналитика не должна мешать заказу */ }
+    }
+    let startedForm = false;
+    form.addEventListener("input", function () { if (!startedForm) { startedForm = true; track("form"); } });
+
     const selectedQty = () => +((form.querySelector('input[name="qty"]:checked') || {}).value || 1);
 
     // Форма заказа скрыта, пока не нажали «Заказать» в карточке: 1 жетон или 3 + 1
@@ -38,6 +52,7 @@
     }
     document.querySelectorAll(".choose").forEach(function (b) {
         b.addEventListener("click", function () {
+            track("plan");
             openOrder(+b.dataset.qty || 1);
             requestAnimationFrame(function () { orderSec.scrollIntoView({ behavior: "smooth" }); });
         });
@@ -46,6 +61,7 @@
     if (location.hash === "#order") openOrder();
 
     let lastOrder = null;
+    document.getElementById("telegramLinkBtn").addEventListener("click", function () { track("tg"); });
     function renderDone() {
         if (!lastOrder) return;
         const d = lastOrder;
@@ -111,6 +127,7 @@
             const data = await res.json();
             if (data.success) {
                 lastOrder = data;
+                track("submit");
                 form.hidden = true;
                 const step = document.getElementById("telegramStep");
                 step.hidden = false;

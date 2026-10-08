@@ -12,7 +12,7 @@
  *        POST /api/location   — геолокация от нашедшего → владельцу
  *        POST /api/found      — кнопка «Telegram» на странице: бот пишет владельцу «питомец найден» (+ точка)
  *   • Telegram-бот @YourPetLocatorBot (webhook: POST /telegram)
- *        /register /mytags /lost /found /settings /care /cancel /help /id; для админа /orders и
+ *        /register /mytags /lost /found /settings /care /cancel /help /id; для админа /orders, /stats и
  *        кнопки статуса заказа (Оплачен → Изготовлен → Отправлен) — клиенту уходит сообщение
  *   • GET /setup?key=WEBHOOK_SECRET — одноразовая настройка бота (повторить после обновления!)
  *   • scheduled() — напоминание владельцам раз в 180 дней проверить контакты (нужен Cron Trigger)
@@ -199,6 +199,18 @@ async function route(request, env, ctx) {
     if (path === '/setup') return await setup(env, url);
 
     // ---- API сайта ----
+    if (path.startsWith('/api/')) {
+      // Только наш сайт и только JSON: чужие страницы не могут слать запросы от имени посетителя
+      const refused = checkOrigin(request, env, url);
+      if (refused) return refused;
+      // Лимит частоты на адрес посетителя (бинды RL_* в wrangler.toml; без них — без лимита)
+      const rl = path === '/api/tag' || path === '/api/ev' ? 'RL_READ' : path === '/api/register' ? 'RL_ORDER' : 'RL_SIGNAL';
+      if (await limited(env, rl, `${clientIp(request)}:${path}`)) {
+        // страница жетона покажет «временная ошибка, попробуйте ещё раз», а не «жетон не найден»
+        return json({ success: false, found: false, error: path === '/api/tag' ? 'temp_error' : 'rate_limited' }, env, 429);
+      }
+    }
+    if (path === '/api/ev' && request.method === 'POST') return await apiEvent(request, env, ctx);
     if (path === '/api/register' && request.method === 'POST') return await apiRegister(request, env, url, ctx);
     if (path === '/api/tag' && request.method === 'GET') return await apiTag(url, env, ctx);
     if (path === '/api/scan' && request.method === 'POST') return await apiScan(request, env, url);
@@ -262,11 +274,64 @@ async function markTestSite(res) {
 // ---------------------------------------------------------------
 // Site API
 // ---------------------------------------------------------------
+// ---------------------------------------------------------------
+// Воронка заказа: сайт присылает 4 события, счётчики по дням лежат в KV (ev:ГГГГ-ММ-ДД).
+// Админ видит итог командой /stats. Посещения считает Cloudflare Web Analytics.
+// ---------------------------------------------------------------
+const EVENTS = ['plan', 'form', 'submit', 'tg'];
+
+async function apiEvent(request, env, ctx) {
+  const b = await request.json().catch(() => ({}));
+  const e = String(b.e || '');
+  if (!EVENTS.includes(e)) return json({ success: false }, env, 400);
+  const lang = ['en', 'he', 'ru'].includes(b.lang) ? b.lang : 'en';
+  if (kvOn(env)) ctx.waitUntil(bumpEvent(env, e, lang));
+  return json({ success: true }, env);
+}
+
+async function bumpEvent(env, e, lang) {
+  const day = new Date().toLocaleDateString('en-CA', { timeZone: env.TIMEZONE || 'Asia/Jerusalem' });
+  const key = `ev:${day}`;
+  try {
+    const cur = (await env.FYP_KV.get(key, 'json')) || {};
+    cur[e] = (cur[e] || 0) + 1;
+    cur[`${e}_${lang}`] = (cur[`${e}_${lang}`] || 0) + 1;
+    await env.FYP_KV.put(key, JSON.stringify(cur), { expirationTtl: 400 * 86400 });
+  } catch (err) { console.error('event', err); }
+}
+
+/** /stats для админа: воронка за 7 и 30 дней. */
+async function funnelStats(env) {
+  if (!kvOn(env)) return 'No storage connected.';
+  // 30 чтений KV за раз (лимит бесплатного плана — 50 подзапросов на вызов)
+  const days = await Promise.all(Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(Date.now() - i * 86400000).toLocaleDateString('en-CA', { timeZone: env.TIMEZONE || 'Asia/Jerusalem' });
+    return env.FYP_KV.get(`ev:${d}`, 'json').catch(() => null);
+  }));
+  const sum = async (n) => {
+    const tot = {};
+    for (const v of days.slice(0, n)) for (const k of Object.keys(v || {})) tot[k] = (tot[k] || 0) + v[k];
+    return tot;
+  };
+  const line = (t, title) => {
+    const n = (k) => t[k] || 0;
+    const pct = (a, b) => (n(b) ? ` (${Math.round((n(a) / n(b)) * 100)}%)` : '');
+    const langs = (k) => ['he', 'ru', 'en'].map((l) => `${l} ${n(`${k}_${l}`)}`).join(' · ');
+    return `<b>${title}</b>\n` +
+      `Chose a plan: ${n('plan')}  (${langs('plan')})\n` +
+      `Started the form: ${n('form')}${pct('form', 'plan')}\n` +
+      `Sent an order: ${n('submit')}${pct('submit', 'form')}  (${langs('submit')})\n` +
+      `Opened Telegram after order: ${n('tg')}${pct('tg', 'submit')}`;
+  };
+  return '📊 Order funnel on the site\n\n' + line(await sum(7), 'Last 7 days') + '\n\n' + line(await sum(30), 'Last 30 days') +
+    '\n\nVisits: Cloudflare dashboard → Web Analytics.';
+}
+
 async function apiRegister(request, env, url, ctx) {
   const b = await request.json().catch(() => ({}));
-  const owner = str(b.owner_name, 80);
-  const pet = str(b.pet_name, 40);
-  const address = str(b.address, 200);
+  const owner = cell(b.owner_name, 80);
+  const pet = cell(b.pet_name, 40);
+  const address = cell(b.address, 200);
   const phone = normalizePhone(b.phone);
   const phone2Raw = str(b.phone2, 30);
   const phone2 = phone2Raw ? normalizePhone(phone2Raw) : '';
@@ -326,7 +391,7 @@ const ORDER_STATUSES = ['new', 'paid', 'made', 'shipped'];
 function orderItems(qty, firstPet, morePets, spareFor) {
   const slots = normQty(qty);
   const names = [firstPet, ...(Array.isArray(morePets) ? morePets : [])]
-    .map((n) => str(n, 40)).filter(Boolean).slice(0, slots);
+    .map((n) => cell(n, 40)).filter(Boolean).slice(0, slots);
   const items = names.map((pet_name) => ({ pet_name, copies: 1 }));
   const spares = slots - items.length;
   const want = Array.isArray(spareFor) ? spareFor : [];
@@ -441,7 +506,7 @@ async function apiScan(request, env, url) {
       disable_web_page_preview: true,
       text:
         `👀 <b>${esc(tag.pet_name)}'s tag was just scanned!</b> (${fmtTime(env)})\n` +
-        `Someone opened ${esc(tag.pet_name)}'s page. They can call you, write on WhatsApp or press Telegram — keep your phone close.\n` +
+        `Someone opened ${esc(tag.pet_name)}'s page. They can call you, write on WhatsApp or tap "Notify the owner" — keep your phone close.\n` +
         `If they share their location, I will send it to you right here.`,
       reply_markup: { inline_keyboard: kb },
     });
@@ -457,15 +522,22 @@ async function apiScan(request, env, url) {
  * Если нашедший разрешил геолокацию — в том же сообщении ссылки на карту и точка.
  * Telegram ID владельца берётся из таблицы (telegram_chat_id). Повтор в течение минуты не дублирует сообщение.
  */
+// Строка в каждом сообщении «питомец найден»: такие сообщения может прислать и мошенник
+const SAFETY_LINE = '\n\n⚠️ <i>FindYpet never asks anyone for money. If someone wants money before you see your pet — don\'t pay. ' +
+  'Call the finder back and meet in a public place.</i>';
+
 async function apiFound(request, env) {
   const b = await request.json().catch(() => ({}));
   const id = String(b.id_tag || b.id || '');
   if (!/^\d{1,9}$/.test(id)) return json({ success: false, error: 'bad_request' }, env, 400);
+  // не больше 3 оповещений в минуту на один жетон, с любых адресов (защита владельца от потока сообщений)
+  if (await limited(env, 'RL_TAG', `tag:${id}`)) return json({ success: false, error: 'rate_limited' }, env, 429);
   const lat = Number(b.lat), lon = Number(b.lon), acc = Number(b.accuracy);
   const hasLoc = b.lat !== undefined && b.lon !== undefined && isFinite(lat) && isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
-  const r = await db(env, 'logScan', hasLoc ? { id, lat, lon } : { id });
+  // координаты нашедшего уходят только владельцу в Telegram и в таблице не хранятся
+  const r = await db(env, 'logScan', { id });
   if (!r.ok) return json({ success: false, error: 'temp_error' }, env, 502);
-  if (!r.found) return json({ success: false, error: 'not_found' }, env);
+  if (!r.found || String(r.tag.status) === 'disabled') return json({ success: false, error: 'not_found' }, env);
   const tag = r.tag;
   if (!feats(await getExtras(env, id)).alerts || !tag.telegram_chat_id) return json({ success: false, error: 'not_linked' }, env);
 
@@ -474,15 +546,16 @@ async function apiFound(request, env) {
 
   const pet = esc(tag.pet_name);
   let text = `🐾 <b>${pet} has been found!</b> (${fmtTime(env)})\n` +
-    `The finder is with ${pet} right now and pressed «Telegram» on the tag page.\n`;
+    `The finder is with ${pet} right now and tapped "Notify the owner" on the tag page.\n`;
   if (hasLoc) {
     const maps = `https://maps.google.com/?q=${lat},${lon}`;
     const waze = `https://waze.com/ul?ll=${lat},${lon}&navigate=yes`;
     text += `📍 They shared their location` + (isFinite(acc) && acc > 0 ? ` (±${Math.round(acc)} m)` : '') + ':\n' +
       `🗺 <a href="${maps}">Open in Google Maps</a>  ·  🚗 <a href="${waze}">Waze</a>`;
   } else {
-    text += `They did not share their location. Call your phone back if you see a missed call, and check WhatsApp.`;
+    text += `They did not share their location. Check missed calls and WhatsApp, then call them back.`;
   }
+  text += SAFETY_LINE;
   const sent = await tg(env, 'sendMessage', { chat_id: tag.telegram_chat_id, parse_mode: 'HTML', disable_web_page_preview: true, text });
   if (hasLoc) await tg(env, 'sendLocation', { chat_id: tag.telegram_chat_id, latitude: lat, longitude: lon });
   if (sent && sent.ok && kvOn(env)) await env.FYP_KV.put(key, '1', { expirationTtl: 60 });
@@ -497,9 +570,10 @@ async function apiLocation(request, env) {
   if (!/^\d{1,9}$/.test(id) || !isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
     return json({ success: false, error: 'bad_request' }, env, 400);
   }
-  const r = await db(env, 'logScan', { id, lat, lon });
+  if (await limited(env, 'RL_TAG', `tag:${id}`)) return json({ success: false, error: 'rate_limited' }, env, 429);
+  const r = await db(env, 'logScan', { id }); // координаты в таблицу не пишем — только владельцу
   if (!r.ok) return json({ success: false, error: 'temp_error' }, env, 502);
-  if (!r.found) return json({ success: false, error: 'not_found' }, env);
+  if (!r.found || String(r.tag.status) === 'disabled') return json({ success: false, error: 'not_found' }, env);
   const tag = r.tag;
 
   const maps = `https://maps.google.com/?q=${lat},${lon}`;
@@ -521,7 +595,7 @@ async function apiLocation(request, env) {
       `🚨📍 <b>${esc(tag.pet_name)} has been found!</b>\n` +
       `The finder shared their location (${fmtTime(env)})` +
       (isFinite(acc) && acc > 0 ? `, accuracy ±${Math.round(acc)} m` : '') + '.\n\n' +
-      `🗺 <a href="${maps}">Open in Google Maps</a>  ·  🚗 <a href="${waze}">Waze</a>`,
+      `🗺 <a href="${maps}">Open in Google Maps</a>  ·  🚗 <a href="${waze}">Waze</a>` + SAFETY_LINE,
   });
   await tg(env, 'sendLocation', { chat_id: tag.telegram_chat_id, latitude: lat, longitude: lon });
   if (!(sent && sent.ok) && smsEnabled(env)) {
@@ -692,6 +766,7 @@ async function handleUpdate(update, env, url) {
   if (text === '/id') return send(env, chatId, `Your chat ID: <code>${chatId}</code>`);
   if (text === '/care') return careInfo(chatId, env);
   if (text === '/orders' && isAdmin(env, chatId)) return listOrders(env, chatId);
+  if (text === '/stats' && isAdmin(env, chatId)) return send(env, chatId, await funnelStats(env));
   if (text === '/help') return send(env, chatId, T.help, mainMenu());
 
   // --- многошаговые диалоги ---
@@ -723,7 +798,7 @@ async function handleUpdate(update, env, url) {
   // регистрация
   if (st.step === 'name') {
     if (!text) return send(env, chatId, T.askName);
-    st.owner_name = str(text, 80);
+    st.owner_name = cell(text, 80);
     st.step = 'phone';
     await db(env, 'setState', { chat_id: chatId, state: st });
     return send(env, chatId, T.askPhone, {
@@ -741,14 +816,14 @@ async function handleUpdate(update, env, url) {
   }
   if (st.step === 'pet') {
     if (!text) return send(env, chatId, T.askPet);
-    st.pet_name = str(text, 40);
+    st.pet_name = cell(text, 40);
     st.step = 'address';
     await db(env, 'setState', { chat_id: chatId, state: st });
     return send(env, chatId, T.askAddress, cancelKb());
   }
   if (st.step === 'address') {
     if (!text) return send(env, chatId, T.askAddress);
-    st.address = str(text, 200);
+    st.address = cell(text, 200);
     st.step = 'qty';
     await db(env, 'setState', { chat_id: chatId, state: st });
     await send(env, chatId, '👌', { remove_keyboard: true });
@@ -763,7 +838,7 @@ async function handleUpdate(update, env, url) {
   if (st.step === 'f_pet') {
     if (!text || text === BTN_CANCEL) return send(env, chatId, `🐾 Name of pet #${st.pets.length + 1}?`, cancelKb());
     st.slots = normQty(st.slots || 1); // диалог мог начаться до 3 + 1 (slots: 3)
-    st.pets.push(str(text, 40));
+    st.pets.push(cell(text, 40));
     if (st.pets.length < st.fam_n) {
       await db(env, 'setState', { chat_id: chatId, state: st });
       return send(env, chatId, `🐾 Name of pet #${st.pets.length + 1}?`, cancelKb());
@@ -892,6 +967,12 @@ async function handleCallback(cq, env, url) {
   }
 
   // --- регистрация ---
+  // Двойное нажатие «Confirm» не должно создать два заказа: замок на минуту — самым первым действием
+  const lockKey = `lock:reg:${chatId}`;
+  if (data === 'reg_ok' && kvOn(env)) {
+    if (await env.FYP_KV.get(lockKey)) return;
+    await env.FYP_KV.put(lockKey, '1', { expirationTtl: 60 });
+  }
   if (data === 'reg_again' || data === 'reg_ok') {
     // убираем кнопки у сообщения с подтверждением
     await tg(env, 'editMessageReplyMarkup', { chat_id: chatId, message_id: cq.message.message_id, reply_markup: { inline_keyboard: [] } });
@@ -900,13 +981,16 @@ async function handleCallback(cq, env, url) {
   if (data !== 'reg_ok') return;
 
   const st = (await db(env, 'getState', { chat_id: chatId })).state;
+  if (st && st.step === 'creating') return; // заказ уже создаётся
   if (!st || st.step !== 'confirm') return send(env, chatId, 'Session expired. Tap /register to start again.', mainMenu());
+  if ((st.slots || 1) === normQty(st.slots || 1)) await db(env, 'setState', { chat_id: chatId, state: { ...st, step: 'creating' } });
   // Подтверждение, показанное до 07.10 (2 + 1: «3 tags — 98 ₪»): сначала новые условия, потом снова «Confirm»
   if ((st.slots || 1) !== normQty(st.slots || 1)) {
     st.slots = normQty(st.slots);
     const b = orderPrice(st.slots);
     await send(env, chatId, `ℹ️ Our offer has changed: now <b>${b.paid} + ${b.free} — ${b.tags} tags for ${ils(b.total)}</b>. ` +
       'Your order gets one more tag — please check the details once more.');
+    if (kvOn(env)) await env.FYP_KV.delete(lockKey);
     return askSpareOrConfirm(env, chatId, st, url);
   }
 
@@ -915,7 +999,10 @@ async function handleCallback(cq, env, url) {
     source: 'telegram', qty, lang: 'en', owner_name: st.owner_name, phone: st.phone, address: st.address,
     items: orderItems(qty, st.pet_name, (st.pets || []).slice(1), st.spare_for), chat_id: chatId,
   });
-  if (!res.ok) return send(env, chatId, '⚠️ Something went wrong. Please try again: /register');
+  if (!res.ok) {
+    if (kvOn(env)) await env.FYP_KV.delete(lockKey);
+    return send(env, chatId, '⚠️ Something went wrong. Please try again: /register');
+  }
   await db(env, 'clearState', { chat_id: chatId });
   await Promise.all(res.tags.map((t) => cachePublic(env, t)));
   await rememberChat(env, chatId);
@@ -1087,7 +1174,7 @@ async function sendRegistered(chatId, tagsIn, env, url, order) {
     `🎉 <b>${esc(first.owner_name)}, you are registered in FindYpet!</b>\n\n` + list + '\n\n' +
     (order
       ? `🧾 Order <b>${order.order_id}</b> · ${esc(orderLabel(order))}\n` +
-        `<b>What happens next:</b> we contact you to confirm the order and payment → we engrave the tag and write the NFC → ` +
+        `<b>What happens next:</b> we contact you to confirm the order and payment → we print the tag and write the NFC → ` +
         `we ship it to your address. I'll keep you posted right here.\n\n`
       : '') +
     `When someone scans a tag, I'll alert you here, and they can call you, write on WhatsApp or Telegram ` +
@@ -1158,7 +1245,7 @@ const STATUS_LABEL = { new: '🆕 New', paid: '💰 Paid', made: '🏭 Made', sh
 async function notifyAdmin(env, url, order) {
   if (!env.ADMIN_CHAT_ID) return;
   const total = order.items.reduce((n, i) => n + i.copies, 0);
-  const phoneEngrave = prettyPhone(normalizePhone(order.phone)).replace('+972 ', '0');
+  const phonePrint = prettyPhone(normalizePhone(order.phone)).replace('+972 ', '0');
   let k = 0;
   const blocks = [];
   for (const it of order.items) {
@@ -1168,10 +1255,11 @@ async function notifyAdmin(env, url, order) {
       k++;
       blocks.push(c === 0
         ? `🏷 <b>Tag ${k} of ${total} — #${it.tag_id}</b>\n` +
-          `🔤 Engrave front: <b>${esc(String(it.pet_name).toUpperCase())}</b> · ${esc(phoneEngrave)}\n` +
+          `🖨 Lid: <b>${esc(String(it.pet_name).toUpperCase())}</b> · ${esc(phonePrint)}\n` +
+          `<code>python3 medallion_v2.py lid ${it.tag_id} "${esc(String(it.pet_name).toUpperCase().replace(/"/g, ''))}" ${esc(phonePrint)}</code>\n` +
           `✍️ NFC + 🔳 QR: <code>${esc(short)}</code>\n<a href="${esc(qr)}">Download QR image</a>`
         : `🏷 <b>Tag ${k} of ${total} — #${it.tag_id} (spare)</b>\n` +
-          `Exact copy of the ${esc(it.pet_name)} tag above: same engraving, same NFC/QR link.`);
+          `Exact copy of the ${esc(it.pet_name)} tag above: same lid, same NFC link.`);
     }
   }
   const missing = (order.missing || []).length
@@ -1213,7 +1301,7 @@ async function setOrderStatus(env, url, adminChat, orderId, status) {
   const links = order.items.map((i) => `🐾 ${esc(i.pet_name)}: ${esc(shortUrl(env, url, i.tag_id))}`).join('\n');
   const text = {
     paid: `💰 <b>Payment received — thank you!</b>\nOrder ${order.order_id}: we're now making your ${tagWord} for ${names}.`,
-    made: `🏭 <b>Your ${tagWord} ${total > 1 ? 'are' : 'is'} ready</b> — engraved and NFC written. We'll ship soon.`,
+    made: `🏭 <b>Your ${tagWord} ${total > 1 ? 'are' : 'is'} ready</b> — printed and NFC written. We'll ship soon.`,
     shipped:
       `📦 <b>Your FindYpet ${tagWord} ${total > 1 ? 'are' : 'is'} on the way!</b>\nOrder ${order.order_id} → ${esc(order.address)}\n\n` +
       `<b>When it arrives:</b>\n1️⃣ Scan the QR or hold your phone to the tag — it must open the pet page:\n${links}\n` +
@@ -1482,9 +1570,43 @@ function esc(s) {
   return String(s === undefined || s === null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/** Текст, который уходит в Google-таблицу: не начинается с = + - @ (иначе таблица считает его формулой). */
+function cell(v, max) {
+  return str(v, max + 10).replace(/^[=+\-@\s]+/, '').slice(0, max);
+}
+
+function clientIp(request) {
+  return request.headers.get('CF-Connecting-IP') || 'unknown';
+}
+
+/** true — лимит исчерпан. Бинд не настроен или сломался — пропускаем запрос (сайт важнее лимита). */
+async function limited(env, binding, key) {
+  const rl = env && env[binding];
+  if (!rl || typeof rl.limit !== 'function') return false;
+  try {
+    const { success } = await rl.limit({ key });
+    return !success;
+  } catch (e) {
+    console.error('ratelimit', binding, e);
+    return false;
+  }
+}
+
+/** POST в API принимаем только как JSON и только со своих страниц (findy-pet.com, тестовый сайт, workers.dev). */
+function checkOrigin(request, env, url) {
+  if (request.method !== 'POST') return null;
+  const ct = (request.headers.get('Content-Type') || '').toLowerCase();
+  if (!ct.startsWith('application/json')) return json({ success: false, error: 'bad_content_type' }, env, 415);
+  const origin = request.headers.get('Origin');
+  if (origin && origin !== url.origin && origin !== siteBase(env, url)) {
+    return json({ success: false, error: 'forbidden_origin' }, env, 403);
+  }
+  return null;
+}
+
 function cors(env) {
   return {
-    'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN || '*',
+    'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN || env.SITE_URL || '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   };
