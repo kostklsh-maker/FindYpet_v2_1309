@@ -1222,6 +1222,7 @@ await test('/plate: admin gets orders.csv of lids for paid orders (spares repeat
 await test('legal: accessibility statement in 3 languages, linked from the site, tag page and privacy; privacy has retention, /delete, consent for the 2nd phone', async () => {
   const a = await call(env, '/accessibility/');
   assert.match(await a.clone().text(), /Konstantin Kalashnikov[\s\S]*tel:\+972526279522/);
+  assert.match(await a.clone().text(), /mailto:hello@findy-pet\.com/); assert.doesNotMatch(await a.clone().text(), /gmail/);
   assert.equal(a.status, 200);
   const html = await a.text();
   for (const s of ['Accessibility statement', 'הצהרת נגישות', 'Заявление о доступности', 'IS 5568', 'WCAG 2.1']) assert.ok(html.includes(s), s);

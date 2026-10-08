@@ -94,7 +94,7 @@ const BOT = {
       '🗑 /delete — delete your data\n' +
       '/cancel — cancel the current action\n' +
       '/id — show your Telegram chat ID\n\n' +
-      '✉️ Questions? Write to us here or at findypet0926@gmail.com',
+      '✉️ Questions? Write to us here or at hello@findy-pet.com',
     askArea:
       '📍 Where was your pet last seen? (area / city — e.g. "Haifa, Carmel Center")\n' +
       'This is shown on the tag page. Tap <b>Skip</b> if you prefer not to say.',
@@ -290,7 +290,7 @@ const BOT = {
       `🗑 ${LRM}/delete — מחיקת הנתונים שלכם\n` +
       `${LRM}/cancel — ביטול הפעולה הנוכחית\n` +
       `${LRM}/id — מזהה הצ׳אט שלכם בטלגרם\n\n` +
-      '✉️ שאלות? כתבו לנו כאן או ל-findypet0926@gmail.com',
+      '✉️ שאלות? כתבו לנו כאן או ל-hello@findy-pet.com',
     askArea:
       '📍 איפה ראו את חיית המחמד בפעם האחרונה? (שכונה או עיר — למשל "חיפה, מרכז הכרמל")\n' +
       'זה יוצג בדף התג. לחצו <b>דילוג</b> אם אתם מעדיפים לא לציין.',
@@ -485,7 +485,7 @@ const BOT = {
       '🗑 /delete — удалить ваши данные\n' +
       '/cancel — отменить текущее действие\n' +
       '/id — ваш chat ID в Telegram\n\n' +
-      '✉️ Вопросы? Напишите нам здесь или на findypet0926@gmail.com',
+      '✉️ Вопросы? Напишите нам здесь или на hello@findy-pet.com',
     askArea:
       '📍 Где питомца видели в последний раз? (район или город — например, «Хайфа, Центр Кармель»)\n' +
       'Это будет на странице жетона. Нажмите <b>Пропустить</b>, если не хотите указывать.',

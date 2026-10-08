@@ -87,7 +87,7 @@ def seo_head(page, T, I18N, pricing, lang):
         '@context': 'https://schema.org',
         '@graph': [
             {'@type': 'Organization', '@id': SITE + '/#org', 'name': 'FindYpet', 'url': SITE + '/',
-             'logo': SITE + '/assets/logo.png', 'email': 'findypet0926@gmail.com',
+             'logo': SITE + '/assets/logo.png', 'email': 'hello@findy-pet.com',
              'sameAs': ['https://t.me/YourPetLocatorBot']},
             {'@type': 'WebSite', '@id': SITE + '/#site', 'url': SITE + '/', 'name': 'FindYpet',
              'inLanguage': ['en', 'he', 'ru'], 'publisher': {'@id': SITE + '/#org'}},
