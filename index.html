@@ -14,7 +14,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@800&family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=9">
+    <link rel="stylesheet" href="css/style.css?v=10">
     <link rel="icon" href="assets/logo.png">
 </head>
 <body>
@@ -116,7 +116,7 @@
         <ul class="trust reveal">
             <li><svg class="ic"><use href="#i-mobile"/></svg><span><b data-t="t1Title">No app for the finder</b><small data-t="t1Text">Camera, tap or a simple call</small></span></li>
             <li><svg class="ic"><use href="#i-coin"/></svg><span><b data-t="t2Title">Pay once</b><small data-t="t2Text">No subscription needed</small></span></li>
-            <li><svg class="ic"><use href="#i-phone"/></svg><span><b data-t="t3Title">Works offline</b><small data-t="t3Text">Your number is engraved on the tag</small></span></li>
+            <li><svg class="ic"><use href="#i-phone"/></svg><span><b data-t="t3Title">Works offline</b><small data-t="t3Text">Your number is printed on the tag</small></span></li>
             <li><svg class="ic"><use href="#i-globe"/></svg><span><b data-t="t4Title">3 languages</b><small>English · עברית · Русский</small></span></li>
         </ul>
     </section>
@@ -170,7 +170,7 @@
                     <!-- screen 3: сообщения бота — тексты как в worker.js (бот пишет по-английски) -->
                     <div class="scr chat" data-scr="2">
                         <div class="chat-top"><span class="chat-av"><svg class="ic"><use href="#i-paw"/></svg></span><span><b>FindYpet</b><small>bot</small></span></div>
-                        <div class="bubble b-1" dir="ltr">👀 <b>Bella's tag was just scanned!</b> (06 Oct, 14:32)<br>Someone opened Bella's page. They can call you, write on WhatsApp or press Telegram — keep your phone close.<br>If they share their location, I will send it to you right here.
+                        <div class="bubble b-1" dir="ltr">👀 <b>Bella's tag was just scanned!</b> (06 Oct, 14:32)<br>Someone opened Bella's page. They can call you, write on WhatsApp or tap "Notify the owner" — keep your phone close.<br>If they share their location, I will send it to you right here.
                             <span class="tg-kb">🚨 My pet is missing — Lost mode on</span>
                         </div>
                         <div class="bubble b-2" dir="ltr">🚨📍 <b>Bella has been found!</b><br>The finder shared their location (06 Oct, 14:33), accuracy ±12 m.
@@ -236,7 +236,7 @@
                     <ul class="pills">
                         <li><svg class="ic"><use href="#i-phone"/></svg><span data-t="finderThen1">Call in one tap</span></li>
                         <li><svg class="ic fill"><use href="#i-wa"/></svg><span data-t="finderThen2">WhatsApp with a ready message</span></li>
-                        <li><svg class="ic fill"><use href="#i-tg"/></svg><span data-t="finderThen5">Telegram — our bot passes your message to the owner</span></li>
+                        <li><svg class="ic fill"><use href="#i-tg"/></svg><span data-t="finderThen5">“Notify the owner” — one tap, and our bot messages the owner (no app needed)</span></li>
                         <li><svg class="ic"><use href="#i-pin"/></svg><span data-t="finderThen3">Tick “Allow sharing my location” — only if you want</span></li>
                         <li><svg class="ic"><use href="#i-note"/></svg><span data-t="finderThen4">See notes: allergies, “don't chase”</span></li>
                     </ul>
@@ -390,7 +390,7 @@
                         <p class="after-title" data-t="asTitle">After you order:</p>
                         <ol class="after-steps">
                             <li data-t="as1">We confirm the order and payment with you</li>
-                            <li data-t="as2">We engrave the tag and write the NFC</li>
+                            <li data-t="as2">We print the tag and write the NFC</li>
                             <li data-t="as3">Delivery to your address</li>
                             <li data-t="as4">Scan it to check — and onto the collar</li>
                         </ol>
@@ -516,7 +516,7 @@
                         <p class="next-title" data-t="nextTitle">What happens next</p>
                         <ol class="next-steps">
                             <li><b data-t="nx1t">Confirm & pay</b><span data-t="nx1">We message you to confirm the order and arrange payment.</span></li>
-                            <li><b data-t="nx2t">We make it</b><span data-t="nx2">We engrave your tag and write its NFC with your pet's page.</span></li>
+                            <li><b data-t="nx2t">We make it</b><span data-t="nx2">We print your tag and write its NFC with your pet's page.</span></li>
                             <li><b data-t="nx3t">Delivery</b><span data-t="nx3">We ship it to your address and let you know when it's on the way.</span></li>
                             <li><b data-t="nx4t">Check & wear</b><span data-t="nx4">Scan the QR or tap your phone to the tag — it opens the pet's page. Then onto the collar!</span></li>
                         </ol>
@@ -537,10 +537,10 @@
                 <details class="faq"><summary data-t="q4">Where do I get alerts?</summary><p data-t="a4">Today — in Telegram, via our bot @YourPetLocatorBot. We're adding WhatsApp and SMS. Even without Telegram, the finder can call you or write to you on WhatsApp.</p></details>
                 <details class="faq"><summary data-t="q5">Who sees my details?</summary><p data-t="a5">Whoever scans the tag sees your pet's name, your first name, your phone and the notes you chose to add. Your address is used only for delivery and is never shown. The finder's location is sent only if they tick “Allow sharing my location”.</p></details>
                 <details class="faq"><summary data-t="q6">Does it replace the microchip?</summary><p data-t="a6">No. The microchip is required by law and remains the last backup. FindYpet adds a fast way to reach you without a vet's scanner.</p></details>
-                <details class="faq"><summary data-t="q8">What is a spare tag?</summary><p data-t="a8">An exact copy of your pet's tag — same engraving, same page and link. Keep it at home or put it on a harness. With 2 tags or 3 + 1 you decide: a tag for each pet, or spares.</p></details>
+                <details class="faq"><summary data-t="q8">What is a spare tag?</summary><p data-t="a8">An exact copy of your pet's tag — same print, same page and link. Keep it at home or put it on a harness. With 2 tags or 3 + 1 you decide: a tag for each pet, or spares.</p></details>
                 <details class="faq"><summary data-t="q12">What is FindYpet Care?</summary><p data-t="a12">A monthly program we're preparing: a digital health card from your vet, partner discounts and bonuses. Planned price — 39 ₪ a month per owner, covering all your pets; cancel any time. It isn't live yet; join the waitlist in our bot — no payment.</p></details>
-                <details class="faq"><summary data-t="q9">How do I pay, and when will I get the tag?</summary><p data-t="a9">After you order, we message you to confirm the order and arrange payment. Then we engrave the tag, write its NFC and ship it to your address. Each step is announced in Telegram — or we call you.</p></details>
-                <details class="faq"><summary data-t="q10">What if my phone number changes?</summary><p data-t="a10">Write to us in the bot — we update your pet's page right away. The old number stays engraved on the front, so you can order a new tag with the new number.</p></details>
+                <details class="faq"><summary data-t="q9">How do I pay, and when will I get the tag?</summary><p data-t="a9">After you order, we message you to confirm the order and arrange payment. Then we print the tag, write its NFC and ship it to your address. Each step is announced in Telegram — or we call you.</p></details>
+                <details class="faq"><summary data-t="q10">What if my phone number changes?</summary><p data-t="a10">Write to us in the bot — we update your pet's page right away. The old number is printed on the tag itself, so it's best to order a new tag with the new number.</p></details>
                 <details class="faq"><summary data-t="q7">How do I update my phone or notes?</summary><p data-t="a7">In the Telegram bot: /settings. Keep your contacts up to date — outdated contacts are a common reason a found pet doesn't get home.</p></details>
             </div>
         </div>
@@ -568,10 +568,10 @@
         <a class="btn btn-primary btn-sm" href="#plans" data-t="navCta">Get a tag</a>
     </div>
 
-    <script src="js/config.js?v=9"></script>
-    <script src="js/plans.js?v=9"></script>
-    <script src="js/i18n.js?v=9"></script>
-    <script src="js/register-form.js?v=9"></script>
-    <script src="js/app.js?v=9"></script>
+    <script src="js/config.js?v=10"></script>
+    <script src="js/plans.js?v=10"></script>
+    <script src="js/i18n.js?v=10"></script>
+    <script src="js/register-form.js?v=10"></script>
+    <script src="js/app.js?v=10"></script>
 </body>
 </html>

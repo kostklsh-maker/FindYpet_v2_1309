@@ -33,6 +33,32 @@ id = "d0564acb6cc546f5b82f0a8f6b78508b"   # findypet-data
 [triggers]
 crons = ["0 7 * * *"]                     # ежедневно 10:00 по Израилю — напоминания раз в 180 дней
 
+# Лимиты частоты запросов (Workers Rate Limiting). Считаются в каждом дата-центре отдельно.
+# Если бинды не подключились, сайт работает без лимитов (см. limited() в worker.js).
+[[unsafe.bindings]]   # страница жетона и события воронки — на один адрес посетителя: 30 в минуту
+name = "RL_READ"
+type = "ratelimit"
+namespace_id = "7101"
+simple = { limit = 30, period = 60 }
+
+[[unsafe.bindings]]   # скан, геолокация, «питомец найден» — на один адрес: 10 в минуту
+name = "RL_SIGNAL"
+type = "ratelimit"
+namespace_id = "7102"
+simple = { limit = 10, period = 60 }
+
+[[unsafe.bindings]]   # заказы с сайта — на один адрес: 5 в минуту
+name = "RL_ORDER"
+type = "ratelimit"
+namespace_id = "7103"
+simple = { limit = 5, period = 60 }
+
+[[unsafe.bindings]]   # оповещения владельцу — на один жетон, с любых адресов: 3 в минуту
+name = "RL_TAG"
+type = "ratelimit"
+namespace_id = "7104"
+simple = { limit = 3, period = 60 }
+
 # ============================================================
 # ТЕСТОВЫЙ САЙТ — test.findy-pet.com (Worker findypet-app-staging)
 # ============================================================
@@ -58,3 +84,28 @@ id = "a83f6204d6344c058652beff71017527"   # findypet-data-test
 
 [env.staging.triggers]
 crons = []
+
+# Тестовый сайт — свои счётчики (другие namespace_id), чтобы проверки не тратили лимиты рабочего.
+[[env.staging.unsafe.bindings]]   # страница жетона и события воронки — на один адрес посетителя: 30 в минуту
+name = "RL_READ"
+type = "ratelimit"
+namespace_id = "7201"
+simple = { limit = 30, period = 60 }
+
+[[env.staging.unsafe.bindings]]   # скан, геолокация, «питомец найден» — на один адрес: 10 в минуту
+name = "RL_SIGNAL"
+type = "ratelimit"
+namespace_id = "7202"
+simple = { limit = 10, period = 60 }
+
+[[env.staging.unsafe.bindings]]   # заказы с сайта — на один адрес: 5 в минуту
+name = "RL_ORDER"
+type = "ratelimit"
+namespace_id = "7203"
+simple = { limit = 5, period = 60 }
+
+[[env.staging.unsafe.bindings]]   # оповещения владельцу — на один жетон, с любых адресов: 3 в минуту
+name = "RL_TAG"
+type = "ratelimit"
+namespace_id = "7204"
+simple = { limit = 3, period = 60 }

