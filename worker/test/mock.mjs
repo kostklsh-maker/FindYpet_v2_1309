@@ -106,3 +106,8 @@ export async function tgUpdate(env, update) {
 export const msg = (chat, text, extra = {}) => ({ message: { chat: { id: chat, type: 'private' }, from: { first_name: 'Kostya' }, text, ...extra } });
 export const cb = (chat, data, from) => ({ callback_query: { id: 'cq1', data, ...(from ? { from } : {}), message: { chat: { id: chat }, message_id: 7 } } });
 export { worker };
+
+/** /setup: ключ уходит в теле POST (в адресе он больше не принимается). */
+export async function setupCall(env, key = 'sec') {
+  return call(env, '/setup', { method: 'POST', body: { key } });
+}

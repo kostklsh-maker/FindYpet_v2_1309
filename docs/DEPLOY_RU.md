@@ -50,7 +50,7 @@ GitHub → репозиторий → **Settings** → **Pages** → **Build and
    - `BOT_USERNAME` (Text) — username тестового бота без @;
    - `WEBHOOK_SECRET` (Secret) — любая строка из букв и цифр;
    - `ADMIN_CHAT_ID` (Secret) — ваш chat id (тот же, что у рабочего сайта; бот показывает его по команде `/id`).
-3. Открыть `https://test.findy-pet.com/setup?key=<WEBHOOK_SECRET>` — в ответе `"setWebhook": { "ok": true }`.
+3. Открыть `https://test.findy-pet.com/setup` и ввести ключ (SETUP_KEY, а пока его нет — WEBHOOK_SECRET) — в ответе `"setWebhook": { "ok": true }`. Ключ в адресе (`?key=`) больше не принимается.
 4. Написать тестовому боту `/start`.
 
 ⚠️ Никогда не вписывайте в тестовый сайт токен рабочего бота @YourPetLocatorBot — рабочий бот перестанет отвечать клиентам.
@@ -92,7 +92,7 @@ Google-таблица и Apps Script **не меняются**.
 
 ## Шаг 3. Обновить команды бота
 Откройте в браузере:
-`https://findypet-app.kostikklsh.workers.dev/setup?key=<ваш WEBHOOK_SECRET>`
+`https://findy-pet.com/setup` → ввести ключ в форму (SETUP_KEY; пока его нет — WEBHOOK_SECRET)
 
 В ответе должно быть: `"kv": "FYP_KV connected ✅"` и `"setMyCommands": { "ok": true }`.
 После этого в меню бота появятся /lost, /found, /settings.
