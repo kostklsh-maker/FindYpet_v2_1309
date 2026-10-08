@@ -1,6 +1,6 @@
 // Сквозные тесты API и бота на мок-окружении. Запуск: node test/run.mjs
 import assert from 'node:assert/strict';
-import { state, KV, makeKV, makeEnv, call, tgUpdate, msg, cb, worker } from './mock.mjs';
+import { state, KV, makeKV, makeEnv, call, tgUpdate, msg, cb, worker, setupCall } from './mock.mjs';
 import { _test } from '../dist/worker.js';
 
 let passed = 0;
@@ -308,7 +308,7 @@ await test('reminders: sent once after 180 days', async () => {
 });
 
 await test('setup reports KV status', async () => {
-  const d = await (await call(env, '/setup?key=sec')).json();
+  const d = await (await setupCall(env)).json();
   assert.match(d.kv, /connected/);
   assert.equal(d.setMyCommands.ok, true);
 });
@@ -863,7 +863,7 @@ await test('order status messages reach the customer in the order language (RU);
 
 await test('/setup: commands and descriptions in English (default), Hebrew and Russian', async () => {
   const before = state.tg.length;
-  const d = await (await call(env, '/setup?key=sec')).json();
+  const d = await (await setupCall(env)).json();
   assert.equal(d.setMyCommands.ok, true); assert.equal(d.setMyCommands_he.ok, true); assert.equal(d.setMyCommands_ru.ok, true);
   const cmds = state.tg.slice(before).filter((c) => c.method === 'setMyCommands');
   assert.deepEqual(cmds.map((c) => c.payload.language_code), [undefined, 'he', 'ru']);
@@ -1108,10 +1108,10 @@ await test('site order: the same idempotency key never creates a second order; T
   r = await call(tsEnv, '/api/register', { method: 'POST', body: { ...body, idem: undefined, ts: 'good-token' } });
   assert.equal((await r.json()).success, true);
   assert.match(await (await call(tsEnv, '/js/plans.js')).text(), /const TURNSTILE_SITE_KEY = "0x4AAAAAAA-site";/);
-  assert.match((await (await call(tsEnv, '/setup?key=sec')).json()).turnstile, /^on ✅/);
+  assert.match((await (await setupCall(tsEnv)).json()).turnstile, /^on ✅/);
   const badEnv = makeEnv({ TURNSTILE_SECRET: 'wrong', TURNSTILE_SITE_KEY: '0x4AAAAAAA-site' });
-  assert.match((await (await call(badEnv, '/setup?key=sec')).json()).turnstile, /secret is wrong/i);
-  assert.match((await (await call(env, '/setup?key=sec')).json()).turnstile, /^off/);
+  assert.match((await (await setupCall(badEnv)).json()).turnstile, /secret is wrong/i);
+  assert.match((await (await setupCall(env)).json()).turnstile, /^off/);
   assert.doesNotMatch(await (await call(env, '/js/plans.js')).text(), /TURNSTILE/);
 });
 
@@ -1135,11 +1135,30 @@ await test('test site /setup refuses the production bot token', async () => {
   const tenv = { STAGE: 'test', TEST_DB: '1', SITE_URL: 'https://test.findy-pet.com', BOT_TOKEN: 'T', WEBHOOK_SECRET: 'sec', FYP_KV: makeKV() };
   state.botUsername = 'YourPetLocatorBot';
   const n = state.tg.length;
-  const r = await call(tenv, '/setup?key=sec');
+  const r = await setupCall(tenv);
   state.botUsername = undefined;
   assert.equal(r.status, 409); assert.match((await r.json()).error, /PRODUCTION bot token/);
   assert.ok(!state.tg.slice(n).some((c) => c.method === 'setWebhook'));
-  assert.equal((await call(tenv, '/setup?key=sec')).status, 200);
+  assert.equal((await setupCall(tenv)).status, 200);
+});
+
+await test('/setup: form only, key never in the address, wrong key refused, separate SETUP_KEY', async () => {
+  const n = state.tg.length;
+  let r = await call(env, '/setup?key=sec');
+  assert.equal(r.status, 403); assert.match(await r.text(), /no longer accepted in the address/);
+  assert.ok(!state.tg.slice(n).some((c) => c.method === 'setWebhook'), 'a key in the URL does nothing');
+  r = await call(env, '/setup');
+  assert.equal(r.status, 200); assert.equal(r.headers.get('Cache-Control'), 'no-store');
+  const page = await r.text();
+  assert.match(page, /<form method="post" action="\/setup">/); assert.match(page, /type="password"/);
+  assert.equal((await setupCall(env, 'wrong')).status, 403);
+  r = await worker.fetch(new Request('http://localhost:8787/setup', { method: 'POST', body: 'key=sec', headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }), env, { waitUntil() {} });
+  assert.equal(r.status, 200); assert.match((await r.json()).setup_key, /WEBHOOK_SECRET/);
+  const kenv = makeEnv({ SETUP_KEY: 'setup-only-key' });
+  assert.equal((await setupCall(kenv, 'sec')).status, 403, 'the webhook secret no longer opens /setup');
+  r = await setupCall(kenv, 'setup-only-key');
+  assert.equal(r.status, 200); assert.match((await r.json()).setup_key, /separate SETUP_KEY/);
+  assert.equal((await call(env, '/setup', { method: 'PUT' })).status, 405);
 });
 
 await test('daily backup: KV data goes to the admin as a JSON file', async () => {
@@ -1195,13 +1214,13 @@ await test('/delete with the old Apps Script: the customer is told it will be do
   await tgUpdate(env, msg(C, '/start ' + d.telegram_link.split('start=')[1]));
   state.oldGas = true;
   await tgUpdate(env, cb(C, `delok:${d.id_tag}`));
-  const v = await (await call(env, '/setup?key=sec')).json();
+  const v = await (await setupCall(env)).json();
   state.oldGas = false;
   assert.match(state.tg.filter((c) => c.payload.chat_id === C).at(-1).payload.text, /finished by hand/);
   assert.match(state.tg.filter((c) => c.payload.chat_id === 'admin').at(-1).payload.text, /Delete request<\/b> for #\d+/);
   assert.notEqual(state.tags.find((t) => t.tag_id === String(d.id_tag)).status, 'deleted');
   assert.match(v.db_version, /v1 — update it/);
-  assert.match((await (await call(env, '/setup?key=sec')).json()).db_version, /Apps Script v2/);
+  assert.match((await (await setupCall(env)).json()).db_version, /Apps Script v2/);
 });
 
 await test('/plate: admin gets orders.csv of lids for paid orders (spares repeated); others get nothing', async () => {
@@ -1232,6 +1251,19 @@ await test('legal: accessibility statement in 3 languages, linked from the site,
   assert.match(await (await call(env, '/he/')).text(), /<a href="\/accessibility\/\?lang=he" data-t="a11yLink">הצהרת נגישות<\/a>/);
   assert.match(await (await call(env, '/t/101')).text(), /<a href="\.\.\/accessibility\/" data-t="a11y">/);
   assert.match(await (await call(env, '/sitemap.xml')).text(), /<loc>http:\/\/localhost:8787\/accessibility\/<\/loc>/);
+});
+
+await test('English copy: no calques, one name for the mode ("Lost mode") on the site and in the bot', async () => {
+  const { readFileSync } = await import('node:fs');
+  const i18n = readFileSync(new URL('../../js/i18n.js', import.meta.url), 'utf8');
+  const en = i18n.slice(0, i18n.indexOf('he: {'));
+  const site = await (await call(env, '/')).text();
+  const worker = readFileSync(new URL('../src/worker.js', import.meta.url), 'utf8');
+  for (const bad of ['works without anything', '\u201cLost\u201d mode', 'Telegram tells you', 'always in your phone', 'Write to us in the bot', 'has everything']) {
+    assert.ok(!en.includes(bad), `i18n en: ${bad}`); assert.ok(!site.includes(bad), `site: ${bad}`);
+  }
+  assert.ok(!worker.includes('LOST MODE'), 'bot: LOST MODE');
+  assert.ok(site.includes('Lost mode in one command'));
 });
 
 console.log(`\n${passed} tests passed`);

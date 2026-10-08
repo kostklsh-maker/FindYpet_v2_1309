@@ -16,7 +16,7 @@
  *        /register /mytags /lost /found /settings /photo /care /lang /cancel /help /id — на иврите, русском и
  *        английском (тексты — const BOT); для админа (по-английски) /orders, /stats и
  *        кнопки статуса заказа (Оплачен → Изготовлен → Отправлен) — клиенту уходит сообщение
- *   • GET /setup?key=WEBHOOK_SECRET — одноразовая настройка бота (повторить после обновления!)
+ *   • /setup — настройка бота: форма, ключ уходит в теле POST, не в адресе (повторить после обновления!)
  *   • scheduled() — напоминание владельцам раз в 180 дней проверить контакты (нужен Cron Trigger)
  *
  *  База данных — Google Sheets через Apps Script (GAS_URL + GAS_KEY) — без изменений.
@@ -29,7 +29,8 @@
  *   BOT_USERNAME              YourPetLocatorBot
  *   GAS_URL         (секрет)  URL веб-приложения Apps Script (…/exec)
  *   GAS_KEY         (секрет)  тот же ключ, что API_KEY в Apps Script
- *   WEBHOOK_SECRET  (секрет)  любая случайная строка (A-Z a-z 0-9 _ -)
+ *   WEBHOOK_SECRET  (секрет)  любая случайная строка (A-Z a-z 0-9 _ -) — её знает только Telegram
+ *   SETUP_KEY       (секрет)  ключ для /setup; пока не задан, подходит WEBHOOK_SECRET
  *   SITE_URL                  адрес сайта без / в конце (пусто = адрес этого Worker)
  *   ADMIN_CHAT_ID             (необяз.) ваш chat id — уведомления о новых заказах
  *   TIMEZONE                  Asia/Jerusalem
@@ -195,7 +196,7 @@ const BOT = {
     btnPreview: '👀 Preview pet page', btnAddExtras: '⚙️ Add second contact / notes',
     useMyTags: 'Use /mytags any time to see your tags.',
     orderTxt: { new: 'received — we will contact you', paid: 'paid — being made', made: 'ready — shipping soon', shipped: 'shipped' },
-    myTagLine: (v) => `🐾 <b>${v.pet}</b> — tag #${v.id}` + (v.lost ? '  🚨 <b>LOST MODE</b>' : '') +
+    myTagLine: (v) => `🐾 <b>${v.pet}</b> — tag #${v.id}` + (v.lost ? '  🚨 <b>Lost mode</b>' : '') +
       (v.copies > 1 ? ` · ${v.copies} tags` : '') + '\n' +
       (v.order ? `🧾 Order ${v.order}: ${v.status}\n` : '') + `🔗 ${v.link}` +
       (v.p2 ? `\n📞 2nd contact: ${v.p2}` : '') + (v.notes ? `\n📝 ${v.notes}` : '') + (v.scan ? `\n🕒 last scan: ${v.scan}` : ''),
@@ -799,7 +800,7 @@ async function route(request, env, ctx) {
     }
 
     // ---- Одноразовая настройка бота ----
-    if (path === '/setup') return await setup(env, url);
+    if (path === '/setup') return await setupRoute(request, env, url);
 
     // ---- API сайта ----
     if (path.startsWith('/api/')) {
@@ -2335,10 +2336,42 @@ async function listOrders(env, chatId) {
 // ---------------------------------------------------------------
 // One-time setup: webhook, commands, descriptions
 // ---------------------------------------------------------------
-async function setup(env, url) {
-  if (!env.WEBHOOK_SECRET || url.searchParams.get('key') !== env.WEBHOOK_SECRET) {
-    return new Response('forbidden', { status: 403 });
+/** Сравнение строк за одинаковое время (ключ не подбирается по скорости ответа). */
+function sameSecret(a, b) {
+  a = String(a || ''); b = String(b || '');
+  if (!a || !b) return false;
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  return diff === 0;
+}
+
+/** /setup: GET — форма, POST — ключ в теле запроса. Ключ в адресе больше не принимается
+ *  (адрес остаётся в истории браузера, в логах и в переписке). */
+async function setupRoute(request, env, url) {
+  const noStore = { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' };
+  const form = (msg, status = 200) => new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>FindYpet setup</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:420px;margin:48px auto;padding:0 16px;color:#0E3B3D}input,button{font:inherit;width:100%;box-sizing:border-box;padding:12px;margin:8px 0;border-radius:10px;border:1px solid #738F8E}button{background:#0E3B3D;color:#fff;border:0;cursor:pointer}.err{color:#B42318;font-weight:600}</style></head><body><h1>FindYpet setup</h1>${msg ? `<p class="err" role="alert">${msg}</p>` : ''}<form method="post" action="/setup"><label for="k">Setup key</label><input id="k" name="key" type="password" autocomplete="off" required autofocus><button type="submit">Run setup</button></form></body></html>`,
+    { status, headers: { 'Content-Type': 'text/html; charset=utf-8', ...noStore } });
+  if (request.method === 'GET') {
+    if (url.searchParams.has('key')) return form('The key is no longer accepted in the address. Enter it below.', 403);
+    return form('');
   }
+  if (request.method !== 'POST') return new Response('method not allowed', { status: 405, headers: { Allow: 'GET, POST' } });
+  if (await limited(env, 'RL_SIGNAL', `${clientIp(request)}:/setup`)) return form('Too many attempts. Wait a minute.', 429);
+  let key = '';
+  try {
+    const type = request.headers.get('Content-Type') || '';
+    if (type.includes('application/json')) key = (await request.json()).key;
+    else key = (await request.formData()).get('key');
+  } catch (e) { key = ''; }
+  const expected = env.SETUP_KEY || env.WEBHOOK_SECRET;
+  if (!sameSecret(key, expected)) return form('Wrong key.', 403);
+  const res = await setup(env, url);
+  const h = new Headers(res.headers);
+  for (const [k, v] of Object.entries(noStore)) h.set(k, v);
+  return new Response(res.body, { status: res.status, headers: h });
+}
+
+async function setup(env, url) {
   const results = {};
   // Тестовый сайт с токеном рабочего бота перехватил бы его webhook — отказываемся
   const me = await tg(env, 'getMe', {});
@@ -2375,6 +2408,7 @@ async function setup(env, url) {
   results.lostChannel = env.LOST_CHANNEL_ID ? `posting to ${env.LOST_CHANNEL_ID}` : 'not set (optional)';
   results.sms = smsEnabled(env) ? 'SMS fallback on' : 'SMS fallback off (optional)';
   results.turnstile = await turnstileStatus(env);
+  results.setup_key = env.SETUP_KEY ? 'separate SETUP_KEY ✅' : 'using WEBHOOK_SECRET — add a separate SETUP_KEY secret ⚠️';
   return new Response(JSON.stringify(results, null, 2), { headers: { 'Content-Type': 'application/json; charset=utf-8' } });
 }
 
