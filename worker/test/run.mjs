@@ -832,7 +832,7 @@ await test('owner alerts follow the order language (HE): scan, found + scam warn
   assert.match(f, /מצאו את Luna!/); assert.match(f, /FindYpet אף פעם לא מבקשת כסף/);
   await call(env, '/api/location', { method: 'POST', body: { id_tag: d.id_tag, lat: 32.8, lon: 35.0, accuracy: 9 } });
   const loc = state.tg.filter((c) => c.payload.chat_id === '7102' && c.method === 'sendMessage').at(-1).payload.text;
-  assert.match(loc, /דיוק ±9 מ׳/); assert.match(loc, /לפתוח ב-Google Maps/);
+  assert.match(loc, /דיוק ±9 מ׳/); assert.match(loc, /\u2066🗺 <a href="https:\/\/maps\.google\.com\/\?q=32\.8,35">Google Maps<\/a>  ·  🚗 <a [^>]+>Waze<\/a>\u2069/);
   // без Telegram — SMS на иврите
   row.telegram_chat_id = '';
   const smsEnv = makeEnv({ TWILIO_ACCOUNT_SID: 'AC1', TWILIO_AUTH_TOKEN: 'x', TWILIO_FROM: 'FindYpet' });
@@ -949,6 +949,51 @@ await test('bot dictionary: every language has every text', async () => {
   const keys = (l) => Object.keys(_test.BOT[l]).sort();
   assert.deepEqual(keys('he'), keys('en')); assert.deepEqual(keys('ru'), keys('en'));
   for (const l of ['en', 'he', 'ru']) assert.ok(_test.tr(l, 'shortDesc').length <= 120 && _test.tr(l, 'desc').length <= 512);
+});
+
+// ---- Стадия 2: лендинг ----
+const loadI18n = async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../../js/i18n.js', import.meta.url), 'utf8');
+  const stub = 'const localStorage={getItem(){return null},setItem(){}};const navigator={language:"en"};' +
+    'const document={documentElement:{},querySelectorAll(){return []}};';
+  return new Function(stub + src + '; return I18N;')();
+};
+await test('landing: real tag (glow), why-a-chip table, 2 price cards + specs + Care strip, new FAQ; finder block after FAQ', async () => {
+  const home = await (await call(env, '/')).text();
+  assert.match(home, /<symbol id="tag-art"/); assert.match(home, /id="glowBtn"/);
+  assert.doesNotMatch(home, /flipTag|flip-tag|scr-dog|🐕/);
+  assert.match(home, /<table class="compare/);
+  assert.doesNotMatch(home, /data-plan="care"/); assert.match(home, /class="care-strip/);
+  for (const k of ['sp1', 'sp2', 'sp3', 'sp4', 'sp5', 'qBat', 'qWater', 'qFit', 'qSpam']) assert.match(home, new RegExp(`data-t="${k}"`));
+  assert.ok(home.indexOf('id="faq"') < home.indexOf('id="finder"'), 'finder block goes after FAQ');
+  assert.ok(home.indexOf('id="why"') < home.indexOf('id="plans"'));
+  assert.match(home, /class="btn btn-primary btn-sm choose" data-qty="1"/); // нижняя панель сразу открывает форму
+  assert.doesNotMatch(home, /Telegram · now/);
+});
+
+await test('landing translations: every data-t key exists, all languages have the same keys', async () => {
+  const I18N = await loadI18n();
+  const home = await (await call(env, '/')).text();
+  const keys = new Set([...home.matchAll(/data-t(?:-html|-aria|-ph)?="([A-Za-z0-9]+)"/g)].map((m) => m[1]));
+  for (const k of keys) assert.ok(k in I18N.en, 'missing in I18N.en: ' + k);
+  const ks = (l) => Object.keys(I18N[l]).sort().join();
+  assert.equal(ks('he'), ks('en')); assert.equal(ks('ru'), ks('en'));
+  for (const l of ['en', 'he', 'ru']) for (const k of ['errReq', 'formTotal', 'bundlePer', 'bundlePerEq', 'glowBtn', 'glowBtnDay']) assert.ok(I18N[l][k], `${l}.${k}`);
+});
+
+await test('demo chat on the landing = the real bot messages in each language', async () => {
+  const I18N = await loadI18n();
+  const home = await (await call(env, '/')).text();
+  const NAME = { en: 'Bella', he: 'בלה', ru: 'Белла' }, LOC = { en: 'en-GB', he: 'he-IL', ru: 'ru-RU' };
+  for (const L of ['en', 'he', 'ru']) {
+    const time = (min) => new Date(Date.UTC(2026, 9, 6, 11, min)).toLocaleString(LOC[L], { timeZone: 'Asia/Jerusalem', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    const b1 = _test.tr(L, 'scanned', { pet: NAME[L], time: time(32) }).replace(/\n/g, '<br>') + `<span class="tg-kb">${_test.tr(L, 'btnLostOn')}</span>`;
+    assert.equal(I18N[L].bub1, b1, L + ' bub1');
+    assert.ok(I18N[L].bub2.startsWith(_test.tr(L, 'locHead', { pet: NAME[L], time: time(33), acc: 12 }).replace(/\n+$/, '').replace(/\n/g, '<br>')), L + ' bub2');
+    assert.ok(I18N[L].bub2.includes(_test.tr(L, 'maps')));
+  }
+  assert.ok(home.includes(I18N.en.bub1) && home.includes(I18N.en.bub2), 'HTML default = EN bot text');
 });
 
 console.log(`\n${passed} tests passed`);

@@ -1,6 +1,6 @@
 // ============================================================
 // Интерактив главной страницы FindYpet
-// (жетон-перевёртыш, демо «4 шага», вкладки для нашедшего,
+// (жетон днём и ночью, демо «4 шага», вкладки для нашедшего,
 //  переключатель «Потерялся», калькулятор питомцев, живой превью жетона)
 // Зависит от i18n.js (t, onLang, money, priceOf, orderTotal)
 // ============================================================
@@ -38,15 +38,24 @@
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
 
-    // ---------- Жетон-перевёртыш ----------
-    const flip = $("#flipTag");
-    let flipTimer = null;
-    function autoFlip() { flip.classList.toggle("flipped"); }
-    if (!reduced) flipTimer = setInterval(autoFlip, 3800);
-    flip.addEventListener("click", function () {
-        clearInterval(flipTimer);
-        flip.classList.toggle("flipped");
-    });
+    // ---------- Жетон днём и ночью: корпус светится в темноте ----------
+    // Один раз сам показывает ночь (если человек ещё не нажал кнопку), дальше — только по кнопке.
+    const hv = $("#heroVisual"), glowBtn = $("#glowBtn"), glowLbl = $("#glowLbl");
+    let glowTouched = false;
+    function setNight(on) {
+        hv.classList.toggle("night", on);
+        glowBtn.setAttribute("aria-pressed", on ? "true" : "false");
+        glowLbl.dataset.t = on ? "glowBtnDay" : "glowBtn";
+        glowLbl.textContent = t(glowLbl.dataset.t);
+    }
+    glowBtn.addEventListener("click", function () { glowTouched = true; setNight(!hv.classList.contains("night")); });
+    if (!reduced) {
+        setTimeout(function () {
+            if (glowTouched) return;
+            setNight(true);
+            setTimeout(function () { if (!glowTouched) setNight(false); }, 2800);
+        }, 2400);
+    }
 
     // ---------- Демо «4 шага» ----------
     const steps = $$(".demo-step"), screens = $$(".scr");
@@ -111,19 +120,30 @@
     lostToggle.addEventListener("change", function () { mini.classList.toggle("lost", lostToggle.checked); });
 
     // ---------- Цены: 3 + 1 — сколько выходит за жетон ----------
+    // «4 жетона · экономия 49 ₪ · меньше 37 ₪ за жетон» — выгода в шекелях, без агорот
     function renderPricing() {
-        const n = bundleSize(), per = priceOf("bundle") / n;
-        $("#bundlePer").textContent = per ? t("bundlePer", { n: n, each: money(per), tag: money(priceOf("tag")) }) : "";
+        const n = bundleSize(), each = priceOf("bundle") / n, save = priceOf("tag") * n - priceOf("bundle");
+        const whole = Number.isInteger(each);
+        $("#bundlePer").textContent = each ? t(whole ? "bundlePerEq" : "bundlePer", { n: n, tag: money(save), per: money(whole ? each : Math.ceil(each)) }) : "";
     }
 
     // ---------- Заказ: живой превью жетона и итог ----------
     const petIn = $("#petName"), phoneIn = $("#ownerPhone");
+    // Надписи на крышке не шире 26 мм (как в генераторе медальона): длинные сжимаем по ширине
+    function fitText(el, max, perChar) {
+        el.removeAttribute("textLength"); el.removeAttribute("lengthAdjust");
+        let w = 0;
+        try { w = el.getComputedTextLength(); } catch (e) { /* не отрисован */ }
+        if (!w) w = el.textContent.length * perChar; // форма ещё скрыта — оценка по числу знаков
+        if (w > max) { el.setAttribute("textLength", max); el.setAttribute("lengthAdjust", "spacingAndGlyphs"); }
+    }
     function renderPreview() {
         const name = (petIn.value || "").trim();
         $("#pvName").textContent = (name || t("bella")).toUpperCase();
         const ph = (phoneIn.value || "").trim();
         $("#pvPhone").textContent = ph || "050-123-4567";
-        $("#pvName").classList.toggle("long", (name || "BELLA").length > 8);
+        fitText($("#pvName"), 26, 4.6);
+        fitText($("#pvPhone"), 26, 3.3);
     }
     // ---------- Заказ: 1, 2 или 4 (3 + 1) жетона ----------
     const qty = function () { const r = $('input[name="qty"]:checked'); return r ? +r.value : 1; };
@@ -132,6 +152,7 @@
     function renderSummary() {
         const q = qty();
         $("#sumPrice").textContent = money(orderTotal(q));
+        $("#formTotal").textContent = t("formTotal", { n: q, sum: money(orderTotal(q)) });
         $("#sumFreeRow").hidden = q < bundleSize();
         $$(".plan-pick label").forEach(function (l) { l.classList.toggle("on", l.querySelector("input").checked); });
         // 2 жетона: ещё один за 49 ₪ — и четвёртый в подарок
@@ -253,7 +274,7 @@
     }
     $$('input[name="qty"]').forEach(function (r) { r.addEventListener("change", function () { carryExtras(); renderSummary(); renderOrder(); }); });
     // Кнопки «Выбрать» (логика выбора — в register-form.js), тут только обновляем итог
-    $$(".choose").forEach(function (b) { b.addEventListener("click", function () { setTimeout(function () { renderSummary(); renderOrder(); }, 0); }); });
+    $$(".choose").forEach(function (b) { b.addEventListener("click", function () { setTimeout(function () { renderSummary(); renderOrder(); renderPreview(); }, 0); }); });
 
     // Шаг 3 «Telegram» подсвечивается после успешного заказа
     const tgStep = $("#telegramStep");

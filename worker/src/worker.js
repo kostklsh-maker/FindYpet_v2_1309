@@ -402,7 +402,7 @@ const BOT = {
       `מי שמצא נמצא עכשיו עם ${v.pet} ולחץ "להודיע לבעלים" בדף התג.\n`,
     foundLoc: (v) => '📍 הוא שיתף מיקום' + (v.acc ? ` (±${v.acc} מ׳)` : '') + ':\n',
     foundNoLoc: 'הוא לא שיתף מיקום. בדקו שיחות שלא נענו וּוואטסאפ, ואז התקשרו אליו.',
-    maps: 'לפתוח ב-Google Maps',
+    maps: 'Google Maps',
     locHead: (v) => `🚨📍 <b>מצאו את ${v.pet}!</b>\nמי שמצא שיתף מיקום (${v.time})` +
       (v.acc ? `, דיוק ±${v.acc} מ׳` : '') + '.\n\n',
     safety: '\n\n⚠️ <i>FindYpet אף פעם לא מבקשת כסף מאף אחד. אם מישהו רוצה כסף לפני שראיתם את חיית המחמד — אל תשלמו. ' +
@@ -621,6 +621,11 @@ const BOT = {
     shortDesc: 'Питомец потерялся? Нашедший позвонит вам или пришлёт геолокацию. Оповещения — прямо здесь.',
   },
 };
+
+/** Строка «🗺 Google Maps · 🚗 Waze»; в иврите — в изоляторе, чтобы ссылки не переставлялись. */
+function mapsLine(L, maps, waze) {
+  return ltr(L, `🗺 <a href="${maps}">${tr(L, 'maps')}</a>  ·  🚗 <a href="${waze}">Waze</a>`);
+}
 
 /** Номер телефона внутри текста на иврите — в изоляторе (иначе «+» и части номера переставляются). */
 const ltr = (L, s) => (L === 'he' && s ? iso(s) : s);
@@ -1140,8 +1145,7 @@ async function apiFound(request, env) {
   if (hasLoc) {
     const maps = `https://maps.google.com/?q=${lat},${lon}`;
     const waze = `https://waze.com/ul?ll=${lat},${lon}&navigate=yes`;
-    text += tr(L, 'foundLoc', { acc: isFinite(acc) && acc > 0 ? Math.round(acc) : 0 }) +
-      `🗺 <a href="${maps}">${tr(L, 'maps')}</a>  ·  🚗 <a href="${waze}">Waze</a>`;
+    text += tr(L, 'foundLoc', { acc: isFinite(acc) && acc > 0 ? Math.round(acc) : 0 }) + mapsLine(L, maps, waze);
   } else {
     text += tr(L, 'foundNoLoc');
   }
@@ -1184,7 +1188,7 @@ async function apiLocation(request, env) {
     disable_web_page_preview: true,
     text:
       tr(L, 'locHead', { pet: esc(tag.pet_name), time: fmtTime(env, L), acc: isFinite(acc) && acc > 0 ? Math.round(acc) : 0 }) +
-      `🗺 <a href="${maps}">${tr(L, 'maps')}</a>  ·  🚗 <a href="${waze}">Waze</a>` + tr(L, 'safety'),
+      mapsLine(L, maps, waze) + tr(L, 'safety'),
   });
   await tg(env, 'sendLocation', { chat_id: tag.telegram_chat_id, latitude: lat, longitude: lon });
   if (!(sent && sent.ok) && smsEnabled(env)) {

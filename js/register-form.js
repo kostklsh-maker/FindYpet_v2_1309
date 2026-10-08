@@ -15,10 +15,29 @@
         const d = String(v || "").replace(/\D/g, "");
         return d.length >= 9 && d.length <= 15;
     }
-    function showError(key) {
+    function showError(key, noScroll) {
         errEl.textContent = key ? t(key) : "";
-        if (key) errEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        if (key && !noScroll) errEl.scrollIntoView({ behavior: "smooth", block: "center" });
     }
+    // Ошибка у самого поля: подсветка, текст под полем, aria-invalid; фокус — на первое ошибочное поле
+    let errSeq = 0;
+    function fieldErr(el, key) {
+        const lab = el.closest("label") || el.parentElement;
+        let m = lab.querySelector(".field-err");
+        if (!m) { m = document.createElement("small"); m.className = "field-err"; m.id = "ferr" + (++errSeq); lab.appendChild(m); }
+        m.dataset.t = key; m.textContent = t(key);
+        el.setAttribute("aria-invalid", "true");
+        el.setAttribute("aria-describedby", m.id);
+        lab.classList.add("invalid");
+    }
+    function clearField(el) {
+        const lab = el.closest("label") || el.parentElement;
+        el.removeAttribute("aria-invalid"); el.removeAttribute("aria-describedby");
+        if (lab) { lab.classList.remove("invalid"); const m = lab.querySelector(".field-err"); if (m) m.remove(); }
+    }
+    function clearErrors() { form.querySelectorAll('[aria-invalid="true"]').forEach(clearField); }
+    form.addEventListener("input", function (e) { if (e.target.getAttribute && e.target.getAttribute("aria-invalid")) clearField(e.target); });
+    form.addEventListener("change", function (e) { if (e.target.type === "checkbox" && e.target.getAttribute("aria-invalid")) clearField(e.target); });
     // Воронка заказа (без личных данных): выбор тарифа → начал заполнять → отправил → открыл Telegram.
     // Счётчики видит админ в боте командой /stats.
     function track(e) {
@@ -108,12 +127,35 @@
             pet_extras: multi ? fam.pet_extras : [],
             lang: currentLang
         };
-        if (!payload.owner_name || !payload.phone || !payload.pet_name || !payload.address) return showError("errFill");
-        if (multi && fam.missing) return showError("errPet2");
-        if (!looksLikePhone(payload.phone)) return showError("errPhone");
-        if (payload.phone2 && !looksLikePhone(payload.phone2)) return showError("errPhone2");
-        if (multi && fam.pet_extras.some(function (e) { return e.phone2 && !looksLikePhone(e.phone2); })) return showError("errPhone2");
-        if (!payload.consent) return showError("errConsent");
+        clearErrors();
+        const el = (id) => document.getElementById(id);
+        const bad = [];
+        if (!payload.pet_name) bad.push([el("petName"), "errReq"]);
+        if (!payload.owner_name) bad.push([el("ownerName"), "errReq"]);
+        if (multi) {
+            document.querySelectorAll(".ftag:not([hidden]) .ft-pet-box:not([hidden]) .ft-name").forEach(function (n) {
+                if (!n.value.trim()) bad.push([n, "errReq"]);
+            });
+            document.querySelectorAll(".ftag:not([hidden]) .ft-phone2").forEach(function (n) {
+                if (n.value.trim() && !looksLikePhone(n.value)) bad.push([n, "errPhone2"]);
+            });
+        }
+        if (!payload.phone) bad.push([el("ownerPhone"), "errReq"]);
+        else if (!looksLikePhone(payload.phone)) bad.push([el("ownerPhone"), "errPhone"]);
+        if (!payload.address) bad.push([el("shippingAddress"), "errReq"]);
+        if (payload.phone2 && !looksLikePhone(payload.phone2)) bad.push([el("phone2"), "errPhone2"]);
+        if (!payload.consent) bad.push([el("consent"), "errConsent"]);
+        if (bad.length) {
+            bad.forEach(function (b) { fieldErr(b[0], b[1]); });
+            // общая строка над кнопкой — для экранных дикторов и как сводка
+            showError(bad.some(function (b) { return b[1] === "errReq"; }) ? (multi && fam.missing ? "errPet2" : "errFill") : bad[0][1], true);
+            const first = bad[0][0];
+            const details = first.closest("details");
+            if (details) details.open = true;
+            first.focus({ preventScroll: true });
+            first.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+        }
 
         btn.disabled = true;
         const label = btn.querySelector("[data-t]");
