@@ -202,7 +202,7 @@ const BOT = {
     myTagsHead: '<b>Your tags</b>\n\n',
     care: (v) =>
       '💚 <b>FindYpet Care — coming soon</b>\n\n' +
-      `A monthly program for pet owners — planned ${v.price}/month per owner, covering all your pets; cancel any time:\n` +
+      'Services we are preparing for pet owners, for all your pets at once:\n' +
       '• a digital health card from your vet clinic\n' +
       '• discounts at pet shops, groomers and pet hotels\n' +
       '• partner bonuses\n\n' +
@@ -397,7 +397,7 @@ const BOT = {
     myTagsHead: '<b>התגים שלכם</b>\n\n',
     care: (v) =>
       '💚 <b>FindYpet Care — בקרוב</b>\n\n' +
-      `תוכנית חודשית לבעלי חיות — מחיר מתוכנן ${v.price} לחודש לבעלים, לכל חיות המחמד שלכם; אפשר לבטל בכל עת:\n` +
+      'שירותים שאנחנו מכינים לבעלי חיות, לכל חיות המחמד שלכם יחד:\n' +
       '• כרטיס רפואי דיגיטלי מהמרפאה הווטרינרית שלכם\n' +
       '• הנחות בחנויות לחיות, במספרות לכלבים ובפנסיונים לחיות\n' +
       '• הטבות משותפים\n\n' +
@@ -596,7 +596,7 @@ const BOT = {
     myTagsHead: '<b>Ваши жетоны</b>\n\n',
     care: (v) =>
       '💚 <b>FindYpet Care — скоро</b>\n\n' +
-      `Ежемесячная программа для владельцев — планируемая цена ${v.price} в месяц за владельца, для всех ваших питомцев; отменить можно в любой момент:\n` +
+      'Сервисы, которые мы готовим для владельцев, — сразу для всех ваших питомцев:\n' +
       '• электронная медкарта из вашей ветклиники\n' +
       '• скидки в зоомагазинах, у грумеров и в гостиницах для животных\n' +
       '• бонусы от партнёров\n\n' +

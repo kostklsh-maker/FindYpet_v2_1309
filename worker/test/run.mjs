@@ -444,7 +444,7 @@ await test('FindYpet Care: /care, waitlist sign-up (once), /start care, site che
   const C = '5151';
   await tgUpdate(env, msg(C, '/care'));
   let m = lastTg('sendMessage').payload;
-  assert.match(m.text, /FindYpet Care — coming soon/); assert.match(m.text, /39 ₪\/month per owner, covering all your pets/);
+  assert.match(m.text, /FindYpet Care — coming soon/); assert.match(m.text, /for all your pets at once/); assert.doesNotMatch(m.text, /₪/);
   assert.equal(m.reply_markup.inline_keyboard[0][0].callback_data, 'care_yes');
   await tgUpdate(env, cb(C, 'care_yes'));
   assert.ok(await KV.get(`care:${C}`));
@@ -973,7 +973,7 @@ await test('landing: real tag (glow), why-a-chip table, 2 price cards + specs gr
   assert.match(home, /<symbol id="tag-art"/); assert.match(home, /id="glowBtn"/);
   assert.doesNotMatch(home, /flipTag|flip-tag|scr-dog|🐕/);
   assert.match(home, /<table class="compare/);
-  assert.doesNotMatch(home, /data-plan="care"/); assert.match(home, /class="care-ann/); assert.doesNotMatch(home, /care-strip/);
+  assert.doesNotMatch(home, /data-plan="care"/); assert.match(home, /class="care-ann/); assert.doesNotMatch(home, /care-strip/); assert.doesNotMatch(home, /39 ₪/);
   for (const k of ['sp1', 'sp2', 'sp3', 'sp4', 'sp5', 'sp6', 'sp6s', 'careTitle', 'care1', 'care3s', 'careNote', 'qBat', 'qWater', 'qFit', 'qSpam']) assert.match(home, new RegExp(`data-t="${k}"`));
   assert.ok(home.indexOf('id="faq"') < home.indexOf('id="finder"'), 'finder block goes after FAQ');
   assert.ok(home.indexOf('id="why"') < home.indexOf('id="plans"'));
