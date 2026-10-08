@@ -27,11 +27,20 @@ function gas(body) {
         address: body.address, telegram_chat_id: body.telegram_chat_id || '', status: 'active', link_token: 'tok' + state.nextId, source: body.source };
       state.tags.push(tag); return { ok: true, tag };
     }
-    case 'getTag': { const t = find(body.id); return t ? { ok: true, found: true, tag: t } : { ok: true, found: false }; }
+    case 'getTag': { const t = find(body.id); return t && t.status !== 'deleted' ? { ok: true, found: true, tag: t } : { ok: true, found: false }; }
+    case 'version': return state.oldGas ? { ok: false, error: 'unknown_action' } : { ok: true, version: 2 };
+    case 'deleteTag': {
+      if (state.oldGas) return { ok: false, error: 'unknown_action' };
+      const t = find(body.id); if (!t || t.status === 'deleted') return { ok: true, found: false };
+      if (String(t.telegram_chat_id) !== String(body.chat_id)) return { ok: false, error: 'forbidden' };
+      for (const k of ['owner_name', 'phone', 'pet_name', 'address', 'telegram_chat_id', 'link_token']) t[k] = '';
+      t.status = 'deleted'; return { ok: true, found: true, deleted: true };
+    }
     case 'logScan': { const t = find(body.id); if (!t) return { ok: true, found: false };
       const now = Date.now(); const throttled = !body.lat && t._last && now - t._last < 1000; if (!body.lat) t._last = now;
       t.last_scan_at = new Date().toISOString(); return { ok: true, found: true, tag: t, throttled }; }
     case 'linkTelegram': { const t = state.tags.find((x) => x.link_token === body.token); if (!t) return { ok: true, found: false };
+      if (!state.oldGas && t.telegram_chat_id && String(t.telegram_chat_id) !== String(body.chat_id)) return { ok: true, found: true, conflict: true };
       t.telegram_chat_id = body.chat_id; return { ok: true, found: true, tag: t }; }
     case 'listByChat': return { ok: true, tags: state.tags.filter((t) => String(t.telegram_chat_id) === String(body.chat_id)) };
     case 'getState': return { ok: true, state: state.states[body.chat_id] || null };

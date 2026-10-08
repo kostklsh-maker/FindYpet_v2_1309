@@ -67,7 +67,7 @@ def render(page, I18N, pricing, lang):
     # /he/ и /ru/ лежат на уровень глубже — относительные ссылки на файлы сайта делаем абсолютными
     if lang != 'en':
         page = re.sub(r'\b(href|src)="(css|js|assets)/', r'\1="/\2/', page)
-        page = re.sub(r'\bhref="privacy/"', f'href="/privacy/?lang={lang}"', page)
+        page = re.sub(r'\bhref="(privacy|accessibility)/"', lambda m: f'href="/{m.group(1)}/?lang={lang}"', page)
 
     # <head>: от <title> до canonical — заново
     head = seo_head(page, T, I18N, pricing, lang)

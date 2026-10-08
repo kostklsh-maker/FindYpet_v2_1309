@@ -14,6 +14,7 @@ on:
       - 'js/**'
       - 'tag/**'
       - 'privacy/**'
+      - 'accessibility/**'
       - 'assets/logo.png'
       - 'assets/mark.png'
       - 'assets/wordmark.png'

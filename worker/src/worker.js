@@ -91,13 +91,21 @@ const BOT = {
       '📷 /photo — add your pet\'s photo to its page\n' +
       '💚 /care — FindYpet Care (coming soon)\n' +
       '🌐 /lang — bot language\n' +
+      '🗑 /delete — delete your data\n' +
       '/cancel — cancel the current action\n' +
       '/id — show your Telegram chat ID\n\n' +
       '✉️ Questions? Write to us here or at findypet0926@gmail.com',
     askArea:
       '📍 Where was your pet last seen? (area / city — e.g. "Haifa, Carmel Center")\n' +
       'This is shown on the tag page. Tap <b>Skip</b> if you prefer not to say.',
-    askPhone2: '📞 Send the <b>second phone number</b> (e.g. a family member). It will be shown on the pet page.',
+    askPhone2: '📞 Send the <b>second phone number</b> (e.g. a family member). It will be shown on the pet page — add it only with that person\'s consent.',
+    pickDelete: '🗑 Delete the data of which pet?',
+    delAsk: (v) => `🗑 <b>Delete ${v.pet}'s data?</b>\n\nWe will erase the name, phone numbers, address, notes and photo, and the tag page will stop showing them — ` +
+      'a finder will no longer be able to reach you through this tag. This can\'t be undone.',
+    btnDelYes: '🗑 Yes, delete', btnDelNo: '↩️ No, keep it',
+    delDone: (v) => `✅ Done — ${v.pet}'s data is deleted and the tag page no longer shows it.\nThank you for using FindYpet. If you want a tag again, send /register.`,
+    delLater: '⏳ We got your request. Deletion is finished by hand within a few days — we will write to you here when it is done.',
+    delCancelled: 'OK, nothing was deleted.',
     askNotes:
       '📝 Send the <b>notes for the finder</b> (up to 200 characters).\n' +
       'For example: "Allergic to chicken. Scared of people — don\'t chase, call me."\n' +
@@ -240,7 +248,7 @@ const BOT = {
       lost: '🚨 My pet is missing — Lost mode on', found: '✅ My pet is home — Lost mode off',
       settings: 'Second contact and notes for the finder', photo: '📷 Pet photo on its page',
       care: '💚 FindYpet Care — coming soon', lang: '🌐 Language · שפה · Язык',
-      cancel: 'Cancel the current action', help: 'Help',
+      delete: 'Delete my data', cancel: 'Cancel the current action', help: 'Help',
     },
     desc: 'FindYpet — smart pet ID tag with your phone number, QR and NFC. Whoever finds your pet can call you, ' +
       'write on WhatsApp or send their location — and you get an alert here the moment the tag is scanned. ' +
@@ -279,13 +287,21 @@ const BOT = {
       `📷 ${LRM}/photo — תמונה של חיית המחמד בדף שלה\n` +
       `💚 ${LRM}/care — FindYpet Care (בקרוב)\n` +
       `🌐 ${LRM}/lang — שפת הבוט\n` +
+      `🗑 ${LRM}/delete — מחיקת הנתונים שלכם\n` +
       `${LRM}/cancel — ביטול הפעולה הנוכחית\n` +
       `${LRM}/id — מזהה הצ׳אט שלכם בטלגרם\n\n` +
       '✉️ שאלות? כתבו לנו כאן או ל-findypet0926@gmail.com',
     askArea:
       '📍 איפה ראו את חיית המחמד בפעם האחרונה? (שכונה או עיר — למשל "חיפה, מרכז הכרמל")\n' +
       'זה יוצג בדף התג. לחצו <b>דילוג</b> אם אתם מעדיפים לא לציין.',
-    askPhone2: '📞 שלחו <b>מספר טלפון נוסף</b> (למשל של בן משפחה). הוא יוצג בדף החיה.',
+    askPhone2: '📞 שלחו <b>מספר טלפון נוסף</b> (למשל של בן משפחה). הוא יוצג בדף החיה — הוסיפו אותו רק בהסכמת אותו אדם.',
+    pickDelete: '🗑 למחוק את הנתונים של איזו חיה?',
+    delAsk: (v) => `🗑 <b>למחוק את הנתונים של ${v.pet}?</b>\n\nנמחק את השם, מספרי הטלפון, הכתובת, ההערות והתמונה, ודף התג יפסיק להציג אותם — ` +
+      'מי שימצא את החיה כבר לא יוכל להשיג אתכם דרך התג הזה. אי אפשר לבטל את זה.',
+    btnDelYes: '🗑 כן, למחוק', btnDelNo: '↩️ לא, להשאיר',
+    delDone: (v) => `✅ בוצע — הנתונים של ${v.pet} נמחקו ודף התג כבר לא מציג אותם.\nתודה שהשתמשתם ב-FindYpet. כדי לקבל תג שוב, שלחו ${LRM}/register.`,
+    delLater: '⏳ קיבלנו את הבקשה. המחיקה תושלם ידנית תוך כמה ימים — נכתוב לכם כאן כשזה יסתיים.',
+    delCancelled: 'בסדר, שום דבר לא נמחק.',
     askNotes:
       '📝 שלחו <b>הערות למוצא</b> (עד 200 תווים).\n' +
       'למשל: "אלרגי לעוף. מפחד מאנשים — לא לרדוף, להתקשר אליי".\n' +
@@ -427,7 +443,7 @@ const BOT = {
       lost: '🚨 חיית המחמד נעלמה — הפעלת מצב חיפוש', found: '✅ חיית המחמד בבית — כיבוי מצב חיפוש',
       settings: 'איש קשר נוסף והערות למוצא', photo: '📷 תמונה של חיית המחמד בדף שלה',
       care: '💚 FindYpet Care — בקרוב', lang: '🌐 שפה · Язык · Language',
-      cancel: 'ביטול הפעולה הנוכחית', help: 'עזרה',
+      delete: 'מחיקת הנתונים שלי', cancel: 'ביטול הפעולה הנוכחית', help: 'עזרה',
     },
     desc: 'FindYpet — תג זיהוי חכם לחיית מחמד עם מספר הטלפון שלכם, QR ו-NFC. מי שימצא את חיית המחמד יוכל להתקשר אליכם, ' +
       'לכתוב בוואטסאפ או לשלוח מיקום — ואתם מקבלים התראה כאן ברגע שהתג נסרק. לחצו על הכפתור למטה כדי להתחיל.',
@@ -466,13 +482,21 @@ const BOT = {
       '📷 /photo — фото питомца на его странице\n' +
       '💚 /care — FindYpet Care (скоро)\n' +
       '🌐 /lang — язык бота\n' +
+      '🗑 /delete — удалить ваши данные\n' +
       '/cancel — отменить текущее действие\n' +
       '/id — ваш chat ID в Telegram\n\n' +
       '✉️ Вопросы? Напишите нам здесь или на findypet0926@gmail.com',
     askArea:
       '📍 Где питомца видели в последний раз? (район или город — например, «Хайфа, Центр Кармель»)\n' +
       'Это будет на странице жетона. Нажмите <b>Пропустить</b>, если не хотите указывать.',
-    askPhone2: '📞 Отправьте <b>второй номер телефона</b> (например, члена семьи). Он появится на странице питомца.',
+    askPhone2: '📞 Отправьте <b>второй номер телефона</b> (например, члена семьи). Он появится на странице питомца — добавляйте его только с согласия этого человека.',
+    pickDelete: '🗑 Данные какого питомца удалить?',
+    delAsk: (v) => `🗑 <b>Удалить данные питомца ${v.pet}?</b>\n\nМы сотрём имя, номера телефонов, адрес, заметки и фото, и страница жетона перестанет их показывать — ` +
+      'нашедший больше не сможет связаться с вами через этот жетон. Отменить это нельзя.',
+    btnDelYes: '🗑 Да, удалить', btnDelNo: '↩️ Нет, оставить',
+    delDone: (v) => `✅ Готово — данные питомца ${v.pet} удалены, страница жетона их больше не показывает.\nСпасибо, что были с FindYpet. Если снова понадобится жетон — отправьте /register.`,
+    delLater: '⏳ Запрос получен. Удаление завершим вручную в течение нескольких дней — напишем вам здесь, когда всё будет готово.',
+    delCancelled: 'Хорошо, ничего не удалено.',
     askNotes:
       '📝 Отправьте <b>заметки для нашедшего</b> (до 200 символов).\n' +
       'Например: «Аллергия на курицу. Боится людей — не догоняйте, позвоните мне».\n' +
@@ -618,7 +642,7 @@ const BOT = {
       lost: '🚨 Питомец пропал — включить режим поиска', found: '✅ Питомец дома — выключить режим поиска',
       settings: 'Второй контакт и заметки для нашедшего', photo: '📷 Фото питомца на его странице',
       care: '💚 FindYpet Care — скоро', lang: '🌐 Язык · שפה · Language',
-      cancel: 'Отменить текущее действие', help: 'Помощь',
+      delete: 'Удалить мои данные', cancel: 'Отменить текущее действие', help: 'Помощь',
     },
     desc: 'FindYpet — умный жетон для питомца с вашим номером, QR-кодом и NFC. Нашедший сможет позвонить вам, ' +
       'написать в WhatsApp или отправить геолокацию, а вы получите оповещение здесь, как только жетон отсканируют. ' +
@@ -895,7 +919,7 @@ function sitemapXml(env, url) {
     `<xhtml:link rel="alternate" hreflang="x-default" href="${b}/"/>`;
   const u = (loc, extra = '') => `<url><loc>${loc}</loc>${extra}</url>`;
   return '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">' +
-    u(`${b}/`, alt) + u(`${b}/he/`, alt) + u(`${b}/ru/`, alt) + u(`${b}/privacy/`) + '</urlset>\n';
+    u(`${b}/`, alt) + u(`${b}/he/`, alt) + u(`${b}/ru/`, alt) + u(`${b}/privacy/`) + u(`${b}/accessibility/`) + '</urlset>\n';
 }
 
 // ---------------------------------------------------------------
@@ -1185,7 +1209,7 @@ async function apiTag(url, env, ctx) {
     if (cached) return json({ ...cached, ...publicExtras(extras, id), can_notify: !!cached.can_notify && feats(extras).alerts, stale: true }, env);
     return json({ found: false, error: 'temp_error' }, env, 502);
   }
-  if (!r.found || String(r.tag.status) === 'disabled') return json({ found: false }, env);
+  if (!r.found || isOff(r.tag)) return json({ found: false }, env);
   ctx.waitUntil(cachePublic(env, r.tag));
   const pub = publicTag(r.tag, env);
   return json({ ...pub, ...publicExtras(extras, id), can_notify: pub.can_notify && feats(extras).alerts }, env);
@@ -1195,7 +1219,7 @@ async function apiTag(url, env, ctx) {
 async function refreshPublic(env, id) {
   const r = await db(env, 'getTag', { id });
   if (!r.ok) return; // таблица недоступна — копия остаётся
-  if (!r.found || String(r.tag.status) === 'disabled') {
+  if (!r.found || isOff(r.tag)) {
     try { await env.FYP_KV.delete(`c:${id}`); } catch (e) { console.error('cache drop', e); }
     return;
   }
@@ -1207,7 +1231,7 @@ async function apiScan(request, env, url) {
   const id = String(b.id_tag || b.id || '');
   if (!/^\d{1,9}$/.test(id)) return json({ success: false }, env, 400);
   const r = await db(env, 'logScan', { id });
-  if (!r.ok || !r.found) return json({ success: false }, env);
+  if (!r.ok || !r.found || isOff(r.tag)) return json({ success: false }, env);
   const tag = r.tag;
   if (r.throttled) return json({ success: true }, env);
   const extras = await getExtras(env, id);
@@ -1246,7 +1270,7 @@ async function apiFound(request, env) {
   // координаты нашедшего уходят только владельцу в Telegram и в таблице не хранятся
   const r = await db(env, 'logScan', { id });
   if (!r.ok) return json({ success: false, error: 'temp_error' }, env, 502);
-  if (!r.found || String(r.tag.status) === 'disabled') return json({ success: false, error: 'not_found' }, env);
+  if (!r.found || isOff(r.tag)) return json({ success: false, error: 'not_found' }, env);
   const tag = r.tag;
   const extras = await getExtras(env, id);
   if (!feats(extras).alerts || !tag.telegram_chat_id) return json({ success: false, error: 'not_linked' }, env);
@@ -1283,7 +1307,7 @@ async function apiLocation(request, env) {
   if (await limited(env, 'RL_TAG', `tag:${id}`)) return json({ success: false, error: 'rate_limited' }, env, 429);
   const r = await db(env, 'logScan', { id }); // координаты в таблицу не пишем — только владельцу
   if (!r.ok) return json({ success: false, error: 'temp_error' }, env, 502);
-  if (!r.found || String(r.tag.status) === 'disabled') return json({ success: false, error: 'not_found' }, env);
+  if (!r.found || isOff(r.tag)) return json({ success: false, error: 'not_found' }, env);
   const tag = r.tag;
   const L = await ownerLang(env, tag.telegram_chat_id, await getExtras(env, id));
 
@@ -1322,6 +1346,9 @@ function ownerUnreachable(env, tag, maps) {
     `🚨 <b>Finder could not reach the owner</b> of #${tag.tag_id} (${esc(tag.pet_name)}) — Telegram did not deliver.\n` +
     `Please call the owner: ${esc(prettyPhone(normalizePhone(tag.phone)))}` + (maps ? `\n📍 Finder's location: ${esc(maps)}` : ''));
 }
+
+/** Жетон отключён админом или удалён владельцем (/delete) — страница «не найден», оповещений нет. */
+function isOff(tag) { return ['disabled', 'deleted'].includes(String((tag && tag.status) || '')); }
 
 function publicTag(t, env) {
   const phone = normalizePhone(t.phone);
@@ -1516,6 +1543,7 @@ async function handleUpdate(update, env, url) {
   if (text === '/found') return pickTag(chatId, env, 'found', 'pickFound', L, (t) => t._lost);
   if (text === '/settings' || isBtn(text, 'btnSettings')) return pickTag(chatId, env, 'set', 'pickSet', L);
   if (text === '/photo') return pickTag(chatId, env, 'pho', 'pickPhoto', L);
+  if (text === '/delete') return pickTag(chatId, env, 'del', 'pickDelete', L);
   if (text === '/cancel' || isBtn(text, 'btnCancel')) {
     await db(env, 'clearState', { chat_id: chatId });
     return send(env, chatId, tr(L, 'cancelled'), mainMenu(L));
@@ -1526,6 +1554,7 @@ async function handleUpdate(update, env, url) {
   // сообщения админу — по-английски
   if (text === '/orders' && isAdmin(env, chatId)) return listOrders(env, chatId);
   if (text === '/stats' && isAdmin(env, chatId)) return send(env, chatId, await funnelStats(env));
+  if ((text === '/plate' || text === '/plate all') && isAdmin(env, chatId)) return plateCsv(env, chatId, text === '/plate all');
   if (text === '/help') return send(env, chatId, tr(L, 'help'), mainMenu(L));
 
   // --- многошаговые диалоги ---
@@ -1651,7 +1680,8 @@ async function handleCallback(cq, env, url) {
   }
 
   // --- действия с конкретной меткой: lost:ID, found:ID, set:ID, pho:ID, set2:ID:field, clr:ID:field ---
-  const m = /^(lost|found|set|set2|clr|pho):(\d{1,9})(?::(phone2|notes|photo))?$/.exec(data);
+  if (data === 'delno') return send(env, chatId, tr(L, 'delCancelled'), mainMenu(L));
+  const m = /^(lost|found|set|set2|clr|pho|del|delok):(\d{1,9})(?::(phone2|notes|photo))?$/.exec(data);
   if (m) {
     const [, act, id, field] = m;
     const tag = await ownedTag(chatId, id, env);
@@ -1664,6 +1694,15 @@ async function handleCallback(cq, env, url) {
       });
     }
     if (act === 'found') return turnLostOff(chatId, tag, env, L);
+    if (act === 'del') {
+      return send(env, chatId, tr(L, 'delAsk', { pet: esc(tag.pet_name) }), { inline_keyboard: [[
+        { text: tr(L, 'btnDelYes'), callback_data: `delok:${id}` }, { text: tr(L, 'btnDelNo'), callback_data: 'delno' },
+      ]] });
+    }
+    if (act === 'delok') {
+      if (cq.message.message_id) await tg(env, 'editMessageReplyMarkup', { chat_id: chatId, message_id: cq.message.message_id, reply_markup: { inline_keyboard: [] } });
+      return deleteTagData(env, chatId, tag, L);
+    }
     if (act === 'set') return settingsMenu(chatId, tag, env, L);
     if (act === 'pho') {
       await db(env, 'setState', { chat_id: chatId, state: { step: 'photo', tag_id: id } });
@@ -1981,6 +2020,69 @@ async function linkFromSite(chatId, token, env, url, from) {
   return sendRegistered(chatId, tags, env, url, order, L);
 }
 
+/**
+ * /delete: владелец стирает данные жетона. Таблица (Apps Script v2: deleteTag) стирает имя, телефон,
+ * адрес, кличку, привязку к чату; здесь — доп. данные, фото, копию страницы и личные данные в заказе.
+ * Старый Apps Script (без deleteTag) — просьбу получает админ и удаляет вручную.
+ */
+async function deleteTagData(env, chatId, tag, L) {
+  const id = String(tag.tag_id);
+  const r = await db(env, 'deleteTag', { id, chat_id: chatId });
+  if (!r.ok) {
+    await send(env, env.ADMIN_CHAT_ID || chatId, `🗑 <b>Delete request</b> for #${id} (${esc(tag.pet_name)}) from chat ${esc(chatId)} — ` +
+      `the table did not delete it (${esc(r.error || 'error')}). Please delete the row manually and tell the customer.`);
+    return send(env, chatId, tr(L, 'delLater'), mainMenu(L));
+  }
+  const x = await getExtras(env, id);
+  if (kvOn(env)) {
+    await Promise.all(['x:', 'c:', 'img:', 'f:'].map((p) => env.FYP_KV.delete(p + id).catch(() => {})));
+    const o = x.order_id ? await getOrder(env, x.order_id) : null;
+    if (o) {
+      o.items = o.items.map((i) => (i.tag_id === id ? { ...i, pet_name: '', deleted: true } : i));
+      if (o.items.every((i) => i.deleted)) { o.owner_name = ''; o.phone = ''; o.address = ''; }
+      o.history = [...(o.history || []), { status: 'deleted', tag_id: id, at: new Date().toISOString() }];
+      await saveOrder(env, o);
+    }
+    const left = await db(env, 'listByChat', { chat_id: chatId });
+    if (left.ok && !(left.tags || []).length) {
+      await Promise.all([`chat:${chatId}`, `care:${chatId}`].map((k) => env.FYP_KV.delete(k).catch(() => {})));
+    }
+  }
+  if (env.ADMIN_CHAT_ID) {
+    await send(env, env.ADMIN_CHAT_ID, `🗑 Customer deleted the data of #${id}` + (x.order_id ? ` (order ${esc(x.order_id)})` : '') +
+      '. If this tag is not made or shipped yet — do not make it.');
+  }
+  return send(env, chatId, tr(L, 'delDone', { pet: esc(tag.pet_name) }), mainMenu(L));
+}
+
+/** /plate для админа: CSV крышек (номер, КЛИЧКА, телефон) для оплаченных заказов — для medallion_v2.py plate. */
+async function plateCsv(env, chatId, all) {
+  if (!kvOn(env)) return send(env, chatId, tr('en', 'noKv'));
+  const rows = [];
+  let cursor;
+  do {
+    const page = await env.FYP_KV.list({ prefix: 'o:', cursor });
+    for (const k of page.keys) {
+      const o = await env.FYP_KV.get(k.name, 'json');
+      if (!o || !(o.status === 'paid' || (all && o.status === 'new'))) continue;
+      const phone = prettyPhone(normalizePhone(o.phone)).replace(/^\+972 /, '0');
+      for (const it of o.items) {
+        if (it.deleted) continue;
+        const name = String(it.pet_name).toUpperCase().replace(/[",\r\n]/g, ' ').trim();
+        for (let c = 0; c < (it.copies || 1); c++) rows.push(`${it.tag_id},${name},${phone}`);
+      }
+    }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  if (!rows.length) return send(env, chatId, all ? 'No new or paid orders.' : 'No paid orders waiting to be made. Use /plate all to include new orders.');
+  const form = new FormData();
+  form.append('chat_id', String(chatId));
+  form.append('caption', `🖨 ${rows.length} lid(s) — python3 medallion_v2.py plate orders.csv`);
+  form.append('document', new Blob(['id,name,phone\n' + rows.join('\n') + '\n'], { type: 'text/csv' }), 'orders.csv');
+  const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendDocument`, { method: 'POST', body: form }).then((x) => x.json()).catch(() => ({ ok: false }));
+  if (!res.ok) return send(env, chatId, '⚠️ Could not send the CSV:\n<code>' + esc(rows.join('\n')) + '</code>');
+}
+
 async function refuseRelink(env, chatId, L, token) {
   await alertAdmin(env, `relink:${token}`,
     `⚠️ An activation link was opened by another Telegram chat (${esc(chatId)}) — refused. ` +
@@ -2240,7 +2342,7 @@ async function setup(env, url) {
     const c = tr(l, 'cmds');
     results[`setMyCommands${sfx}`] = await tg(env, 'setMyCommands', {
       ...lc,
-      commands: ['register', 'mytags', 'lost', 'found', 'settings', 'photo', 'care', 'lang', 'cancel', 'help']
+      commands: ['register', 'mytags', 'lost', 'found', 'settings', 'photo', 'care', 'lang', 'delete', 'cancel', 'help']
         .map((command) => ({ command, description: c[command] })),
     });
     results[`setMyDescription${sfx}`] = await tg(env, 'setMyDescription', { ...lc, description: tr(l, 'desc') });
@@ -2248,6 +2350,8 @@ async function setup(env, url) {
   }
   results.webhookInfo = await tg(env, 'getWebhookInfo', {});
   results.db = await db(env, 'getTag', { id: '0' }).catch((e) => ({ ok: false, error: String(e) }));
+  const ver = await db(env, 'version', {}).catch(() => ({}));
+  results.db_version = ver && ver.version ? `Apps Script v${ver.version}` : 'Apps Script v1 — update it (apps-script/Code.gs): /delete and relink protection need v2';
   results.kv = kvOn(env) ? 'FYP_KV connected ✅' : 'FYP_KV NOT connected — /lost, /settings and backup cache are off';
   results.rate_limits = ['RL_READ', 'RL_SIGNAL', 'RL_ORDER', 'RL_TAG'].map((n) => `${n} ${env[n] && typeof env[n].limit === 'function' ? '✅' : '❌'}`).join(' · ');
   results.lostChannel = env.LOST_CHANNEL_ID ? `posting to ${env.LOST_CHANNEL_ID}` : 'not set (optional)';
@@ -2686,7 +2790,7 @@ async function testDb(env, action, d) {
     }
     case 'getTag': {
       const t = await getT(d.id);
-      return t ? { ok: true, found: true, tag: t } : { ok: true, found: false };
+      return t && t.status !== 'deleted' ? { ok: true, found: true, tag: t } : { ok: true, found: false };
     }
     case 'logScan': {
       const t = await getT(d.id);
@@ -2713,6 +2817,16 @@ async function testDb(env, action, d) {
         .filter((t) => t && String(t.telegram_chat_id) === String(d.chat_id));
       return { ok: true, tags };
     }
+    case 'deleteTag': {
+      const t = await getT(d.id);
+      if (!t || t.status === 'deleted') return { ok: true, found: false };
+      if (String(t.telegram_chat_id) !== String(d.chat_id)) return { ok: false, error: 'forbidden' };
+      for (const k of ['owner_name', 'phone', 'pet_name', 'address', 'telegram_chat_id', 'link_token']) t[k] = '';
+      t.status = 'deleted';
+      await putT(t);
+      return { ok: true, found: true, deleted: true };
+    }
+    case 'version': return { ok: true, version: 2 };
     case 'getState': return { ok: true, state: (await kv.get(`db:st:${d.chat_id}`, 'json')) || null };
     case 'setState': await kv.put(`db:st:${d.chat_id}`, JSON.stringify(d.state)); return { ok: true };
     case 'clearState': await kv.delete(`db:st:${d.chat_id}`); return { ok: true };

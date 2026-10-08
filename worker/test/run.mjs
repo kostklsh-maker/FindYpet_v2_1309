@@ -1153,4 +1153,79 @@ await test('daily backup: KV data goes to the admin as a JSON file', async () =>
   assert.match(doc.payload.document.name, /^findypet-backup-\d{4}-\d{2}-\d{2}\.json$/);
 });
 
+// ---- Стадия 2: удаление данных, крышки для печати, версия Apps Script ----
+await test('/delete: owner erases the tag data (table + KV + order), page shows nothing, scans are silent; admin is told', async () => {
+  const C = '7301';
+  const d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Del Me', phone: '050-121-2121', pet_name: 'Gone', address: 'Haifa, Secret 5', consent: true, lang: 'ru', notes: 'shy' } })).json();
+  await tgUpdate(env, msg(C, '/start ' + d.telegram_link.split('start=')[1]));
+  await KV.put(`img:${d.id_tag}`, new Uint8Array([0xff, 0xd8, 0xff]).buffer, { metadata: { type: 'image/jpeg', v: 'x1' } });
+  await tgUpdate(env, msg(C, '/delete'));
+  const ask = lastTg('sendMessage').payload;
+  assert.match(ask.text, /Удалить данные питомца Gone\?/);
+  assert.deepEqual(ask.reply_markup.inline_keyboard[0].map((b) => b.callback_data), [`delok:${d.id_tag}`, 'delno']);
+  await tgUpdate(env, cb('7666', `delok:${d.id_tag}`)); // чужой чат — не может
+  assert.match(lastTg('sendMessage').payload.text, /not linked to your Telegram/);
+  await tgUpdate(env, cb(C, 'delno'));
+  assert.match(lastTg('sendMessage').payload.text, /ничего не удалено/);
+  await tgUpdate(env, cb(C, `delok:${d.id_tag}`));
+  const row = state.tags.find((t) => t.tag_id === String(d.id_tag));
+  assert.equal(row.status, 'deleted'); assert.equal(row.phone, ''); assert.equal(row.address, '');
+  for (const k of ['x:', 'c:', 'img:']) assert.equal(await KV.get(k + d.id_tag), null, k);
+  const o = await KV.get(`o:${d.order_id}`, 'json');
+  assert.equal(o.phone, ''); assert.equal(o.address, ''); assert.ok(o.items[0].deleted);
+  assert.equal(await KV.get(`chat:${C}`), null);
+  assert.match(state.tg.filter((c) => c.payload.chat_id === C).at(-1).payload.text, /данные питомца Gone удалены/);
+  assert.match(state.tg.filter((c) => c.payload.chat_id === 'admin').at(-1).payload.text, /Customer deleted the data of #\d+ \(order FY\d+\)/);
+  assert.equal((await (await call(env, `/api/tag?id=${d.id_tag}`)).json()).found, false);
+  const n = state.tg.length;
+  await new Promise((r) => setTimeout(r, 1100));
+  assert.equal((await (await call(env, '/api/scan', { method: 'POST', body: { id_tag: d.id_tag } })).json()).success, false);
+  assert.equal(state.tg.length, n);
+  assert.equal((await call(env, `/p/${d.id_tag}`)).status, 404);
+});
+
+await test('/delete with the old Apps Script: the customer is told it will be done by hand, the admin gets the request', async () => {
+  const C = '7302';
+  const d = await (await call(env, '/api/register', { method: 'POST', body: { owner_name: 'Old', phone: '050-121-3131', pet_name: 'Keep', address: 'Haifa', consent: true } })).json();
+  await tgUpdate(env, msg(C, '/start ' + d.telegram_link.split('start=')[1]));
+  state.oldGas = true;
+  await tgUpdate(env, cb(C, `delok:${d.id_tag}`));
+  const v = await (await call(env, '/setup?key=sec')).json();
+  state.oldGas = false;
+  assert.match(state.tg.filter((c) => c.payload.chat_id === C).at(-1).payload.text, /finished by hand/);
+  assert.match(state.tg.filter((c) => c.payload.chat_id === 'admin').at(-1).payload.text, /Delete request<\/b> for #\d+/);
+  assert.notEqual(state.tags.find((t) => t.tag_id === String(d.id_tag)).status, 'deleted');
+  assert.match(v.db_version, /v1 — update it/);
+  assert.match((await (await call(env, '/setup?key=sec')).json()).db_version, /Apps Script v2/);
+});
+
+await test('/plate: admin gets orders.csv of lids for paid orders (spares repeated); others get nothing', async () => {
+  const d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Plate', phone: '050-131-4141', pet_name: 'Lulu', address: 'Haifa', consent: true, tags: 2 } })).json();
+  await tgUpdate(env, cb('admin', `ord:${d.order_id}:paid`));
+  const n = state.tg.length;
+  await tgUpdate(env, msg('7303', '/plate'));
+  assert.ok(!state.tg.slice(n).some((c) => c.method === 'sendDocument'));
+  await tgUpdate(env, msg('admin', '/plate'));
+  const doc = state.tg.slice(n).find((c) => c.method === 'sendDocument');
+  const csv = await doc.payload.document.text();
+  assert.match(csv, /^id,name,phone\n/);
+  assert.equal(csv.split('\n').filter((l) => l === `${d.id_tag},LULU,050-131-4141`).length, 2);
+  assert.equal(doc.payload.document.name, 'orders.csv');
+});
+
+await test('legal: accessibility statement in 3 languages, linked from the site, tag page and privacy; privacy has retention, /delete, consent for the 2nd phone', async () => {
+  const a = await call(env, '/accessibility/');
+  assert.equal(a.status, 200);
+  const html = await a.text();
+  for (const s of ['Accessibility statement', 'הצהרת נגישות', 'Заявление о доступности', 'IS 5568', 'WCAG 2.1']) assert.ok(html.includes(s), s);
+  const priv = await (await call(env, '/privacy/')).text();
+  for (const s of ['How long we keep data', 'כמה זמן אנחנו שומרים מידע', 'Как долго мы храним данные', '/delete', "only with that person's consent", '../accessibility/?lang=he']) assert.ok(priv.includes(s), s);
+  assert.match(await (await call(env, '/')).text(), /<a href="accessibility\/" data-t="a11yLink">/);
+  assert.match(await (await call(env, '/he/')).text(), /<a href="\/accessibility\/\?lang=he" data-t="a11yLink">הצהרת נגישות<\/a>/);
+  assert.match(await (await call(env, '/t/101')).text(), /<a href="\.\.\/accessibility\/" data-t="a11y">/);
+  assert.match(await (await call(env, '/sitemap.xml')).text(), /<loc>http:\/\/localhost:8787\/accessibility\/<\/loc>/);
+});
+
 console.log(`\n${passed} tests passed`);
