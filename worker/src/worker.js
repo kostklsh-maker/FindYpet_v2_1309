@@ -1381,6 +1381,7 @@ async function setup(env, url) {
   results.webhookInfo = await tg(env, 'getWebhookInfo', {});
   results.db = await db(env, 'getTag', { id: '0' }).catch((e) => ({ ok: false, error: String(e) }));
   results.kv = kvOn(env) ? 'FYP_KV connected ✅' : 'FYP_KV NOT connected — /lost, /settings and backup cache are off';
+  results.rate_limits = ['RL_READ', 'RL_SIGNAL', 'RL_ORDER', 'RL_TAG'].map((n) => `${n} ${env[n] && typeof env[n].limit === 'function' ? '✅' : '❌'}`).join(' · ');
   results.lostChannel = env.LOST_CHANNEL_ID ? `posting to ${env.LOST_CHANNEL_ID}` : 'not set (optional)';
   results.sms = smsEnabled(env) ? 'SMS fallback on' : 'SMS fallback off (optional)';
   return new Response(JSON.stringify(results, null, 2), { headers: { 'Content-Type': 'application/json; charset=utf-8' } });

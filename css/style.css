@@ -761,6 +761,3 @@ h2 { letter-spacing: -.01em; }
     .ftag { padding: 10px 10px 2px; }
     .qty-pick .pp-free { font-size: 11px; }
 }
-
-/* v14: под кнопкой заказа — «сейчас платить не нужно» */
-.pay-later { margin: 10px 0 0; text-align: center; font-size: 14px; color: var(--muted, #5b6b6b); }
