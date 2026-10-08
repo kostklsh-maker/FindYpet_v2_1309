@@ -756,17 +756,82 @@ h2 { letter-spacing: -.01em; }
 
 /* Цены: две карточки, характеристики, «Забота» узкой полосой */
 .plans { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 780px; }
-.specs { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 12px; max-width: 900px; margin: 34px auto 0; }
-.specs li { display: inline-flex; align-items: center; gap: 8px; background: var(--soft); border-radius: 999px; padding: 9px 16px; font-size: 14.5px; font-weight: 600; color: var(--ink); }
-.specs .ic { font-size: 18px; color: var(--brand2); flex: none; }
-.care-strip { display: flex; align-items: center; gap: 12px; max-width: 780px; margin: 24px auto 0; padding: 8px 8px 8px 14px;
-    background: rgba(14,59,61,.06); border: 1px solid rgba(14,59,61,.12); border-radius: 999px;
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: var(--muted); font-size: 14px; }
-[dir="rtl"] .care-strip { padding: 8px 14px 8px 8px; }
-.care-strip p { flex: 1 1 auto; min-width: 0; line-height: 1.35; }
-.care-strip b { color: var(--ink); }
-.cs-badge { background: rgba(14,59,61,.85); color: #fff; font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; flex: none; }
-.care-strip .btn { flex: none; }
+/* Характеристики: ровная сетка плиток */
+.specs-box { max-width: 900px; margin: 40px auto 0; }
+.specs-h { text-align: center; font-size: 13px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--brand2); margin: 0 0 14px; }
+.specs { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; }
+.specs li { display: flex; align-items: center; gap: 12px; background: var(--soft); border: 1px solid rgba(14,59,61,.07); border-radius: 16px; padding: 14px 16px; min-height: 72px; }
+.sp-ic { flex: none; width: 40px; height: 40px; border-radius: 12px; background: #fff; display: grid; place-items: center; color: var(--brand2); box-shadow: 0 2px 6px rgba(16,41,42,.06); }
+.sp-ic .ic { font-size: 20px; }
+.sp-tx { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.sp-tx b { font-size: 15px; font-weight: 700; color: var(--ink); }
+.sp-tx small { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+/* FindYpet Care — анонс */
+.care-ann { position: relative; isolation: isolate; overflow: hidden; max-width: 900px; margin: 56px auto 0; padding: 36px 36px 30px; border-radius: 28px; color: #fff;
+    background: radial-gradient(120% 90% at 100% 0%, rgba(0,162,166,.55) 0%, rgba(0,162,166,0) 55%),
+                radial-gradient(80% 70% at 0% 100%, rgba(255,119,19,.22) 0%, rgba(255,119,19,0) 60%),
+                linear-gradient(150deg, #0E3B3D 0%, #0B4E50 55%, #0E3B3D 100%);
+    box-shadow: 0 30px 60px -28px rgba(14,59,61,.65), inset 0 1px 0 rgba(255,255,255,.08); }
+.care-ann::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background-image: radial-gradient(rgba(255,255,255,.09) 1px, transparent 1.2px); background-size: 18px 18px;
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 75%); mask-image: linear-gradient(180deg, #000 0%, transparent 75%); }
+.care-ann::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background: linear-gradient(105deg, transparent 42%, rgba(255,255,255,.11) 50%, transparent 58%) 0 0 / 300% 100% no-repeat; }
+.care-ann.in::after { animation: ca-shine 1.8s .5s ease-out 1 both; }
+@keyframes ca-shine { from { background-position: 0 0; } to { background-position: 100% 0; } }
+.ca-top { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 28px; align-items: center; }
+.ca-kicker { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.ca-badge { display: inline-flex; align-items: center; gap: 7px; background: var(--cta); color: var(--ink); font-size: 12.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 5px 11px; border-radius: 999px; }
+.ca-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 0 rgba(14,59,61,.5); }
+.care-ann.in .ca-dot { animation: ca-ping 1.6s ease-out 3; }
+@keyframes ca-ping { 0% { box-shadow: 0 0 0 0 rgba(14,59,61,.55); } 100% { box-shadow: 0 0 0 9px rgba(14,59,61,0); } }
+.ca-name { font-weight: 800; font-size: 15px; color: #9FE3E4; letter-spacing: .01em; }
+.care-ann h3 { font-size: clamp(26px, 3.4vw, 36px); line-height: 1.12; letter-spacing: -.6px; font-weight: 800; color: #fff; margin: 0 0 12px; text-wrap: balance; }
+.ca-lead { font-size: 16.5px; line-height: 1.5; color: rgba(255,255,255,.82); max-width: 520px; margin: 0; }
+
+/* иллюстрация: «медкарта» с глубиной */
+.ca-art { position: relative; height: 200px; perspective: 900px; }
+.ca-card { position: absolute; inset: 14px 10px 18px 20px; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 11px;
+    background: linear-gradient(160deg, rgba(255,255,255,.20), rgba(255,255,255,.06)); border: 1px solid rgba(255,255,255,.22);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: 0 24px 40px -18px rgba(0,0,0,.55);
+    transform: rotateY(-14deg) rotateX(6deg) rotateZ(-2deg); transform-origin: 50% 50%; }
+[dir="rtl"] .ca-card { transform: rotateY(14deg) rotateX(6deg) rotateZ(2deg); }
+.cc-head { display: flex; align-items: center; gap: 10px; }
+.cc-ava { width: 38px; height: 38px; border-radius: 50%; background: var(--brand); display: grid; place-items: center; flex: none; }
+.cc-ava .ic { font-size: 20px; color: #fff; }
+.cc-bars { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.cc-bars i, .cc-row i { display: block; height: 7px; border-radius: 4px; background: rgba(255,255,255,.42); }
+.cc-bars i:last-child { width: 60%; background: rgba(255,255,255,.22); }
+.cc-heart { font-size: 20px; color: #FF9A52; fill: #FF9A52; }
+.cc-row { display: flex; align-items: center; gap: 9px; }
+.cc-row .ic { font-size: 15px; color: #7EE0B0; stroke-width: 3; flex: none; }
+.cc-row i { flex: 1; background: rgba(255,255,255,.26); }
+.cc-row:nth-child(3) i { width: 70%; flex: none; }
+.cc-row:nth-child(4) i { width: 50%; flex: none; }
+.ca-chip { position: absolute; display: inline-flex; align-items: center; gap: 4px; font-weight: 800; font-size: 14px; color: var(--ink); background: #fff; border-radius: 999px; padding: 7px 11px; box-shadow: 0 12px 24px -10px rgba(0,0,0,.5); }
+.ca-chip .ic { font-size: 17px; color: var(--brand2); }
+.ca-chip.c1 { top: 0; right: 0; }
+.ca-chip.c2 { bottom: 4px; left: 0; padding: 8px; background: var(--cta); }
+.ca-chip.c2 .ic { color: var(--ink); }
+[dir="rtl"] .ca-chip.c1 { right: auto; left: 0; }
+[dir="rtl"] .ca-chip.c2 { left: auto; right: 0; }
+.care-ann.in .ca-chip.c1 { animation: ca-float 3.2s ease-in-out 2; }
+.care-ann.in .ca-chip.c2 { animation: ca-float 3.2s .8s ease-in-out 2; }
+@keyframes ca-float { 50% { transform: translateY(-6px); } }
+
+.ca-list { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 26px 0 0; padding: 0; }
+.ca-list li { display: flex; flex-direction: column; gap: 4px; padding: 16px; border-radius: 16px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); }
+.ca-ic { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: rgba(0,162,166,.30); margin-bottom: 6px; }
+.ca-ic .ic { font-size: 20px; color: #9FE3E4; }
+.ca-list b { font-size: 15.5px; color: #fff; }
+.ca-list small { font-size: 13.5px; line-height: 1.4; color: rgba(255,255,255,.72); }
+.ca-foot { display: flex; align-items: center; gap: 14px 20px; margin-top: 24px; }
+.ca-btn { flex: none; background: #fff; color: var(--deep); font-weight: 800; box-shadow: 0 10px 24px -10px rgba(0,0,0,.5); }
+.ca-btn:hover { background: #E8FAFA; color: var(--deep); }
+.ca-btn .ic { color: var(--cta); }
+.ca-btn:focus-visible { outline: 3px solid #FFB27A; outline-offset: 3px; }
+.ca-note { margin: 0; font-size: 13.5px; line-height: 1.45; color: rgba(255,255,255,.66); }
 
 /* Форма: итог над кнопкой, ошибки у полей */
 .ts-box:not(:empty) { margin: 12px 0 0; min-height: 65px; }
@@ -797,12 +862,23 @@ label.consent .field-err { flex-basis: 100%; padding-inline-start: 30px; margin-
     .compare thead th:first-child { display: none; }
     .compare thead th { white-space: normal; }
     .compare tbody th[scope="row"] { grid-column: 1 / -1; width: auto; padding-bottom: 2px; border-bottom: 0; font-size: 12.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--brand2); }
-    .specs li { font-size: 13.5px; padding: 8px 13px; }
-    .care-strip { flex-wrap: wrap; border-radius: 18px; padding: 10px 12px; gap: 8px 10px; }
-    .care-strip p { white-space: normal; flex: 1 1 200px; }
-    .care-strip .btn { width: 100%; }
+    .specs-box { margin-top: 30px; }
+    .specs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .specs li { flex-direction: column; align-items: flex-start; gap: 8px; padding: 13px; min-height: 0; }
+    .sp-ic { width: 36px; height: 36px; border-radius: 10px; }
+    .sp-tx b { font-size: 14.5px; }
+    .sp-tx small { font-size: 12.5px; }
+    .care-ann { margin-top: 40px; padding: 26px 18px 20px; border-radius: 24px; }
+    .ca-top { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .ca-art { height: 178px; max-width: 260px; width: 100%; margin: 14px auto 0; }
+    .ca-list { grid-template-columns: 1fr; gap: 8px; margin-top: 18px; }
+    .ca-list li { display: grid; grid-template-columns: 38px minmax(0, 1fr); column-gap: 12px; row-gap: 2px; padding: 12px; }
+    .ca-list .ca-ic { grid-row: 1 / 3; margin: 0; align-self: center; }
+    .ca-foot { flex-direction: column; align-items: stretch; text-align: center; gap: 12px; margin-top: 18px; }
+    .ca-btn { width: 100%; justify-content: center; }
     .hero h1 { font-size: 34px; letter-spacing: -1px; }
 }
 @media (prefers-reduced-motion: reduce) {
     .ptag, .hero-visual { transition: none; }
+    .care-ann.in::after, .care-ann.in .ca-dot, .care-ann.in .ca-chip { animation: none !important; }
 }
