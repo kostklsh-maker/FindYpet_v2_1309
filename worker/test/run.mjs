@@ -122,7 +122,7 @@ await test('scan alert in the owner language (RU) has "Lost mode on" button', as
   const m = lastTg('sendMessage');
   assert.equal(m.payload.chat_id, CHAT);
   assert.match(m.payload.text, /Жетон питомца Bella только что отсканировали!/);
-  assert.match(m.payload.text, /\(\d{2} окт\.?, \d{2}:\d{2}\)/);
+  assert.match(m.payload.text, /\(\d{1,2} окт\.?,? (в )?\d{2}:\d{2}\)/);
   assert.equal(m.payload.reply_markup.inline_keyboard[0][0].callback_data, `lost:${tagId}`);
   assert.equal(m.payload.reply_markup.inline_keyboard[0][0].text, '🚨 Питомец пропал — включить режим поиска');
 });
@@ -142,20 +142,29 @@ await test('/lang: buttons for 3 languages; choice is saved and the menu switche
   assert.match(lastTg('sendMessage').payload.text, /Your tags/);
 });
 
-await test('/lost → asks area → Lost mode on, share text, channel post', async () => {
+await test('/lost → asks area → Lost mode on, share text; channel post only for a paid order and after admin approval', async () => {
   const chEnv = makeEnv({ LOST_CHANNEL_ID: '@findypet_lost' });
+  const ok = await KV.get(`o:FY${tagId}`, 'json'); ok.status = 'paid'; await KV.put(`o:FY${tagId}`, JSON.stringify(ok));
   await tgUpdate(chEnv, msg(CHAT, '/lost'));
   assert.equal(state.states[CHAT].step, 'lost_area');
-  await tgUpdate(chEnv, msg(CHAT, 'Haifa, Carmel'));
+  await tgUpdate(chEnv, msg(CHAT, 'Haifa, Carmel https://spam.example @spammer'));
   const x = await KV.get(`x:${tagId}`, 'json');
   assert.equal(x.lost, true);
-  assert.equal(x.lost_area, 'Haifa, Carmel');
-  assert.equal(x.channel_msg_id, 555);
+  assert.equal(x.lost_area, 'Haifa, Carmel'); // ссылки и @упоминания вырезаны
+  assert.equal(x.channel_msg_id, undefined);   // без одобрения админа в канал не попадает
+  assert.ok(!state.tg.some((c) => c.payload.chat_id === '@findypet_lost'));
+  const mod = state.tg.filter((c) => c.payload.chat_id === 'admin').at(-1).payload;
+  assert.match(mod.text, /publish to @findypet_lost\?/);
+  assert.deepEqual(mod.reply_markup.inline_keyboard[0].map((b) => b.callback_data), [`chan:${tagId}:ok`, `chan:${tagId}:no`]);
+  const own = lastTg('sendMessage').payload.text;
+  await tgUpdate(chEnv, cb(CHAT, `chan:${tagId}:ok`)); // не админ — ничего
+  assert.ok(!state.tg.some((c) => c.payload.chat_id === '@findypet_lost'));
+  await tgUpdate(chEnv, cb('admin', `chan:${tagId}:ok`));
+  assert.equal((await KV.get(`x:${tagId}`, 'json')).channel_msg_id, 555);
   const post = state.tg.find((c) => c.payload.chat_id === '@findypet_lost');
   assert.match(post.payload.text, /🚨 <b>Bella<\/b>/);
   assert.match(post.payload.text, /חיית מחמד אבודה/); assert.match(post.payload.text, /Потерялся питомец/); assert.match(post.payload.text, /Lost pet\. Seen it\?/);
   assert.match(post.payload.text, new RegExp(`/p/${tagId}$`));
-  const own = lastTg('sendMessage').payload.text;
   assert.match(own, /Forward this to local groups/);
   // текст для групп — на трёх языках, сначала язык владельца; ссылка — на объявление, не на жетон
   const codes = [...own.matchAll(/(🇬🇧|🇮🇱|🇷🇺) <code>([^<]+)<\/code>/g)];
@@ -989,8 +998,10 @@ await test('demo chat on the landing = the real bot messages in each language', 
   for (const L of ['en', 'he', 'ru']) {
     const time = (min) => new Date(Date.UTC(2026, 9, 6, 11, min)).toLocaleString(LOC[L], { timeZone: 'Asia/Jerusalem', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
     const b1 = _test.tr(L, 'scanned', { pet: NAME[L], time: time(32) }).replace(/\n/g, '<br>') + `<span class="tg-kb">${_test.tr(L, 'btnLostOn')}</span>`;
-    assert.equal(I18N[L].bub1, b1, L + ' bub1');
-    assert.ok(I18N[L].bub2.startsWith(_test.tr(L, 'locHead', { pet: NAME[L], time: time(33), acc: 12 }).replace(/\n+$/, '').replace(/\n/g, '<br>')), L + ' bub2');
+    // время в скобках зависит от версии ICU в Node — сравниваем без него
+    const noTime = (x) => x.replace(/\(([^()]*\d{1,2}:\d{2})\)/g, '(T)');
+    assert.equal(noTime(I18N[L].bub1), noTime(b1), L + ' bub1');
+    assert.ok(noTime(I18N[L].bub2).startsWith(noTime(_test.tr(L, 'locHead', { pet: NAME[L], time: time(33), acc: 12 }).replace(/\n+$/, '').replace(/\n/g, '<br>'))), L + ' bub2');
     assert.ok(I18N[L].bub2.includes(_test.tr(L, 'maps')));
   }
   assert.ok(home.includes(I18N.en.bub1) && home.includes(I18N.en.bub2), 'HTML default = EN bot text');
@@ -1010,7 +1021,7 @@ await test('SEO: /he/ and /ru/ are translated HTML with their own title, canonic
     }
     assert.match(html, /<meta property="og:image" content="https:\/\/findy-pet\.com\/assets\/og\.jpg">/);
     assert.match(html, /data-price="tag">49 ₪</); assert.match(html, /data-price="bundle">147 ₪</);
-    const ld = JSON.parse(html.match(/<script type="application\/ld\+json">(.*?)<\/script>/s)[1]);
+    const ld = JSON.parse(html.match(/<script[^>]*type="application\/ld\+json">(.*?)<\/script>/s)[1]);
     const byType = Object.fromEntries(ld['@graph'].map((n) => [n['@type'], n]));
     assert.deepEqual(byType.Product.offers.map((o) => [o.price, o.priceCurrency]), [['49', 'ILS'], ['147', 'ILS']]);
     assert.ok(byType.FAQPage.mainEntity.length >= 14);
@@ -1040,6 +1051,106 @@ await test('SEO: robots.txt and sitemap.xml on the live site; tag pages and post
   assert.equal((await call(e, '/t/101')).headers.get('X-Robots-Tag'), 'noindex, nofollow');
   assert.equal((await call(e, '/tag/?id=101')).headers.get('X-Robots-Tag'), 'noindex, nofollow');
   assert.equal((await call(e, '/he/')).headers.get('X-Robots-Tag'), null);
+});
+
+// ---- Стадия 2: безопасность и надёжность ----
+await test('security headers: CSP with a nonce on every inline script; nosniff everywhere; no CSP on JSON', async () => {
+  for (const path of ['/', '/he/', '/t/101', '/privacy/']) {
+    const r = await call(env, path);
+    const pol = r.headers.get('Content-Security-Policy');
+    assert.ok(pol, path + ' has CSP');
+    const nonce = /'nonce-([^']+)'/.exec(pol)[1];
+    assert.match(pol, /frame-ancestors 'none'/); assert.match(pol, /object-src 'none'/);
+    assert.equal(r.headers.get('X-Content-Type-Options'), 'nosniff');
+    assert.equal(r.headers.get('X-Frame-Options'), 'DENY');
+    const html = await r.text();
+    const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)([^>]*)>/g)].map((m) => m[1]);
+    assert.ok(inline.every((a) => a.includes(`nonce="${nonce}"`)), path + ': every inline script has the nonce');
+  }
+  const a = await call(env, `/p/${tagId}`);
+  assert.match(a.headers.get('Content-Security-Policy'), /nonce-/);
+  const j = await call(env, `/api/tag?id=${tagId}`);
+  assert.equal(j.headers.get('Content-Security-Policy'), null); assert.equal(j.headers.get('X-Content-Type-Options'), 'nosniff');
+  const n1 = /'nonce-([^']+)'/.exec((await call(env, '/')).headers.get('Content-Security-Policy'))[1];
+  const n2 = /'nonce-([^']+)'/.exec((await call(env, '/')).headers.get('Content-Security-Policy'))[1];
+  assert.notEqual(n1, n2, 'nonce is new for every response');
+});
+
+await test('activation link works once: another Telegram account is refused, admin is told; the owner can reopen it', async () => {
+  const d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Tal', phone: '050-888-1122', pet_name: 'Kofi', address: 'Haifa', consent: true, lang: 'en', tags: 2, pets: ['Mocha'] } })).json();
+  const tok = d.telegram_link.split('start=')[1];
+  await tgUpdate(env, msg('7201', '/start ' + tok));
+  assert.match(state.tg.filter((c) => c.payload.chat_id === '7201').at(-2).payload.text, /you are registered/);
+  // второй жетон того же заказа тоже закрыт: его токен из order.tokens
+  const o = await KV.get(`o:${d.order_id}`, 'json');
+  for (const t of Object.values(o.tokens)) assert.equal(await KV.get(`tok:${t}`), '7201');
+  await tgUpdate(env, msg('7666', '/start ' + tok));
+  assert.match(lastTg('sendMessage').payload.text, /already been used by another Telegram account/);
+  assert.ok(state.tags.filter((t) => t.link_token === tok).every((t) => t.telegram_chat_id === '7201'), 'not relinked');
+  assert.match(state.tg.filter((c) => c.payload.chat_id === 'admin').at(-1).payload.text, /opened by another Telegram chat \(7666\) — refused/);
+  await tgUpdate(env, msg('7201', '/start ' + tok));
+  assert.match(state.tg.filter((c) => c.payload.chat_id === '7201').at(-2).payload.text, /you are registered/);
+});
+
+await test('site order: the same idempotency key never creates a second order; Turnstile is checked when switched on', async () => {
+  const body = { owner_name: 'Idem', phone: '050-999-0001', pet_name: 'Once', address: 'Haifa', consent: true, idem: 'idem-key-12345' };
+  const n = state.tags.length;
+  const a = await (await call(env, '/api/register', { method: 'POST', body })).json();
+  const b = await (await call(env, '/api/register', { method: 'POST', body })).json();
+  assert.equal(a.success, true); assert.equal(b.order_id, a.order_id);
+  assert.equal(state.tags.length, n + 1);
+  const tsEnv = makeEnv({ TURNSTILE_SECRET: 'ts-secret', TURNSTILE_SITE_KEY: '0x4AAAAAAA-site' });
+  let r = await call(tsEnv, '/api/register', { method: 'POST', body: { ...body, idem: undefined } });
+  assert.equal(r.status, 403); assert.equal((await r.json()).error_code, 'captcha');
+  r = await call(tsEnv, '/api/register', { method: 'POST', body: { ...body, idem: undefined, ts: 'bad' } });
+  assert.equal(r.status, 403);
+  r = await call(tsEnv, '/api/register', { method: 'POST', body: { ...body, idem: undefined, ts: 'good-token' } });
+  assert.equal((await r.json()).success, true);
+  assert.match(await (await call(tsEnv, '/js/plans.js')).text(), /const TURNSTILE_SITE_KEY = "0x4AAAAAAA-site";/);
+  assert.doesNotMatch(await (await call(env, '/js/plans.js')).text(), /TURNSTILE/);
+});
+
+await test('failures reach the admin: order the table refused; finder who could not reach the owner', async () => {
+  state.gasDown = true;
+  const r = await call(env, '/api/register', { method: 'POST', body: { owner_name: 'Down', phone: '050-999-0002', pet_name: 'Nope', address: 'Haifa', consent: true } });
+  state.gasDown = false;
+  assert.equal(r.status, 502);
+  assert.match(state.tg.filter((c) => c.payload.chat_id === 'admin').at(-1).payload.text, /Site order FAILED[\s\S]*Down · 📱 \+972 50-999-0002/);
+  const d = await (await call(env, '/api/register', { method: 'POST', body: { owner_name: 'Blk', phone: '050-999-0003', pet_name: 'Ghost', address: 'Haifa', consent: true } })).json();
+  state.tags.find((t) => t.tag_id === String(d.id_tag)).telegram_chat_id = 'blocked';
+  await call(env, '/api/found', { method: 'POST', body: { id_tag: d.id_tag, lat: 32.8, lon: 35 } });
+  const alert = state.tg.filter((c) => c.payload.chat_id === 'admin').at(-1).payload.text;
+  assert.match(alert, /Finder could not reach the owner/); assert.match(alert, /\+972 50-999-0003/); assert.match(alert, /maps\.google\.com/);
+  const n = state.tg.length;
+  await call(env, '/api/found', { method: 'POST', body: { id_tag: d.id_tag } });
+  assert.ok(!state.tg.slice(n).some((c) => c.payload.chat_id === 'admin'), 'no second alert within 10 minutes');
+});
+
+await test('test site /setup refuses the production bot token', async () => {
+  const tenv = { STAGE: 'test', TEST_DB: '1', SITE_URL: 'https://test.findy-pet.com', BOT_TOKEN: 'T', WEBHOOK_SECRET: 'sec', FYP_KV: makeKV() };
+  state.botUsername = 'YourPetLocatorBot';
+  const n = state.tg.length;
+  const r = await call(tenv, '/setup?key=sec');
+  state.botUsername = undefined;
+  assert.equal(r.status, 409); assert.match((await r.json()).error, /PRODUCTION bot token/);
+  assert.ok(!state.tg.slice(n).some((c) => c.method === 'setWebhook'));
+  assert.equal((await call(tenv, '/setup?key=sec')).status, 200);
+});
+
+await test('daily backup: KV data goes to the admin as a JSON file', async () => {
+  const n = state.tg.length;
+  const pending = [];
+  await worker.scheduled({}, env, { waitUntil: (p) => pending.push(p) });
+  await Promise.all(pending);
+  const doc = state.tg.slice(n).find((c) => c.method === 'sendDocument');
+  assert.ok(doc, 'sendDocument called');
+  assert.equal(doc.payload.chat_id, 'admin');
+  const data = JSON.parse(await doc.payload.document.text());
+  assert.ok(Object.keys(data.data).some((k) => k.startsWith('o:FY')));
+  assert.ok(Object.keys(data.data).some((k) => k.startsWith('x:')));
+  assert.ok(!Object.keys(data.data).some((k) => k.startsWith('img:') || k.startsWith('c:')));
+  assert.match(doc.payload.document.name, /^findypet-backup-\d{4}-\d{2}-\d{2}\.json$/);
 });
 
 console.log(`\n${passed} tests passed`);

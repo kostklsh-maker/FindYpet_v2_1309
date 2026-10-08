@@ -77,6 +77,8 @@ const BOT = {
     askAddress: '🏠 Your <b>address</b> (city, street, apartment) — we ship the tag there. It is never shown on the pet page.',
     cancelled: 'Cancelled. Send /help to see what I can do.',
     notFoundToken: '⚠️ This activation link is not valid (or expired).\nYou can register a new pet here: /register',
+    tokenUsed: '⚠️ This activation link has already been used by another Telegram account. ' +
+      'If that was you on another device, write to us here and we will move the tag to this chat.',
     noTags: 'You have no registered pets yet. Tap /register to add one.',
     noKv: '⚠️ This feature is not switched on yet. Please try again later.',
     help:
@@ -264,6 +266,7 @@ const BOT = {
     askAddress: '🏠 <b>הכתובת</b> שלכם (עיר, רחוב, דירה) — לשם נשלח את התג. היא אף פעם לא מוצגת בדף החיה.',
     cancelled: `בוטל. שלחו ${LRM}/help כדי לראות מה אני יודע לעשות.`,
     notFoundToken: `⚠️ קישור ההפעלה הזה לא תקף (או שפג תוקפו).\nאפשר לרשום חיית מחמד חדשה כאן: ${LRM}/register`,
+    tokenUsed: '⚠️ קישור ההפעלה הזה כבר שימש חשבון טלגרם אחר. אם אלה הייתם אתם ממכשיר אחר, כתבו לנו כאן ונעביר את התג לצ׳אט הזה.',
     noTags: `עדיין אין לכם חיות מחמד רשומות. לחצו ${LRM}/register כדי להוסיף.`,
     noKv: '⚠️ האפשרות הזו עדיין לא פעילה. נסו שוב מאוחר יותר.',
     help:
@@ -449,6 +452,8 @@ const BOT = {
     askAddress: '🏠 Ваш <b>адрес</b> (город, улица, квартира) — туда отправим жетон. На странице питомца он никогда не показывается.',
     cancelled: 'Отменено. Отправьте /help, чтобы увидеть, что я умею.',
     notFoundToken: '⚠️ Эта ссылка для активации недействительна (или устарела).\nЗарегистрировать нового питомца можно здесь: /register',
+    tokenUsed: '⚠️ Эта ссылка активации уже использована другим аккаунтом Telegram. ' +
+      'Если это были вы с другого устройства, напишите нам здесь — мы перенесём жетон в этот чат.',
     noTags: 'У вас пока нет зарегистрированных питомцев. Нажмите /register, чтобы добавить.',
     noKv: '⚠️ Эта функция пока не включена. Попробуйте позже.',
     help:
@@ -730,18 +735,19 @@ function feats() { return { alerts: true, lost: true, extras: true }; }
 // ---------------------------------------------------------------
 export default {
   async fetch(request, env, ctx) {
-    if (!isTestSite(env)) return route(request, env, ctx);
+    if (!isTestSite(env)) return secure(await route(request, env, ctx));
     // Тестовый сайт: не индексируется поисковиками, на каждой странице — пометка «ТЕСТ»
     if (new URL(request.url).pathname === '/robots.txt') {
       return new Response('User-agent: *\nDisallow: /\n', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
     }
-    return markTestSite(await route(request, env, ctx));
+    return markTestSite(await secure(await route(request, env, ctx)));
   },
 
-  // Cron Trigger (например, раз в день): напоминание проверить контакты
+  // Cron Trigger (раз в день): напоминание проверить контакты + резервная копия данных админу
   async scheduled(event, env, ctx) {
-    if (isTestSite(env)) return; // тестовый сайт напоминаний не рассылает
+    if (isTestSite(env)) return; // тестовый сайт напоминаний и копий не рассылает
     ctx.waitUntil(sendReminders(env).catch((e) => console.error('reminders error', e)));
+    ctx.waitUntil(dailyBackup(env).catch((e) => console.error('backup error', e)));
   },
 };
 
@@ -819,7 +825,8 @@ async function route(request, env, ctx) {
 
     // ---- Цены тарифов для сайта ----
     if (path === '/js/plans.js') {
-      return new Response(`const PRICING = ${JSON.stringify(PRICING)};\n`, {
+      const ts = env.TURNSTILE_SITE_KEY && /^[\w-]{8,64}$/.test(env.TURNSTILE_SITE_KEY) ? `const TURNSTILE_SITE_KEY = "${env.TURNSTILE_SITE_KEY}";\n` : '';
+      return new Response(`const PRICING = ${JSON.stringify(PRICING)};\n` + ts, {
         headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=300' },
       });
     }
@@ -831,6 +838,42 @@ async function route(request, env, ctx) {
     console.error(err);
     return json({ success: false, error: 'server_error' }, env, 500);
   }
+}
+
+// ---------------------------------------------------------------
+// Заголовки безопасности. HTML: CSP с одноразовым nonce для встроенных <script> (страница жетона,
+// объявление, политика), сторонние скрипты — только Cloudflare Web Analytics и Turnstile.
+// ---------------------------------------------------------------
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'geolocation=(self), camera=(), microphone=(), payment=(), usb=()',
+  'Strict-Transport-Security': 'max-age=15552000',
+};
+function csp(nonce) {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' https://static.cloudflareinsights.com https://challenges.cloudflare.com`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: blob:",
+    "connect-src 'self' https://cloudflareinsights.com",
+    'frame-src https://challenges.cloudflare.com',
+    "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'", "object-src 'none'",
+  ].join('; ');
+}
+async function secure(res) {
+  const h = new Headers(res.headers);
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) if (!h.has(k)) h.set(k, v);
+  if (!(h.get('Content-Type') || '').startsWith('text/html')) {
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
+  }
+  const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
+  const html = (await res.text()).replace(/<script(?![^>]*\bsrc=)(?![^>]*\bnonce=)/g, `<script nonce="${nonce}"`);
+  h.set('Content-Security-Policy', csp(nonce));
+  h.set('X-Frame-Options', 'DENY');
+  h.delete('Content-Length');
+  return new Response(html, { status: res.status, statusText: res.statusText, headers: h });
 }
 
 // ---------------------------------------------------------------
@@ -966,17 +1009,35 @@ async function apiRegister(request, env, url, ctx) {
       items[i].notes = str(e.notes, 200);
     }
   }
+  // Защита от ботов (Cloudflare Turnstile) — включается секретом TURNSTILE_SECRET
+  if (env.TURNSTILE_SECRET && !(await turnstileOk(env, b.ts, request))) {
+    return json({ success: false, error: 'Captcha failed.', error_code: 'captcha' }, env, 403);
+  }
+  // Повтор того же нажатия (сеть оборвалась, двойной клик) не создаёт второй заказ: ключ idem живёт 10 минут
+  const idem = /^[A-Za-z0-9-]{8,64}$/.test(String(b.idem || '')) && kvOn(env) ? `idem:${b.idem}` : '';
+  if (idem) {
+    const prev = await env.FYP_KV.get(idem);
+    if (prev === 'pending') return json({ success: false, error: 'Order is being created.', error_code: 'busy' }, env, 409);
+    if (prev) return json(JSON.parse(prev), env);
+    await env.FYP_KV.put(idem, 'pending', { expirationTtl: 120 });
+  }
   const res = await createOrder(env, url, {
     source: 'site', qty, lang, owner_name: owner, phone, address, items, phone2, notes,
     care_interest: b.care === true,
     // 3 жетона присылала только страница 2 + 1, открытая до 07.10 (там было «98 ₪») — админ уточнит цену
     old_offer: Number(b.tags) === 3,
   });
-  if (!res.ok) return json({ success: false, error: 'Database error. Please try again.', error_code: 'db' }, env, 502);
+  if (!res.ok) {
+    if (idem) await env.FYP_KV.delete(idem);
+    ctx.waitUntil(alertAdmin(env, `order:${phone}`,
+      `⚠️ <b>Site order FAILED</b> — the table did not answer, the customer saw "try again".\n` +
+      `👤 ${esc(owner)} · 📱 ${esc(prettyPhone(phone))} · 🐾 ${esc(pet)} · ${normQty(b.tags)} tag(s)\nCall them if no new order arrives soon.`));
+    return json({ success: false, error: 'Database error. Please try again.', error_code: 'db' }, env, 502);
+  }
   ctx.waitUntil(Promise.all(res.tags.map((t) => cachePublic(env, t))));
   const first = res.tags[0];
 
-  return json({
+  const out = {
     success: true,
     order_id: res.order.order_id,
     total_tags: res.order.tags_total,
@@ -986,7 +1047,35 @@ async function apiRegister(request, env, url, ctx) {
     id_tag: first.tag_id,
     tag_url: shortUrl(env, url, first.tag_id),
     telegram_link: `https://t.me/${env.BOT_USERNAME}?start=${first.link_token}`,
-  }, env);
+  };
+  if (idem) await env.FYP_KV.put(idem, JSON.stringify(out), { expirationTtl: 600 });
+  return json(out, env);
+}
+
+/** Cloudflare Turnstile: проверка токена с формы заказа. */
+async function turnstileOk(env, token, request) {
+  if (!token || String(token).length > 2048) return false;
+  try {
+    const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      body: new URLSearchParams({ secret: env.TURNSTILE_SECRET, response: String(token), remoteip: clientIp(request) }),
+    });
+    const d = await r.json();
+    return !!d.success;
+  } catch (e) {
+    console.error('turnstile', e);
+    return true; // сервис проверки недоступен — заказ важнее (лимит частоты всё равно действует)
+  }
+}
+
+/** Сигнал админу о сбое (не чаще раза в 10 минут на один ключ). */
+async function alertAdmin(env, key, text) {
+  if (!env.ADMIN_CHAT_ID) return;
+  if (kvOn(env)) {
+    const k = `alert:${key}`;
+    try { if (await env.FYP_KV.get(k)) return; await env.FYP_KV.put(k, '1', { expirationTtl: 600 }); } catch (e) { /* без замка */ }
+  }
+  await send(env, env.ADMIN_CHAT_ID, text);
 }
 
 // ---------------------------------------------------------------
@@ -1179,6 +1268,7 @@ async function apiFound(request, env) {
   const sent = await tg(env, 'sendMessage', { chat_id: tag.telegram_chat_id, parse_mode: 'HTML', disable_web_page_preview: true, text });
   if (hasLoc) await tg(env, 'sendLocation', { chat_id: tag.telegram_chat_id, latitude: lat, longitude: lon });
   if (sent && sent.ok && kvOn(env)) await env.FYP_KV.put(key, '1', { expirationTtl: 60 });
+  if (!(sent && sent.ok)) await ownerUnreachable(env, tag, hasLoc ? `https://maps.google.com/?q=${lat},${lon}` : '');
   return json({ success: !!(sent && sent.ok) }, env);
 }
 
@@ -1222,7 +1312,15 @@ async function apiLocation(request, env) {
     const ok = await sendSms(env, tag.phone, tr(L, 'smsFound', { pet: tag.pet_name, maps }));
     return json({ success: ok }, env);
   }
+  if (!(sent && sent.ok)) await ownerUnreachable(env, tag, maps);
   return json({ success: !!(sent && sent.ok) }, env);
+}
+
+/** Нашедший нажал «Сообщить хозяину», а Telegram не доставил (бот заблокирован и т.п.) — админ позвонит владельцу. */
+function ownerUnreachable(env, tag, maps) {
+  return alertAdmin(env, `found:${tag.tag_id}`,
+    `🚨 <b>Finder could not reach the owner</b> of #${tag.tag_id} (${esc(tag.pet_name)}) — Telegram did not deliver.\n` +
+    `Please call the owner: ${esc(prettyPhone(normalizePhone(tag.phone)))}` + (maps ? `\n📍 Finder's location: ${esc(maps)}` : ''));
 }
 
 function publicTag(t, env) {
@@ -1330,6 +1428,42 @@ async function sendReminders(env) {
 }
 
 // ---------------------------------------------------------------
+// Резервная копия данных из KV (заказы, доп. данные жетонов, лист ожидания Care, языки чатов)
+// раз в день — файлом админу в Telegram. Таблица Google хранится у Google и сюда не входит.
+// ---------------------------------------------------------------
+const BACKUP_PREFIXES = ['o:', 'x:', 'care:', 'lang:', 'chat:', 'tok:'];
+async function dailyBackup(env) {
+  if (!kvOn(env) || !env.ADMIN_CHAT_ID) return;
+  const data = {};
+  let n = 0;
+  for (const prefix of BACKUP_PREFIXES) {
+    let cursor;
+    do {
+      const page = await env.FYP_KV.list({ prefix, cursor });
+      for (const k of page.keys) {
+        if (n >= 900) break; // лимит операций KV на один запуск
+        const v = await env.FYP_KV.get(k.name);
+        n++;
+        try { data[k.name] = JSON.parse(v); } catch { data[k.name] = v; }
+      }
+      cursor = page.list_complete || n >= 900 ? undefined : page.cursor;
+    } while (cursor);
+  }
+  const day = new Date().toLocaleDateString('en-CA', { timeZone: env.TIMEZONE || 'Asia/Jerusalem' });
+  const body = JSON.stringify({ created_at: new Date().toISOString(), keys: n, truncated: n >= 900, data }, null, 1);
+  const form = new FormData();
+  form.append('chat_id', String(env.ADMIN_CHAT_ID));
+  form.append('caption', `🗄 FindYpet backup ${day}: ${n} records (orders, tag extras, Care waitlist, chats).`);
+  form.append('disable_notification', 'true');
+  form.append('document', new Blob([body], { type: 'application/json' }), `findypet-backup-${day}.json`);
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendDocument`, { method: 'POST', body: form });
+    const d = await res.json();
+    if (!d.ok) console.error('backup send', JSON.stringify(d));
+  } catch (e) { console.error('backup send failed', e); }
+}
+
+// ---------------------------------------------------------------
 // SMS-резерв (Twilio). Включается, только если заданы TWILIO_*.
 // ---------------------------------------------------------------
 function smsEnabled(env) {
@@ -1413,7 +1547,7 @@ async function handleUpdate(update, env, url) {
   }
   // режим «Потерялся»: где видели в последний раз
   if (st.step === 'lost_area') {
-    const area = isBtn(text, 'btnSkip') ? '' : str(text, 80);
+    const area = isBtn(text, 'btnSkip') ? '' : cleanArea(text);
     await db(env, 'clearState', { chat_id: chatId });
     return turnLostOn(chatId, st.tag_id, area, env, url, L);
   }
@@ -1601,6 +1735,13 @@ async function handleCallback(cq, env, url) {
     return askSpareOrConfirm(env, chatId, st, url, L);
   }
 
+  // --- админ: пост о пропаже в канал ---
+  const cm = /^chan:(\d{1,9}):(ok|no)$/.exec(data);
+  if (cm) {
+    if (!isAdmin(env, chatId) || !env.LOST_CHANNEL_ID) return;
+    return channelDecision(env, url, chatId, cq, cm[1], cm[2] === 'ok');
+  }
+
   // --- админ: статус заказа ---
   const om = /^ord:(FY\d{1,9}):(paid|made|shipped)$/.exec(data);
   if (om) {
@@ -1716,23 +1857,53 @@ async function turnLostOn(chatId, id, area, env, url, L) {
   const flag = { he: '🇮🇱', ru: '🇷🇺', en: '🇬🇧' };
   const shares = order.map((l) => `${flag[l]} <code>${esc(tr(l, 'share', { pet: tag.pet_name, area, link: poster }))}</code>`).join('\n\n');
 
-  // Публикация в канал сообщества (если настроен) — на трёх языках
-  if (env.LOST_CHANNEL_ID) {
-    const post = await tg(env, 'sendMessage', {
-      chat_id: env.LOST_CHANNEL_ID,
-      parse_mode: 'HTML',
-      disable_web_page_preview: false,
-      text:
-        `🚨 <b>${esc(tag.pet_name)}</b>\n` +
-        ['he', 'ru', 'en'].map((l) => `${flag[l]} ${tr(l, 'chanLine')}`).join('\n') + '\n\n' +
-        (area ? `📍 ${esc(area)}\n` : '') +
-        `🕒 ${fmtTime(env, 'en')}\n` +
-        esc(poster),
+  // Канал сообщества (если настроен): только оплаченные заказы (и старые жетоны без заказа) и только
+  // после «Опубликовать» у админа — чтобы канал не стал доской для спама
+  if (env.LOST_CHANNEL_ID && env.ADMIN_CHAT_ID && (await channelAllowed(env, x))) {
+    await tg(env, 'sendMessage', {
+      chat_id: env.ADMIN_CHAT_ID, parse_mode: 'HTML', disable_web_page_preview: true,
+      text: `📣 <b>Lost mode on</b> — publish to ${esc(env.LOST_CHANNEL_ID)}?\n\n` + channelPost(env, tag, area, poster),
+      reply_markup: { inline_keyboard: [[{ text: '✅ Publish', callback_data: `chan:${id}:ok` }, { text: '✖️ Skip', callback_data: `chan:${id}:no` }]] },
     });
-    if (post && post.ok) await putExtras(env, id, { channel_msg_id: post.result.message_id });
   }
 
   await send(env, chatId, tr(L, 'lostOn', { pet: esc(tag.pet_name), area: esc(area), shares, photo: !!x.photo_v }), mainMenu(L));
+}
+
+function channelPost(env, tag, area, poster) {
+  return `🚨 <b>${esc(tag.pet_name)}</b>\n` +
+    ['he', 'ru', 'en'].map((l) => `${{ he: '🇮🇱', ru: '🇷🇺', en: '🇬🇧' }[l]} ${tr(l, 'chanLine')}`).join('\n') + '\n\n' +
+    (area ? `📍 ${esc(area)}\n` : '') +
+    `🕒 ${fmtTime(env, 'en')}\n` +
+    esc(poster);
+}
+async function channelAllowed(env, x) {
+  if (!x.order_id) return true; // жетоны до системы заказов — настоящие клиенты
+  const o = await getOrder(env, x.order_id);
+  return !o || ['paid', 'made', 'shipped'].includes(o.status);
+}
+/** Админ: «Опубликовать» / «Пропустить» пост о пропаже в канал. */
+async function channelDecision(env, url, adminChat, cq, id, ok) {
+  if (cq.message && cq.message.message_id) {
+    await tg(env, 'editMessageReplyMarkup', { chat_id: adminChat, message_id: cq.message.message_id, reply_markup: { inline_keyboard: [] } });
+  }
+  if (!ok) return send(env, adminChat, `Skipped — #${id} is not posted to the channel.`);
+  const x = await getExtras(env, id);
+  if (!x.lost) return send(env, adminChat, `#${id} is no longer in Lost mode — nothing to post.`);
+  if (x.channel_msg_id) return send(env, adminChat, `#${id} is already in the channel.`);
+  const r = await db(env, 'getTag', { id });
+  if (!r.ok || !r.found) return send(env, adminChat, `⚠️ Could not load #${id}.`);
+  const post = await tg(env, 'sendMessage', {
+    chat_id: env.LOST_CHANNEL_ID, parse_mode: 'HTML', disable_web_page_preview: false,
+    text: channelPost(env, r.tag, x.lost_area || '', posterUrl(env, url, id)),
+  });
+  if (post && post.ok) await putExtras(env, id, { channel_msg_id: post.result.message_id });
+  return send(env, adminChat, post && post.ok ? `✅ #${id} posted to the channel.` : '⚠️ The channel did not accept the post (is the bot an admin there?).');
+}
+
+/** Район пропажи: без ссылок и @упоминаний (его видят на странице, в объявлении и в канале). */
+function cleanArea(text) {
+  return str(text, 160).replace(/\b(?:https?:\/\/|www\.)\S+|\bt\.me\/\S+|@\w{3,}/gi, ' ').replace(/\s{2,}/g, ' ').trim().slice(0, 80);
 }
 
 async function turnLostOff(chatId, tag, env, L) {
@@ -1779,7 +1950,12 @@ async function startRegistration(chatId, from, env, L) {
 async function linkFromSite(chatId, token, env, url, from) {
   const L0 = await chatLang(env, chatId, from);
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(token)) return send(env, chatId, tr(L0, 'notFoundToken'), mainMenu(L0));
+  // Ссылка активации одноразовая: после первой привязки другой Telegram-аккаунт её использовать не может
+  // (иначе чужой человек со скриншотом ссылки получал бы оповещения о питомце)
+  const usedBy = kvOn(env) ? await env.FYP_KV.get(`tok:${token}`) : null;
+  if (usedBy && usedBy !== chatId) return refuseRelink(env, chatId, L0, token);
   const r = await db(env, 'linkTelegram', { token, chat_id: chatId });
+  if (r.ok && r.conflict) return refuseRelink(env, chatId, L0, token); // таблица: жетон уже привязан к другому чату
   if (!r.ok || !r.found) return send(env, chatId, tr(L0, 'notFoundToken'), mainMenu(L0));
   await rememberChat(env, chatId);
   // Все жетоны того же заказа привязываются одним нажатием Start
@@ -1795,10 +1971,21 @@ async function linkFromSite(chatId, token, env, url, from) {
     order.chat_id = chatId;
     await saveOrder(env, order);
   }
+  if (kvOn(env)) {
+    const toks = new Set([token, ...Object.values((order && order.tokens) || {}).filter(Boolean)]);
+    await Promise.all([...toks].map((t) => env.FYP_KV.put(`tok:${t}`, chatId)));
+  }
   // бот говорит на языке, на котором оформлен заказ на сайте (если язык ещё не выбран через /lang)
   const L = await keepChatLang(env, chatId, (order && order.lang) || x.lang || L0);
   await Promise.all(tags.map((t) => cachePublic(env, t)));
   return sendRegistered(chatId, tags, env, url, order, L);
+}
+
+async function refuseRelink(env, chatId, L, token) {
+  await alertAdmin(env, `relink:${token}`,
+    `⚠️ An activation link was opened by another Telegram chat (${esc(chatId)}) — refused. ` +
+    'If the customer changed Telegram, move the tag manually.');
+  return send(env, chatId, tr(L, 'tokenUsed'), mainMenu(L));
 }
 
 async function sendRegistered(chatId, tagsIn, env, url, order, L) {
@@ -2033,6 +2220,13 @@ async function setup(env, url) {
     return new Response('forbidden', { status: 403 });
   }
   const results = {};
+  // Тестовый сайт с токеном рабочего бота перехватил бы его webhook — отказываемся
+  const me = await tg(env, 'getMe', {});
+  results.bot = me && me.ok && me.result ? `@${me.result.username}` : 'getMe failed';
+  if (isTestSite(env) && me && me.ok && me.result && me.result.username === 'YourPetLocatorBot') {
+    return new Response(JSON.stringify({ error: 'This test site has the PRODUCTION bot token. Put the test bot token into BOT_TOKEN of findypet-app-staging.' }, null, 2),
+      { status: 409, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+  }
   results.setWebhook = await tg(env, 'setWebhook', {
     url: `${url.origin}/telegram`,
     secret_token: env.WEBHOOK_SECRET,
@@ -2508,6 +2702,7 @@ async function testDb(env, action, d) {
       const id = await kv.get(`db:tok:${d.token}`);
       const t = id && (await getT(id));
       if (!t) return { ok: true, found: false };
+      if (t.telegram_chat_id && String(t.telegram_chat_id) !== String(d.chat_id)) return { ok: true, found: true, conflict: true };
       t.telegram_chat_id = String(d.chat_id);
       await putT(t);
       await addToChat(d.chat_id, t.tag_id);

@@ -767,6 +767,7 @@ h2 { letter-spacing: -.01em; }
 .care-strip .btn { flex: none; }
 
 /* Форма: итог над кнопкой, ошибки у полей */
+.ts-box:not(:empty) { margin: 12px 0 0; min-height: 65px; }
 .form-total { margin: 14px 0 4px; font-weight: 700; font-size: 15.5px; color: var(--ink); }
 .field-err { display: block; color: #B42318; font-size: 13px; font-weight: 600; margin-top: 4px; }
 label.invalid input, label.invalid textarea, label.invalid select { border-color: #D92D20 !important; box-shadow: 0 0 0 3px rgba(217,45,32,.14); }

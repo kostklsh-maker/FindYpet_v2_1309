@@ -49,6 +49,28 @@
             }
         } catch (err) { /* аналитика не должна мешать заказу */ }
     }
+    // Ключ повтора: если ответ потерялся и человек нажал «Заказать» ещё раз, второй заказ не создастся
+    const newIdem = () => { try { return crypto.randomUUID(); } catch (e) { return Date.now().toString(36) + Math.random().toString(36).slice(2, 12); } };
+    let idem = newIdem();
+
+    // Защита от ботов (Cloudflare Turnstile): включается, когда Worker отдаёт TURNSTILE_SITE_KEY в /js/plans.js
+    const tsKey = typeof TURNSTILE_SITE_KEY !== "undefined" ? TURNSTILE_SITE_KEY : "";
+    let tsToken = "", tsWidget = null;
+    function loadTurnstile() {
+        if (!tsKey || document.getElementById("tsScript")) return;
+        window.fypTsReady = function () {
+            tsWidget = window.turnstile.render("#tsBox", {
+                sitekey: tsKey, size: "flexible", language: typeof currentLang !== "undefined" ? currentLang : "auto",
+                callback: function (tok) { tsToken = tok; }, "expired-callback": function () { tsToken = ""; }
+            });
+        };
+        const sc = document.createElement("script");
+        sc.id = "tsScript"; sc.async = true;
+        sc.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=fypTsReady&render=explicit";
+        document.head.appendChild(sc);
+    }
+    function resetTurnstile() { tsToken = ""; try { if (tsWidget !== null) window.turnstile.reset(tsWidget); } catch (e) {} }
+
     let startedForm = false;
     form.addEventListener("input", function () { if (!startedForm) { startedForm = true; track("form"); } });
 
@@ -63,6 +85,7 @@
     }
     function openOrder(qty) {
         orderSec.classList.remove("closed");
+        loadTurnstile();
         if (qty) {
             const r = form.querySelector('input[name="qty"][value="' + qty + '"]');
             if (r) { r.checked = true; r.dispatchEvent(new Event("change", { bubbles: true })); }
@@ -125,7 +148,9 @@
             pets: multi ? fam.pets : [],
             spare_for: multi ? fam.spare_for : [],
             pet_extras: multi ? fam.pet_extras : [],
-            lang: currentLang
+            lang: currentLang,
+            idem: idem,
+            ts: tsToken
         };
         clearErrors();
         const el = (id) => document.getElementById(id);
@@ -157,6 +182,8 @@
             return;
         }
 
+        if (tsKey && !tsToken) return showError("errCaptcha");
+
         btn.disabled = true;
         const label = btn.querySelector("[data-t]");
         label.textContent = t("processing");
@@ -168,6 +195,8 @@
             });
             const data = await res.json();
             if (data.success) {
+                idem = newIdem();
+                resetTurnstile();
                 lastOrder = data;
                 track("submit");
                 form.hidden = true;
@@ -178,7 +207,9 @@
                 step.scrollIntoView({ behavior: "smooth", block: "center" });
             } else {
                 const code = String(data.error_code || data.error || "");
-                showError(/phone2/i.test(code) ? "errPhone2" : /phone/i.test(code) ? "errPhone" : /consent/i.test(code) ? "errConsent" : /fill/i.test(code) ? "errFill" : "errGeneric");
+                if (code === "captcha") resetTurnstile();
+                showError(/phone2/i.test(code) ? "errPhone2" : /phone/i.test(code) ? "errPhone" : /consent/i.test(code) ? "errConsent" : /fill/i.test(code) ? "errFill"
+                    : code === "captcha" ? "errCaptcha" : code === "busy" ? "errBusy" : "errGeneric");
             }
         } catch (err) {
             console.error(err);

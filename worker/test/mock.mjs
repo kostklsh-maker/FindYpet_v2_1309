@@ -55,11 +55,17 @@ globalThis.fetch = async (input, init = {}) => {
   }
   if (url.startsWith('https://api.telegram.org')) {
     const method = url.split('/').pop();
-    const payload = JSON.parse(init.body || '{}');
+    const payload = init.body instanceof FormData ? Object.fromEntries(init.body.entries()) : JSON.parse(init.body || '{}');
     state.tg.push({ method, payload });
     const blocked = String(payload.chat_id) === 'blocked';
+    if (method === 'getMe') return new Response(JSON.stringify({ ok: true, result: { id: 1, is_bot: true, username: state.botUsername || 'FindYpetTestBot' } }));
     if (method === 'getFile') return new Response(JSON.stringify({ ok: true, result: { file_id: payload.file_id, file_path: 'photos/file_7.jpg' } }));
     return new Response(JSON.stringify(blocked ? { ok: false, description: 'bot was blocked' } : { ok: true, result: { message_id: 555 } }));
+  }
+  if (url.startsWith('https://challenges.cloudflare.com/turnstile/v0/siteverify')) {
+    const f = new URLSearchParams(String(init.body));
+    state.turnstile = (state.turnstile || 0) + 1;
+    return new Response(JSON.stringify({ success: f.get('response') === 'good-token' && f.get('secret') === 'ts-secret' }));
   }
   if (url.startsWith('https://api.twilio.com')) {
     state.sms.push(Object.fromEntries(new URLSearchParams(String(init.body))));
