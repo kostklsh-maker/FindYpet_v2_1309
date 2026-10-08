@@ -74,7 +74,9 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.startsWith('https://challenges.cloudflare.com/turnstile/v0/siteverify')) {
     const f = new URLSearchParams(String(init.body));
     state.turnstile = (state.turnstile || 0) + 1;
-    return new Response(JSON.stringify({ success: f.get('response') === 'good-token' && f.get('secret') === 'ts-secret' }));
+    const okSecret = f.get('secret') === 'ts-secret', okResp = f.get('response') === 'good-token';
+    const codes = !okSecret ? ['invalid-input-secret'] : okResp ? [] : ['invalid-input-response'];
+    return new Response(JSON.stringify({ success: okSecret && okResp, 'error-codes': codes }));
   }
   if (url.startsWith('https://api.twilio.com')) {
     state.sms.push(Object.fromEntries(new URLSearchParams(String(init.body))));
