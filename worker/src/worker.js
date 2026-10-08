@@ -1076,6 +1076,24 @@ async function apiRegister(request, env, url, ctx) {
   return json(out, env);
 }
 
+/** /setup: включена ли защита формы и подходит ли секретный ключ (проверка пустым токеном — заказ не создаётся). */
+async function turnstileStatus(env) {
+  const site = !!(env.TURNSTILE_SITE_KEY && /^[\w-]{8,64}$/.test(env.TURNSTILE_SITE_KEY));
+  if (!env.TURNSTILE_SECRET && !site) return 'off (optional): TURNSTILE_SITE_KEY and TURNSTILE_SECRET not set';
+  if (!site) return 'TURNSTILE_SITE_KEY missing or invalid — the form shows no captcha, so every order will be refused ❌';
+  if (!env.TURNSTILE_SECRET) return 'TURNSTILE_SECRET missing — the captcha shows but is not checked on the server ⚠️';
+  try {
+    const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST', body: new URLSearchParams({ secret: env.TURNSTILE_SECRET, response: 'setup-check' }),
+    });
+    const codes = ((await r.json())['error-codes'] || []).join(',');
+    if (/invalid-input-secret|missing-input-secret/.test(codes)) return 'TURNSTILE_SECRET is wrong (Cloudflare rejected it) ❌';
+    return 'on ✅ site key and secret accepted by Cloudflare';
+  } catch (e) {
+    return 'on, but Cloudflare could not be reached to check the secret ⚠️';
+  }
+}
+
 /** Cloudflare Turnstile: проверка токена с формы заказа. */
 async function turnstileOk(env, token, request) {
   if (!token || String(token).length > 2048) return false;
@@ -2356,6 +2374,7 @@ async function setup(env, url) {
   results.rate_limits = ['RL_READ', 'RL_SIGNAL', 'RL_ORDER', 'RL_TAG'].map((n) => `${n} ${env[n] && typeof env[n].limit === 'function' ? '✅' : '❌'}`).join(' · ');
   results.lostChannel = env.LOST_CHANNEL_ID ? `posting to ${env.LOST_CHANNEL_ID}` : 'not set (optional)';
   results.sms = smsEnabled(env) ? 'SMS fallback on' : 'SMS fallback off (optional)';
+  results.turnstile = await turnstileStatus(env);
   return new Response(JSON.stringify(results, null, 2), { headers: { 'Content-Type': 'application/json; charset=utf-8' } });
 }
 

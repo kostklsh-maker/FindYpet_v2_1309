@@ -1108,6 +1108,10 @@ await test('site order: the same idempotency key never creates a second order; T
   r = await call(tsEnv, '/api/register', { method: 'POST', body: { ...body, idem: undefined, ts: 'good-token' } });
   assert.equal((await r.json()).success, true);
   assert.match(await (await call(tsEnv, '/js/plans.js')).text(), /const TURNSTILE_SITE_KEY = "0x4AAAAAAA-site";/);
+  assert.match((await (await call(tsEnv, '/setup?key=sec')).json()).turnstile, /^on ✅/);
+  const badEnv = makeEnv({ TURNSTILE_SECRET: 'wrong', TURNSTILE_SITE_KEY: '0x4AAAAAAA-site' });
+  assert.match((await (await call(badEnv, '/setup?key=sec')).json()).turnstile, /secret is wrong/i);
+  assert.match((await (await call(env, '/setup?key=sec')).json()).turnstile, /^off/);
   assert.doesNotMatch(await (await call(env, '/js/plans.js')).text(), /TURNSTILE/);
 });
 
