@@ -759,11 +759,13 @@ h2 { letter-spacing: -.01em; }
 .specs { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 12px; max-width: 900px; margin: 34px auto 0; }
 .specs li { display: inline-flex; align-items: center; gap: 8px; background: var(--soft); border-radius: 999px; padding: 9px 16px; font-size: 14.5px; font-weight: 600; color: var(--ink); }
 .specs .ic { font-size: 18px; color: var(--brand2); flex: none; }
-.care-strip { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; max-width: 780px; margin: 22px auto 0; padding: 14px 18px;
-    border: 1.5px dashed #BFD7D5; border-radius: 18px; color: var(--muted); font-size: 14.5px; }
-.care-strip p { flex: 1 1 320px; }
+.care-strip { display: flex; align-items: center; gap: 12px; max-width: 780px; margin: 24px auto 0; padding: 8px 8px 8px 14px;
+    background: rgba(14,59,61,.06); border: 1px solid rgba(14,59,61,.12); border-radius: 999px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: var(--muted); font-size: 14px; }
+[dir="rtl"] .care-strip { padding: 8px 14px 8px 8px; }
+.care-strip p { flex: 1 1 auto; min-width: 0; line-height: 1.35; }
 .care-strip b { color: var(--ink); }
-.cs-badge { background: var(--deep); color: #fff; font-size: 12px; font-weight: 700; padding: 5px 11px; border-radius: 999px; white-space: nowrap; }
+.cs-badge { background: rgba(14,59,61,.85); color: #fff; font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; flex: none; }
 .care-strip .btn { flex: none; }
 
 /* Форма: итог над кнопкой, ошибки у полей */
@@ -796,8 +798,9 @@ label.consent .field-err { flex-basis: 100%; padding-inline-start: 30px; margin-
     .compare thead th { white-space: normal; }
     .compare tbody th[scope="row"] { grid-column: 1 / -1; width: auto; padding-bottom: 2px; border-bottom: 0; font-size: 12.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--brand2); }
     .specs li { font-size: 13.5px; padding: 8px 13px; }
-    .care-strip { flex-direction: column; align-items: flex-start; }
-    .care-strip p { flex: none; }
+    .care-strip { flex-wrap: wrap; border-radius: 18px; padding: 10px 12px; gap: 8px 10px; }
+    .care-strip p { white-space: normal; flex: 1 1 200px; }
+    .care-strip .btn { width: 100%; }
     .hero h1 { font-size: 34px; letter-spacing: -1px; }
 }
 @media (prefers-reduced-motion: reduce) {
