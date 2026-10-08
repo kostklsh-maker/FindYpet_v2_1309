@@ -128,3 +128,4 @@ node worker/test/run.mjs       # 32 автотеста (моки таблицы,
 python3 worker/test/shots_v6.py  # скриншоты лендинга на 3 языках (нужен запущенный test/server.mjs)
 node worker/test/server.mjs    # локальный просмотр: http://localhost:8787 , /t/101 , /t/102 (Lost), /t/103 (сбой базы)
 ```
+- Почта hello@findy-pet.com (Cloudflare Email Routing → findypet0926@gmail.com) работает с 08.10.2026, указана на сайте, в политике, на странице доступности и в боте.
