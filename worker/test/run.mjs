@@ -1,6 +1,7 @@
 // Сквозные тесты API и бота на мок-окружении. Запуск: node test/run.mjs
 import assert from 'node:assert/strict';
 import { state, KV, makeKV, makeEnv, call, tgUpdate, msg, cb, worker } from './mock.mjs';
+import { _test } from '../dist/worker.js';
 
 let passed = 0;
 async function test(name, fn) {
@@ -74,13 +75,12 @@ await test('/api/tag returns extras; address never exposed', async () => {
   assert.ok(!JSON.stringify(d).includes('Herzl'));
 });
 
-await test('database outage → page served from backup cache (stale), not "not activated"', async () => {
+await test('database outage → page opens from the saved copy (KV first), not "not activated"', async () => {
   state.gasDown = true;
   const r = await call(env, `/api/tag?id=${tagId}`);
   const d = await r.json();
   state.gasDown = false;
   assert.equal(d.found, true);
-  assert.equal(d.stale, true);
   assert.equal(d.phone, '+972501234567');
   // метка без кэша → temp_error
   state.gasDown = true;
@@ -105,19 +105,41 @@ await test('SMS fallback when owner has no Telegram', async () => {
 });
 
 const CHAT = '5001';
-await test('link from site → registered message with short link and settings button', async () => {
+await test('link from site → registered message (in the order language: RU) with short link and settings button', async () => {
   await tgUpdate(env, msg(CHAT, '/start ' + token));
   const m = state.tg.filter((c) => c.method === 'sendMessage' && c.payload.chat_id === CHAT).at(-2);
   assert.match(m.payload.text, new RegExp(`/t/${tagId}`));
+  assert.match(m.payload.text, /вы зарегистрированы в FindYpet/);
+  assert.equal(m.payload.reply_markup.inline_keyboard[0][0].text, '👀 Страница питомца');
+  assert.equal(await KV.get(`lang:${CHAT}`), 'ru');
+  assert.equal(lastTg('sendMessage').payload.reply_markup.keyboard[0][0].text, '🐾 Зарегистрировать питомца');
   assert.ok(await KV.get(`chat:${CHAT}`));
 });
 
-await test('scan alert has "Lost mode on" button', async () => {
+await test('scan alert in the owner language (RU) has "Lost mode on" button', async () => {
   await new Promise((r) => setTimeout(r, 1100));
   await call(env, '/api/scan', { method: 'POST', body: { id_tag: tagId } });
   const m = lastTg('sendMessage');
   assert.equal(m.payload.chat_id, CHAT);
+  assert.match(m.payload.text, /Жетон питомца Bella только что отсканировали!/);
+  assert.match(m.payload.text, /\(\d{2} окт\.?, \d{2}:\d{2}\)/);
   assert.equal(m.payload.reply_markup.inline_keyboard[0][0].callback_data, `lost:${tagId}`);
+  assert.equal(m.payload.reply_markup.inline_keyboard[0][0].text, '🚨 Питомец пропал — включить режим поиска');
+});
+
+await test('/lang: buttons for 3 languages; choice is saved and the menu switches language', async () => {
+  await tgUpdate(env, msg(CHAT, '/lang'));
+  const ask = lastTg('sendMessage').payload;
+  assert.match(ask.text, /Выберите язык бота/);
+  assert.deepEqual(ask.reply_markup.inline_keyboard[0].map((b) => b.callback_data), ['lang_he', 'lang_ru', 'lang_en']);
+  await tgUpdate(env, cb(CHAT, 'lang_en'));
+  assert.equal(await KV.get(`lang:${CHAT}`), 'en');
+  const ok = lastTg('sendMessage').payload;
+  assert.match(ok.text, /now speaks English/);
+  assert.equal(ok.reply_markup.keyboard[0][0].text, '🐾 Register a pet');
+  // кнопка меню на любом из языков работает, даже после смены языка
+  await tgUpdate(env, msg(CHAT, '🏷 Мои жетоны'));
+  assert.match(lastTg('sendMessage').payload.text, /Your tags/);
 });
 
 await test('/lost → asks area → Lost mode on, share text, channel post', async () => {
@@ -130,8 +152,16 @@ await test('/lost → asks area → Lost mode on, share text, channel post', asy
   assert.equal(x.lost_area, 'Haifa, Carmel');
   assert.equal(x.channel_msg_id, 555);
   const post = state.tg.find((c) => c.payload.chat_id === '@findypet_lost');
-  assert.match(post.payload.text, /Lost: Bella/);
-  assert.match(lastTg('sendMessage').payload.text, /Forward this to local groups/);
+  assert.match(post.payload.text, /🚨 <b>Bella<\/b>/);
+  assert.match(post.payload.text, /חיית מחמד אבודה/); assert.match(post.payload.text, /Потерялся питомец/); assert.match(post.payload.text, /Lost pet\. Seen it\?/);
+  assert.match(post.payload.text, new RegExp(`/p/${tagId}$`));
+  const own = lastTg('sendMessage').payload.text;
+  assert.match(own, /Forward this to local groups/);
+  // текст для групп — на трёх языках, сначала язык владельца; ссылка — на объявление, не на жетон
+  const codes = [...own.matchAll(/(🇬🇧|🇮🇱|🇷🇺) <code>([^<]+)<\/code>/g)];
+  assert.deepEqual(codes.map((c) => c[1]), ['🇬🇧', '🇮🇱', '🇷🇺']);
+  for (const c of codes) { assert.match(c[2], new RegExp(`/p/${tagId}$`)); assert.match(c[2], /Haifa, Carmel/); }
+  assert.match(own, /No photo yet — send \/photo/);
   const d = await (await call(env, `/api/tag?id=${tagId}`)).json();
   assert.equal(d.lost, true);
   assert.equal(d.lost_area, 'Haifa, Carmel');
@@ -753,6 +783,172 @@ await test('deploy smoke checks look for strings the worker really serves', asyn
       assert.ok(body.includes(needle), `${name}: ${path} does not contain '${needle}'`);
     }
   }
+});
+
+// ---- Стадия 2: бот на иврите и русском, фото, объявление, страница из KV ----
+const he = { first_name: 'Dana', language_code: 'he' };
+await test('Hebrew Telegram → Hebrew welcome, menu and registration; buttons are recognised', async () => {
+  const C = '7101';
+  await tgUpdate(env, msg(C, '/start', { from: he }));
+  const w = lastTg('sendMessage').payload;
+  assert.match(w.text, /ברוכים הבאים ל-FindYpet/);
+  assert.match(w.text, /עברית · Русский · English — ‎\/lang/);
+  assert.equal(w.reply_markup.keyboard[0][0].text, '🐾 רישום חיית מחמד');
+  await tgUpdate(env, msg(C, '🐾 רישום חיית מחמד', { from: he }));
+  assert.equal(state.states[C].step, 'name');
+  assert.match(lastTg('sendMessage').payload.text, /רישום חיית מחמד חדשה/);
+  for (const t of ['Dana', '050-222-3344', 'Shoko', 'Tel Aviv']) await tgUpdate(env, msg(C, t, { from: he }));
+  const q = state.tg.filter((c) => c.payload.chat_id === C && c.payload.reply_markup && c.payload.reply_markup.inline_keyboard).at(-1).payload;
+  assert.match(q.text, /כמה תגים\?/);
+  assert.equal(q.reply_markup.inline_keyboard[2][0].text, '4 תגים (⁦3 + 1⁩ במתנה) — 147 ₪');
+  await tgUpdate(env, cb(C, 'qty_1', he));
+  const conf = lastTg('sendMessage').payload;
+  assert.match(conf.text, /בדקו בבקשה את הפרטים/); assert.match(conf.text, /privacy\/\?lang=he/);
+  assert.equal(conf.reply_markup.inline_keyboard[0][0].text, '✅ אישור');
+  const n = state.tags.length;
+  await tgUpdate(env, cb(C, 'reg_ok', he));
+  assert.equal(state.tags.length, n + 1);
+  const id = state.tags.at(-1).tag_id;
+  assert.equal((await KV.get(`x:${id}`, 'json')).lang, 'he');
+  assert.equal(await KV.get(`lang:${C}`), 'he');
+  const reg = state.tg.filter((c) => c.payload.chat_id === C && c.method === 'sendMessage').at(-2).payload.text;
+  assert.match(reg, /Dana, נרשמתם ל-FindYpet/); assert.match(reg, /הזמנה <b>FY\d+<\/b> · תג אחד · 49 ₪/);
+  // админу — по-английски
+  assert.match(state.tg.filter((c) => c.payload.chat_id === 'admin').at(-1).payload.text, /New order FY\d+/);
+});
+
+await test('owner alerts follow the order language (HE): scan, found + scam warning, location, SMS', async () => {
+  const d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Noa', phone: '050-333-4455', pet_name: 'Luna', address: 'Haifa', consent: true, lang: 'he' } })).json();
+  const row = state.tags.find((t) => t.tag_id === String(d.id_tag));
+  row.telegram_chat_id = '7102';
+  await new Promise((r) => setTimeout(r, 1100));
+  await call(env, '/api/scan', { method: 'POST', body: { id_tag: d.id_tag } });
+  const scan = lastTg('sendMessage').payload;
+  assert.match(scan.text, /התג של Luna נסרק עכשיו!/);
+  assert.equal(scan.reply_markup.inline_keyboard[0][0].text, '🚨 חיית המחמד נעלמה — הפעלת מצב חיפוש');
+  await call(env, '/api/found', { method: 'POST', body: { id_tag: d.id_tag } });
+  const f = lastTg('sendMessage').payload.text;
+  assert.match(f, /מצאו את Luna!/); assert.match(f, /FindYpet אף פעם לא מבקשת כסף/);
+  await call(env, '/api/location', { method: 'POST', body: { id_tag: d.id_tag, lat: 32.8, lon: 35.0, accuracy: 9 } });
+  const loc = state.tg.filter((c) => c.payload.chat_id === '7102' && c.method === 'sendMessage').at(-1).payload.text;
+  assert.match(loc, /דיוק ±9 מ׳/); assert.match(loc, /לפתוח ב-Google Maps/);
+  // без Telegram — SMS на иврите
+  row.telegram_chat_id = '';
+  const smsEnv = makeEnv({ TWILIO_ACCOUNT_SID: 'AC1', TWILIO_AUTH_TOKEN: 'x', TWILIO_FROM: 'FindYpet' });
+  await call(smsEnv, '/api/location', { method: 'POST', body: { id_tag: d.id_tag, lat: 32.8, lon: 35.0 } });
+  assert.match(state.sms.at(-1).Body, /^FindYpet: מצאו את Luna!/);
+});
+
+await test('order status messages reach the customer in the order language (RU); admin stays English', async () => {
+  const d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Ira', phone: '050-444-5566', pet_name: 'Barsik', address: 'Ashdod', consent: true, lang: 'ru', tags: 2 } })).json();
+  await tgUpdate(env, msg('7103', '/start ' + d.telegram_link.split('start=')[1]));
+  await tgUpdate(env, cb('admin', `ord:${d.order_id}:paid`));
+  const toCustomer = state.tg.filter((c) => c.payload.chat_id === '7103').at(-1).payload.text;
+  assert.match(toCustomer, /Оплата получена — спасибо!/); assert.match(toCustomer, /изготавливаем жетоны для: Barsik/);
+  assert.match(lastTg('sendMessage').payload.text, /Customer notified/);
+  await tgUpdate(env, cb('admin', `ord:${d.order_id}:shipped`));
+  assert.match(state.tg.filter((c) => c.payload.chat_id === '7103').at(-1).payload.text, /Ваши жетоны FindYpet уже в пути!/);
+});
+
+await test('/setup: commands and descriptions in English (default), Hebrew and Russian', async () => {
+  const before = state.tg.length;
+  const d = await (await call(env, '/setup?key=sec')).json();
+  assert.equal(d.setMyCommands.ok, true); assert.equal(d.setMyCommands_he.ok, true); assert.equal(d.setMyCommands_ru.ok, true);
+  const cmds = state.tg.slice(before).filter((c) => c.method === 'setMyCommands');
+  assert.deepEqual(cmds.map((c) => c.payload.language_code), [undefined, 'he', 'ru']);
+  assert.ok(cmds.every((c) => c.payload.commands.some((x) => x.command === 'lang') && c.payload.commands.some((x) => x.command === 'photo')));
+  assert.equal(cmds[2].payload.commands[0].description, 'Зарегистрировать питомца и получить жетон');
+  const desc = state.tg.slice(before).filter((c) => c.method === 'setMyShortDescription');
+  assert.ok(desc.every((c) => c.payload.short_description.length <= 120));
+});
+
+await test('/photo: owner sends a photo → stored, shown on the tag page, served as JPEG; can be removed', async () => {
+  const C = '7104';
+  const d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Gil', phone: '050-555-6677', pet_name: 'Pita', address: 'Haifa', consent: true, lang: 'en' } })).json();
+  await tgUpdate(env, msg(C, '/start ' + d.telegram_link.split('start=')[1]));
+  await tgUpdate(env, msg(C, '/photo'));
+  assert.equal(state.states[C].step, 'photo');
+  assert.match(lastTg('sendMessage').payload.text, /Send one photo of <b>Pita<\/b>/);
+  await tgUpdate(env, msg(C, 'hello'));
+  assert.match(lastTg('sendMessage').payload.text, /send the photo as a picture/);
+  await tgUpdate(env, msg(C, '', { photo: [
+    { file_id: 'small', width: 90, height: 90, file_size: 2000 },
+    { file_id: 'big', width: 1280, height: 960, file_size: 120000 },
+    { file_id: 'huge', width: 2560, height: 1920, file_size: 900000 } ] }));
+  assert.equal(state.tg.filter((c) => c.method === 'getFile').at(-1).payload.file_id, 'big');
+  const x = await KV.get(`x:${d.id_tag}`, 'json');
+  assert.ok(x.photo_v);
+  assert.match(state.tg.filter((c) => c.payload.chat_id === C && c.method === 'sendMessage').at(-2).payload.text, /Photo saved/);
+  const page = await (await call(env, `/api/tag?id=${d.id_tag}`)).json();
+  assert.equal(page.photo, `/img/${d.id_tag}?v=${x.photo_v}`);
+  const img = await call(env, page.photo);
+  assert.equal(img.status, 200); assert.equal(img.headers.get('Content-Type'), 'image/jpeg');
+  assert.match(img.headers.get('Cache-Control'), /immutable/);
+  assert.equal(new Uint8Array(await img.arrayBuffer())[0], 0xff);
+  const tagHtml = await (await call(env, `/t/${d.id_tag}`)).text();
+  assert.match(tagHtml, /id="petPhoto"/);
+  await tgUpdate(env, cb(C, `clr:${d.id_tag}:photo`));
+  assert.match(lastTg('sendMessage').payload.text, /Photo removed/);
+  assert.equal((await call(env, `/img/${d.id_tag}`)).status, 404);
+  assert.equal((await (await call(env, `/api/tag?id=${d.id_tag}`)).json()).photo, '');
+});
+
+await test('poster /p/<id>: three languages, call button, QR, noindex; opening it does not alert the owner; home → no phone', async () => {
+  const C = '7105';
+  const d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Rina', phone: '050-666-7788', pet_name: 'Mitzi', address: 'Haifa', consent: true, lang: 'he' } })).json();
+  await tgUpdate(env, msg(C, '/start ' + d.telegram_link.split('start=')[1]));
+  await tgUpdate(env, msg(C, '/photo'));
+  await tgUpdate(env, msg(C, '', { photo: [{ file_id: 'p1', width: 800, height: 800 }] }));
+  await tgUpdate(env, msg(C, '/lost'));
+  await tgUpdate(env, msg(C, 'Hadar <b>'));
+  const own = lastTg('sendMessage').payload.text;
+  assert.match(own, /מצב חיפוש הופעל: Mitzi/);
+  assert.match(own, /^🇮🇱 <code>/m); assert.doesNotMatch(own, /עדיין אין תמונה/);
+  const before = state.tg.length;
+  const r = await call(env, `/p/${d.id_tag}`);
+  assert.equal(r.status, 200); assert.equal(r.headers.get('X-Robots-Tag'), 'noindex, nofollow');
+  const html = await r.text();
+  assert.equal(state.tg.length, before, 'opening the poster must not message the owner');
+  assert.match(html, /חיית מחמד אבודה/); assert.match(html, /Потерялся питомец/); assert.match(html, /Lost pet/);
+  assert.match(html, /href="tel:\+972506667788"/); assert.match(html, /050-666-7788/);
+  assert.match(html, /Hadar &lt;b&gt;/); assert.doesNotMatch(html, /Hadar <b>/);
+  assert.match(html, /<svg[^>]+aria-label="QR"/);
+  assert.match(html, new RegExp(`og:image" content="http://localhost:8787/img/${d.id_tag}\\?v=`));
+  assert.match(html, /wa\.me\/972506667788/);
+  await tgUpdate(env, msg(C, '/found'));
+  const home = await (await call(env, `/p/${d.id_tag}`)).text();
+  assert.match(home, /כבר בבית!/); assert.doesNotMatch(home, /tel:/); assert.doesNotMatch(home, /050-666-7788/);
+  assert.equal((await call(env, '/p/99999')).status, 404);
+});
+
+await test('QR code on the poster: correct size and finder patterns', async () => {
+  const m = _test.qrMatrix('https://findy-pet.com/p/101');
+  assert.equal(m.length, 29); // версия 3
+  const finder = (x, y) => [0, 1, 2, 3, 4, 5, 6].every((i) => m[y][x + i] && m[y + 6][x + i] && m[y + i][x] && m[y + i][x + 6]);
+  assert.ok(finder(0, 0) && finder(22, 0) && finder(0, 22));
+});
+
+await test('tag page answers from the saved copy at once; a disabled tag disappears after the background refresh', async () => {
+  const d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Ben', phone: '050-777-8899', pet_name: 'Rocky', address: 'Haifa', consent: true } })).json();
+  const row = state.tags.find((t) => t.tag_id === String(d.id_tag));
+  row.phone = '050-777-0000';
+  const first = await (await call(env, `/api/tag?id=${d.id_tag}`)).json();
+  assert.equal(first.phone, '+972507778899'); // копия — сразу
+  assert.equal((await (await call(env, `/api/tag?id=${d.id_tag}`)).json()).phone, '+972507770000'); // обновилась в фоне
+  row.status = 'disabled';
+  await call(env, `/api/tag?id=${d.id_tag}`);
+  assert.equal((await (await call(env, `/api/tag?id=${d.id_tag}`)).json()).found, false);
+});
+
+await test('bot dictionary: every language has every text', async () => {
+  const keys = (l) => Object.keys(_test.BOT[l]).sort();
+  assert.deepEqual(keys('he'), keys('en')); assert.deepEqual(keys('ru'), keys('en'));
+  for (const l of ['en', 'he', 'ru']) assert.ok(_test.tr(l, 'shortDesc').length <= 120 && _test.tr(l, 'desc').length <= 512);
 });
 
 console.log(`\n${passed} tests passed`);

@@ -5,10 +5,13 @@ export const state = { gasDown: false, tg: [], sms: [], tags: [], states: {}, ne
 
 export function makeKV() {
   const kvStore = new Map();
+  const meta = new Map();
+  const bin = (v) => v instanceof ArrayBuffer || ArrayBuffer.isView(v);
   return {
     async get(k, type) { const v = kvStore.get(k); if (v === undefined) return null; return type === 'json' ? JSON.parse(v) : v; },
-    async put(k, v) { kvStore.set(k, String(v)); },
-    async delete(k) { kvStore.delete(k); },
+    async getWithMetadata(k, type) { const v = await this.get(k, type); return { value: v, metadata: v === null ? null : (meta.get(k) || null) }; },
+    async put(k, v, opts = {}) { kvStore.set(k, bin(v) ? v : String(v)); if (opts.metadata) meta.set(k, opts.metadata); else meta.delete(k); },
+    async delete(k) { kvStore.delete(k); meta.delete(k); },
     async list({ prefix = '' } = {}) { return { keys: [...kvStore.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })), list_complete: true }; },
     _dump() { return Object.fromEntries(kvStore); },
   };
@@ -44,11 +47,18 @@ globalThis.fetch = async (input, init = {}) => {
     if (state.gasDown) throw new Error('simulated outage');
     return new Response(JSON.stringify(gas(JSON.parse(init.body))));
   }
+  if (url.startsWith('https://api.telegram.org/file/bot')) {
+    // скачивание фото, присланного в бот: маленький «JPEG» (FF D8 FF …)
+    state.tg.push({ method: 'download', payload: { url } });
+    const b = new Uint8Array(4000); b.set([0xff, 0xd8, 0xff, 0xe0]);
+    return new Response(b, { headers: { 'Content-Type': 'image/jpeg' } });
+  }
   if (url.startsWith('https://api.telegram.org')) {
     const method = url.split('/').pop();
     const payload = JSON.parse(init.body || '{}');
     state.tg.push({ method, payload });
     const blocked = String(payload.chat_id) === 'blocked';
+    if (method === 'getFile') return new Response(JSON.stringify({ ok: true, result: { file_id: payload.file_id, file_path: 'photos/file_7.jpg' } }));
     return new Response(JSON.stringify(blocked ? { ok: false, description: 'bot was blocked' } : { ok: true, result: { message_id: 555 } }));
   }
   if (url.startsWith('https://api.twilio.com')) {
@@ -77,5 +87,5 @@ export async function tgUpdate(env, update) {
   return call(env, '/telegram', { method: 'POST', body: update, headers: { 'X-Telegram-Bot-Api-Secret-Token': 'sec' } });
 }
 export const msg = (chat, text, extra = {}) => ({ message: { chat: { id: chat, type: 'private' }, from: { first_name: 'Kostya' }, text, ...extra } });
-export const cb = (chat, data) => ({ callback_query: { id: 'cq1', data, message: { chat: { id: chat }, message_id: 7 } } });
+export const cb = (chat, data, from) => ({ callback_query: { id: 'cq1', data, ...(from ? { from } : {}), message: { chat: { id: chat }, message_id: 7 } } });
 export { worker };
