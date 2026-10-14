@@ -313,6 +313,19 @@ await test('setup reports KV status', async () => {
   assert.equal(d.setMyCommands.ok, true);
 });
 
+await test('setup sets the bot display name "FindYpet" once; the test site gets "FindYpet TEST"', async () => {
+  state.botName = 'Old name';
+  let n = state.tg.length;
+  await setupCall(env);
+  assert.deepEqual(state.tg.slice(n).filter((c) => c.method === 'setMyName').map((c) => c.payload.name), ['FindYpet']);
+  n = state.tg.length;
+  assert.equal((await (await setupCall(env)).json()).setMyName, 'FindYpet ✅');
+  assert.equal(state.tg.slice(n).filter((c) => c.method === 'setMyName').length, 0);
+  await setupCall({ ...env, STAGE: 'test' });
+  assert.equal(state.botName, 'FindYpet TEST');
+  state.botName = undefined;
+});
+
 await test('site: 3 + 1 with 1 pet → one tag ×4 (3 spares), 147 ₪', async () => {
   const n = state.tags.length;
   const d = await (await call(env, '/api/register', { method: 'POST', body: {

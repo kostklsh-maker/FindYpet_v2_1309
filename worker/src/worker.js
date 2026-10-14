@@ -2386,6 +2386,11 @@ async function setup(env, url) {
     allowed_updates: ['message', 'callback_query'],
     drop_pending_updates: true,
   });
+  // Отображаемое имя бота (у Telegram строгий лимит на смену имени — меняем, только если оно другое)
+  const botName = env.STAGE === 'test' ? 'FindYpet TEST' : 'FindYpet';
+  const curName = await tg(env, 'getMyName', {});
+  results.setMyName = curName && curName.ok && curName.result && curName.result.name === botName
+    ? `${botName} ✅` : await tg(env, 'setMyName', { name: botName });
   // Меню команд и описание бота: английский — по умолчанию, иврит и русский — для Telegram на этих языках
   for (const l of LANGS) {
     const lc = l === 'en' ? {} : { language_code: l };
