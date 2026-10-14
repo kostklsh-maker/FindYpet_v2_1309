@@ -879,8 +879,8 @@ function csp(nonce) {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' https://static.cloudflareinsights.com https://challenges.cloudflare.com`,
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com",
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self'",
     "img-src 'self' data: blob:",
     "connect-src 'self' https://cloudflareinsights.com",
     'frame-src https://challenges.cloudflare.com',
@@ -3043,7 +3043,7 @@ function serveEmbedded(url, env) {
   if (!f) return new Response('Not found', { status: 404 });
   const body = f.b64 ? Uint8Array.from(atob(f.b64), (c) => c.charCodeAt(0)) : f.text;
   return new Response(body, {
-    headers: { 'Content-Type': f.type, 'Cache-Control': p.endsWith('.html') ? 'no-cache' : 'public, max-age=300' },
+    headers: { 'Content-Type': f.type, 'Cache-Control': p.endsWith('.html') ? 'no-cache' : p.startsWith('/assets/fonts/') ? 'public, max-age=2592000' : 'public, max-age=300' },
   });
 }
 

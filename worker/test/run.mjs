@@ -1266,4 +1266,22 @@ await test('English copy: no calques, one name for the mode ("Lost mode") on the
   assert.ok(site.includes('Lost mode in one command'));
 });
 
+await test('fonts are self-hosted: no Google Fonts on the pages or in CSP, woff2 served with a long cache', async () => {
+  for (const path of ['/', '/he/', '/ru/', '/t/101', '/privacy/']) {
+    const r = await call(env, path);
+    const html = await r.text();
+    assert.doesNotMatch(html, /fonts\.(googleapis|gstatic)\.com/, path);
+    const pol = r.headers.get('Content-Security-Policy') || '';
+    assert.doesNotMatch(pol, /fonts\.(googleapis|gstatic)/, path);
+  }
+  assert.match(await (await call(env, '/he/')).text(), /href="\/css\/fonts\.css"/);
+  const css = await (await call(env, '/css/fonts.css')).text();
+  for (const f of css.match(/\/assets\/fonts\/[\w-]+\.woff2/g)) {
+    const r = await call(env, f);
+    assert.equal(r.status, 200, f); assert.equal(r.headers.get('Content-Type'), 'font/woff2', f);
+    assert.match(r.headers.get('Cache-Control'), /max-age=2592000/, f);
+    assert.equal(new TextDecoder().decode((await r.arrayBuffer()).slice(0, 4)), 'wOF2', f);
+  }
+});
+
 console.log(`\n${passed} tests passed`);

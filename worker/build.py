@@ -9,10 +9,11 @@ here = pathlib.Path(__file__).resolve().parent
 repo = here.parent
 
 # Что из корня репозитория попадает на сайт внутри Worker'а
-SITE = ['index.html', 'css', 'js', 'tag', 'privacy', 'accessibility', 'assets/logo.png', 'assets/mark.png', 'assets/wordmark.png', 'assets/og.jpg']
+SITE = ['index.html', 'css', 'js', 'tag', 'privacy', 'accessibility', 'assets/logo.png', 'assets/mark.png', 'assets/wordmark.png', 'assets/og.jpg', 'assets/fonts']
 TYPES = {'.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
          '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml',
-         '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.ico': 'image/x-icon'}
+         '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.ico': 'image/x-icon',
+         '.woff2': 'font/woff2'}
 
 src = (here / 'src/worker.js').read_text()
 assert '/*__EMBEDDED__*/null' in src, 'в src/worker.js нет метки /*__EMBEDDED__*/null'
@@ -36,7 +37,7 @@ E = {}
 for f in files:
     key = '/' + f.relative_to(repo).as_posix()
     t = TYPES.get(f.suffix.lower(), 'application/octet-stream')
-    if t.startswith('image/') and f.suffix != '.svg':
+    if (t.startswith('image/') and f.suffix != '.svg') or t.startswith('font/'):
         E[key] = {'type': t, 'b64': base64.b64encode(f.read_bytes()).decode()}
     else:
         E[key] = {'type': t, 'text': f.read_text().replace('\r\n', '\n')}
