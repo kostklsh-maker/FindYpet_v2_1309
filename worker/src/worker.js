@@ -879,8 +879,8 @@ function csp(nonce) {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' https://static.cloudflareinsights.com https://challenges.cloudflare.com`,
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com",
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self'",
     "img-src 'self' data: blob:",
     "connect-src 'self' https://cloudflareinsights.com",
     'frame-src https://challenges.cloudflare.com',
@@ -2386,6 +2386,11 @@ async function setup(env, url) {
     allowed_updates: ['message', 'callback_query'],
     drop_pending_updates: true,
   });
+  // Отображаемое имя бота (у Telegram строгий лимит на смену имени — меняем, только если оно другое)
+  const botName = env.STAGE === 'test' ? 'FindYpet TEST' : 'FindYpet';
+  const curName = await tg(env, 'getMyName', {});
+  results.setMyName = curName && curName.ok && curName.result && curName.result.name === botName
+    ? `${botName} ✅` : await tg(env, 'setMyName', { name: botName });
   // Меню команд и описание бота: английский — по умолчанию, иврит и русский — для Telegram на этих языках
   for (const l of LANGS) {
     const lc = l === 'en' ? {} : { language_code: l };
@@ -3043,7 +3048,7 @@ function serveEmbedded(url, env) {
   if (!f) return new Response('Not found', { status: 404 });
   const body = f.b64 ? Uint8Array.from(atob(f.b64), (c) => c.charCodeAt(0)) : f.text;
   return new Response(body, {
-    headers: { 'Content-Type': f.type, 'Cache-Control': p.endsWith('.html') ? 'no-cache' : 'public, max-age=300' },
+    headers: { 'Content-Type': f.type, 'Cache-Control': p.endsWith('.html') ? 'no-cache' : p.startsWith('/assets/fonts/') ? 'public, max-age=2592000' : 'public, max-age=300' },
   });
 }
 
