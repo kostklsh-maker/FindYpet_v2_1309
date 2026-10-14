@@ -68,6 +68,8 @@ globalThis.fetch = async (input, init = {}) => {
     state.tg.push({ method, payload });
     const blocked = String(payload.chat_id) === 'blocked';
     if (method === 'getMe') return new Response(JSON.stringify({ ok: true, result: { id: 1, is_bot: true, username: state.botUsername || 'FindYpetTestBot' } }));
+    if (method === 'getMyName') return new Response(JSON.stringify({ ok: true, result: { name: state.botName || 'Old name' } }));
+    if (method === 'setMyName') state.botName = payload.name;
     if (method === 'getFile') return new Response(JSON.stringify({ ok: true, result: { file_id: payload.file_id, file_path: 'photos/file_7.jpg' } }));
     return new Response(JSON.stringify(blocked ? { ok: false, description: 'bot was blocked' } : { ok: true, result: { message_id: 555 } }));
   }

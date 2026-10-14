@@ -2,7 +2,10 @@
 #   ветка test → тестовый сайт  test.findy-pet.com  (Worker findypet-app-staging)
 #   ветка main → рабочий сайт   findy-pet.com       (Worker findypet-app)
 # Порядок работы: изменения сначала в test → проверка на test.findy-pet.com → перенос в main.
-# Нужны секреты репозитория: CLOUDFLARE_API_TOKEN (шаблон «Edit Cloudflare Workers») и CLOUDFLARE_ACCOUNT_ID.
+# Нужны секреты: CLOUDFLARE_API_TOKEN и CLOUDFLARE_ACCOUNT_ID. Задание идёт в окружении GitHub
+# «production» (ветка main) или «staging» (ветка test): секрет окружения важнее секрета репозитория,
+# поэтому у каждого сайта может быть свой токен. В окружении «production» включено ручное
+# подтверждение (Required reviewers): рабочий сайт выкладывается только после кнопки Approve.
 name: Deploy worker
 
 on:
@@ -19,6 +22,7 @@ on:
       - 'assets/mark.png'
       - 'assets/wordmark.png'
       - 'assets/og.jpg'
+      - 'assets/fonts/**'
       - 'worker/**'
       - '.github/workflows/deploy-worker.yml'
   workflow_dispatch:
@@ -36,6 +40,9 @@ jobs:
     # выкладываются только две ветки: main (рабочий сайт) и test (тестовый)
     if: github.ref_name == 'main' || github.ref_name == 'test'
     name: ${{ github.ref_name == 'main' && 'findy-pet.com (production)' || 'test.findy-pet.com (staging)' }}
+    environment:
+      name: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+      url: ${{ github.ref_name == 'main' && 'https://findy-pet.com' || 'https://test.findy-pet.com' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
