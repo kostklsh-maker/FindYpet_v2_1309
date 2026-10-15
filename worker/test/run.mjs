@@ -1308,7 +1308,7 @@ await test('weekly summary: on Sunday the admin gets orders, 3 + 1 share, links,
   const run = async (ms, e = env) => {
     // как в рабочем cron: отдельный воскресный запуск
     const n = state.tg.length; const pending = [];
-    await worker.scheduled({ cron: '30 6 * * 0', scheduledTime: ms }, e, { waitUntil: (p) => pending.push(p) });
+    await worker.scheduled({ cron: '30 6 * * SUN', scheduledTime: ms }, e, { waitUntil: (p) => pending.push(p) });
     await Promise.all(pending);
     return state.tg.slice(n).filter((c) => c.method === 'sendMessage' && /weekly summary/.test(c.payload.text || ''));
   };
