@@ -1060,8 +1060,9 @@ async function weeklyText(env, now) {
       if (reads >= 600) break;
       reads++;
       const o = await env.FYP_KV.get(k.name, 'json').catch(() => null);
-      if (!o || !o.created_at) continue;
-      const w = wk.get(ilDay(env, Date.parse(o.created_at)));
+      const at = o && Date.parse(o.created_at);
+      if (!at) continue; // нет даты или она не читается
+      const w = wk.get(ilDay(env, at));
       if (w === undefined) continue;
       const s = ord[w];
       const tags = Number(o.tags_total) || (o.items || []).reduce((n, i) => n + (i.copies || 1), 0);
