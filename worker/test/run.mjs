@@ -301,7 +301,7 @@ await test('reminders: sent once after 180 days', async () => {
   await KV.put('chat:8008', JSON.stringify({ since: '2025-01-01T00:00:00Z', last_reminder: '2025-01-01T00:00:00Z' }));
   const n = state.tg.length;
   const pending = [];
-  await worker.scheduled({}, env, { waitUntil: (p) => pending.push(p) });
+  await worker.scheduled({ scheduledTime: Date.parse('2030-06-03T07:00:00Z') }, env, { waitUntil: (p) => pending.push(p) }); // понедельник: без недельной сводки
   await Promise.all(pending);
   const sent = state.tg.slice(n).filter((c) => c.method === 'sendMessage');
   assert.deepEqual(sent.map((c) => c.payload.chat_id), ['8008']);
@@ -1177,7 +1177,7 @@ await test('/setup: form only, key never in the address, wrong key refused, sepa
 await test('daily backup: KV data goes to the admin as a JSON file', async () => {
   const n = state.tg.length;
   const pending = [];
-  await worker.scheduled({}, env, { waitUntil: (p) => pending.push(p) });
+  await worker.scheduled({ scheduledTime: Date.parse('2030-06-03T07:00:00Z') }, env, { waitUntil: (p) => pending.push(p) }); // понедельник: без недельной сводки
   await Promise.all(pending);
   const doc = state.tg.slice(n).find((c) => c.method === 'sendDocument');
   assert.ok(doc, 'sendDocument called');
@@ -1295,6 +1295,57 @@ await test('fonts are self-hosted: no Google Fonts on the pages or in CSP, woff2
     assert.match(r.headers.get('Cache-Control'), /max-age=2592000/, f);
     assert.equal(new TextDecoder().decode((await r.arrayBuffer()).slice(0, 4)), 'wOF2', f);
   }
+});
+
+await test('weekly summary: on Sunday the admin gets orders, 3 + 1 share, links, scans, Care and failures vs last week', async () => {
+  const SUN = Date.parse('2030-06-02T07:00:00Z'); // воскресенье, 10:00 по Израилю
+  await KV.put('o:FYW1', JSON.stringify({ order_id: 'FYW1', created_at: '2030-05-29T10:00:00Z', source: 'site', tags_total: 4, price: 147, care_interest: true, items: [] }));
+  await KV.put('o:FYW2', JSON.stringify({ order_id: 'FYW2', created_at: '2030-06-01T18:00:00Z', source: 'telegram', tags_total: 1, price: 49, items: [] }));
+  await KV.put('o:FYW3', JSON.stringify({ order_id: 'FYW3', created_at: '2030-05-22T10:00:00Z', source: 'site', tags_total: 2, price: 98, items: [] }));
+  await KV.put('o:FYW4', JSON.stringify({ order_id: 'FYW4', created_at: '2030-06-02T06:00:00Z', source: 'site', tags_total: 1, price: 49, items: [] })); // сегодня — в следующую неделю
+  await KV.put('ev:2030-05-30', JSON.stringify({ scan: 3, link: 1, care: 1, err_db: 2, plan: 5, form: 3, submit: 2 }));
+  await KV.put('ev:2030-05-24', JSON.stringify({ scan: 1, err_tg: 1 }));
+  const run = async (ms, e = env) => {
+    // как в рабочем cron: отдельный воскресный запуск
+    const n = state.tg.length; const pending = [];
+    await worker.scheduled({ cron: '30 6 * * 0', scheduledTime: ms }, e, { waitUntil: (p) => pending.push(p) });
+    await Promise.all(pending);
+    return state.tg.slice(n).filter((c) => c.method === 'sendMessage' && /weekly summary/.test(c.payload.text || ''));
+  };
+  const sent = await run(SUN);
+  assert.equal(sent.length, 1); assert.equal(sent[0].payload.chat_id, 'admin');
+  const t = sent[0].payload.text;
+  assert.match(t, /26\.05–01\.06/);
+  assert.match(t, /Orders: <b>2<\/b> \(site 1 · bot 1\) <i>\(prev 1\)<\/i>/);
+  assert.match(t, /1 tag ×1 · 2 tags ×0 · 3 \+ 1 ×1/);
+  assert.match(t, /3 \+ 1 share: 50% <i>\(prev 0%\)<\/i>/);
+  assert.match(t, /at list price: 196 ₪ <i>\(prev 98 ₪\)<\/i>/);
+  assert.match(t, /Telegram linked after a site order: 1 <i>\(prev 0\)/);
+  assert.match(t, /Tag page scans: 3 <i>\(prev 1\)/);
+  assert.match(t, /Care waitlist: \+2 \(bot 1 · order form 1\)/);
+  assert.match(t, /Failures: 2 \(database 2\) <i>\(prev 1\)/);
+  assert.match(t, /chose a plan 5 → started the form 3 → sent an order 2/);
+  assert.equal((await run(SUN + 3600000)).length, 0, 'only once per Sunday');
+  assert.equal((await run(Date.parse('2030-06-03T07:00:00Z'))).length, 0, 'not on Monday');
+  assert.equal((await run(Date.parse('2030-06-09T07:00:00Z'), testEnv())).length, 0, 'not on the test site');
+  for (const k of ['o:FYW1', 'o:FYW2', 'o:FYW3', 'o:FYW4']) await KV.delete(k);
+});
+
+await test('weekly summary: /week on demand for the admin only; failures and scans are counted', async () => {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+  const ev0 = (await KV.get(`ev:${today}`, 'json')) || {};
+  state.gasDown = true;
+  await call(env, '/api/tag?id=99998');
+  state.gasDown = false;
+  await call(env, '/api/scan', { method: 'POST', body: { id_tag: tagId } });
+  const ev1 = await KV.get(`ev:${today}`, 'json');
+  assert.equal((ev1.err_db || 0) - (ev0.err_db || 0), 1);
+  assert.equal((ev1.scan || 0) - (ev0.scan || 0), 1);
+  await tgUpdate(env, msg('admin', '/week'));
+  assert.match(lastTg('sendMessage').payload.text, /FindYpet weekly summary/);
+  const before = state.tg.length;
+  await tgUpdate(env, msg('stranger', '/week'));
+  assert.ok(!state.tg.slice(before).some((c) => /weekly summary/.test(c.payload.text || '')));
 });
 
 console.log(`\n${passed} tests passed`);

@@ -768,11 +768,20 @@ export default {
     return markTestSite(await secure(await route(request, env, ctx)));
   },
 
-  // Cron Trigger (раз в день): напоминание проверить контакты + резервная копия данных админу
+  // Cron Trigger (раз в день): напоминание проверить контакты + резервная копия данных админу;
+  // по воскресеньям — ещё недельная сводка админу (B10)
+  // (у сводки свой cron WEEKLY_CRON — отдельный запуск со своим лимитом операций KV)
   async scheduled(event, env, ctx) {
     if (isTestSite(env)) return; // тестовый сайт напоминаний и копий не рассылает
-    ctx.waitUntil(sendReminders(env).catch((e) => console.error('reminders error', e)));
-    ctx.waitUntil(dailyBackup(env).catch((e) => console.error('backup error', e)));
+    const cron = event && event.cron;
+    if (cron !== WEEKLY_CRON) {
+      ctx.waitUntil(sendReminders(env).catch((e) => console.error('reminders error', e)));
+      ctx.waitUntil(dailyBackup(env).catch((e) => console.error('backup error', e)));
+    }
+    if (cron === WEEKLY_CRON || !cron) {
+      const now = (event && event.scheduledTime) || Date.now();
+      ctx.waitUntil(weeklyDigest(env, now).catch((e) => console.error('weekly digest error', e)));
+    }
   },
 };
 
@@ -861,6 +870,7 @@ async function route(request, env, ctx) {
     return path.startsWith('/tag') ? noindex(res) : res;
   } catch (err) {
     console.error(err);
+    await bumpFail(env, 'server').catch(() => {});
     return json({ success: false, error: 'server_error' }, env, 500);
   }
 }
@@ -973,7 +983,7 @@ async function bumpEvent(env, e, lang) {
   try {
     const cur = (await env.FYP_KV.get(key, 'json')) || {};
     cur[e] = (cur[e] || 0) + 1;
-    cur[`${e}_${lang}`] = (cur[`${e}_${lang}`] || 0) + 1;
+    if (lang) cur[`${e}_${lang}`] = (cur[`${e}_${lang}`] || 0) + 1;
     await env.FYP_KV.put(key, JSON.stringify(cur), { expirationTtl: 400 * 86400 });
   } catch (err) { console.error('event', err); }
 }
@@ -1003,6 +1013,86 @@ async function funnelStats(env) {
   };
   return '📊 Order funnel on the site\n\n' + line(await sum(7), 'Last 7 days') + '\n\n' + line(await sum(30), 'Last 30 days') +
     '\n\nVisits: Cloudflare dashboard → Web Analytics.';
+}
+
+/** Сбои для недельной сводки: db (таблица), tg (Telegram), sms, backup, server. Только на рабочем сайте. */
+async function bumpFail(env, kind) {
+  if (kvOn(env) && !isTestSite(env)) await bumpEvent(env, `err_${kind}`);
+}
+
+// ---------------------------------------------------------------
+// Недельная сводка админу (B10): каждое воскресенье утром (cron) и по команде /week.
+// Неделя — 7 полных дней до сегодняшнего (по времени Израиля), сравнение с 7 днями до неё.
+// Заказы берутся из KV (o:FY…), остальное — из дневных счётчиков ev:<день>.
+// ---------------------------------------------------------------
+const WEEKLY_CRON = '30 6 * * 0'; // как в worker/wrangler.toml
+const FAIL_KINDS = { db: 'database', tg: 'Telegram', sms: 'SMS', backup: 'backup', server: 'server' };
+
+function ilDay(env, ms) {
+  return new Date(ms).toLocaleDateString('en-CA', { timeZone: env.TIMEZONE || 'Asia/Jerusalem' });
+}
+
+async function weeklyDigest(env, now) {
+  if (!kvOn(env) || !env.ADMIN_CHAT_ID) return;
+  const wd = new Date(now).toLocaleDateString('en-US', { weekday: 'short', timeZone: env.TIMEZONE || 'Asia/Jerusalem' });
+  if (wd !== 'Sun') return;
+  const mark = `wk:${ilDay(env, now)}`;
+  if (await env.FYP_KV.get(mark)) return; // уже отправлена сегодня
+  await env.FYP_KV.put(mark, '1', { expirationTtl: 8 * 86400 });
+  await send(env, env.ADMIN_CHAT_ID, await weeklyText(env, now));
+}
+
+async function weeklyText(env, now) {
+  const dayMs = 86400000;
+  const daysOf = (from) => Array.from({ length: 7 }, (_, i) => ilDay(env, now - (from + i) * dayMs));
+  const cur = daysOf(1), prev = daysOf(8);
+  const evs = await Promise.all([...cur, ...prev].map((d) => env.FYP_KV.get(`ev:${d}`, 'json').catch(() => null)));
+  const add = (list) => list.reduce((t, v) => { for (const k of Object.keys(v || {})) t[k] = (t[k] || 0) + v[k]; return t; }, {});
+  const ev = [add(evs.slice(0, 7)), add(evs.slice(7))];
+
+  // Заказы за две недели (лимит чтений KV на запуск — как у резервной копии)
+  const wk = new Map([...cur.map((d) => [d, 0]), ...prev.map((d) => [d, 1])]);
+  const ord = [0, 1].map(() => ({ n: 0, site: 0, bot: 0, q1: 0, q2: 0, q4: 0, tags: 0, sum: 0, care: 0 }));
+  let reads = 0, cursor;
+  do {
+    const page = await env.FYP_KV.list({ prefix: 'o:', cursor });
+    for (const k of page.keys) {
+      if (reads >= 600) break;
+      reads++;
+      const o = await env.FYP_KV.get(k.name, 'json').catch(() => null);
+      const at = o && Date.parse(o.created_at);
+      if (!at) continue; // нет даты или она не читается
+      const w = wk.get(ilDay(env, at));
+      if (w === undefined) continue;
+      const s = ord[w];
+      const tags = Number(o.tags_total) || (o.items || []).reduce((n, i) => n + (i.copies || 1), 0);
+      s.n++; s[o.source === 'telegram' ? 'bot' : 'site']++;
+      s[tags >= PRICING.bundle ? 'q4' : tags === 2 ? 'q2' : 'q1']++;
+      s.tags += tags; s.sum += Number(o.price) || 0;
+      if (o.care_interest) s.care++;
+    }
+    cursor = page.list_complete || reads >= 600 ? undefined : page.cursor;
+  } while (cursor);
+
+  const was = (b) => ` <i>(prev ${b})</i>`;
+  const pct = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : '—');
+  const [o, op] = ord;
+  const n = (i, k) => ev[i][k] || 0;
+  const fails = (i) => Object.keys(FAIL_KINDS).reduce((t, k) => t + n(i, `err_${k}`), 0);
+  const failLine = Object.entries(FAIL_KINDS).filter(([k]) => n(0, `err_${k}`)).map(([k, name]) => `${name} ${n(0, `err_${k}`)}`).join(' · ');
+  const fmt = (d) => d.slice(8, 10) + '.' + d.slice(5, 7);
+  return `📈 <b>FindYpet weekly summary</b> · ${fmt(cur[6])}–${fmt(cur[0])}\n\n` +
+    `🧾 Orders: <b>${o.n}</b> (site ${o.site} · bot ${o.bot})${was(op.n)}\n` +
+    `   1 tag ×${o.q1} · 2 tags ×${o.q2} · 3 + 1 ×${o.q4}\n` +
+    `   3 + 1 share: ${pct(o.q4, o.n)}${was(pct(op.q4, op.n))}\n` +
+    `   Tags: ${o.tags} · at list price: ${o.sum} ${PRICING.currency}${was(`${op.sum} ${PRICING.currency}`)}\n` +
+    `📲 Telegram linked after a site order: ${n(0, 'link')}${was(n(1, 'link'))}\n` +
+    `🔎 Tag page scans: ${n(0, 'scan')}${was(n(1, 'scan'))}\n` +
+    `💚 Care waitlist: +${n(0, 'care') + o.care} (bot ${n(0, 'care')} · order form ${o.care})${was(n(1, 'care') + op.care)}\n` +
+    `⚠️ Failures: ${fails(0)}${failLine ? ` (${failLine})` : ''}${was(fails(1))}\n\n` +
+    `<b>Site funnel</b>: chose a plan ${n(0, 'plan')} → started the form ${n(0, 'form')} → sent an order ${n(0, 'submit')}` +
+    `${was(`${n(1, 'plan')} → ${n(1, 'form')} → ${n(1, 'submit')}`)}\n` +
+    'Visits: Cloudflare dashboard → Web Analytics.';
 }
 
 async function apiRegister(request, env, url, ctx) {
@@ -1251,6 +1341,7 @@ async function apiScan(request, env, url) {
   if (!/^\d{1,9}$/.test(id)) return json({ success: false }, env, 400);
   const r = await db(env, 'logScan', { id });
   if (!r.ok || !r.found || isOff(r.tag)) return json({ success: false }, env);
+  if (kvOn(env)) await bumpEvent(env, 'scan');
   const tag = r.tag;
   if (r.throttled) return json({ success: true }, env);
   const extras = await getExtras(env, id);
@@ -1505,8 +1596,8 @@ async function dailyBackup(env) {
   try {
     const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendDocument`, { method: 'POST', body: form });
     const d = await res.json();
-    if (!d.ok) console.error('backup send', JSON.stringify(d));
-  } catch (e) { console.error('backup send failed', e); }
+    if (!d.ok) { console.error('backup send', JSON.stringify(d)); await bumpFail(env, 'backup'); }
+  } catch (e) { console.error('backup send failed', e); await bumpFail(env, 'backup'); }
 }
 
 // ---------------------------------------------------------------
@@ -1528,10 +1619,11 @@ async function sendSms(env, to, body) {
       },
       body: new URLSearchParams({ To: phone, From: env.TWILIO_FROM, Body: body.slice(0, 600) }),
     });
-    if (!res.ok) console.error('SMS error', res.status, (await res.text()).slice(0, 300));
+    if (!res.ok) { console.error('SMS error', res.status, (await res.text()).slice(0, 300)); await bumpFail(env, 'sms'); }
     return res.ok;
   } catch (e) {
     console.error('SMS failed', e);
+    await bumpFail(env, 'sms');
     return false;
   }
 }
@@ -1573,6 +1665,7 @@ async function handleUpdate(update, env, url) {
   // сообщения админу — по-английски
   if (text === '/orders' && isAdmin(env, chatId)) return listOrders(env, chatId);
   if (text === '/stats' && isAdmin(env, chatId)) return send(env, chatId, await funnelStats(env));
+  if (text === '/week' && isAdmin(env, chatId)) return send(env, chatId, kvOn(env) ? await weeklyText(env, Date.now()) : 'No storage connected.');
   if ((text === '/plate' || text === '/plate all') && isAdmin(env, chatId)) return plateCsv(env, chatId, text === '/plate all');
   if (text === '/help') return send(env, chatId, tr(L, 'help'), mainMenu(L));
 
@@ -2016,6 +2109,7 @@ async function linkFromSite(chatId, token, env, url, from) {
   if (r.ok && r.conflict) return refuseRelink(env, chatId, L0, token); // таблица: жетон уже привязан к другому чату
   if (!r.ok || !r.found) return send(env, chatId, tr(L0, 'notFoundToken'), mainMenu(L0));
   await rememberChat(env, chatId);
+  if (kvOn(env) && usedBy !== chatId) await bumpEvent(env, 'link'); // повторный Start тем же чатом не считаем
   // Все жетоны того же заказа привязываются одним нажатием Start
   const tags = [r.tag];
   const x = await getExtras(env, r.tag.tag_id);
@@ -2165,6 +2259,7 @@ async function careJoin(chatId, env, from, L) {
   if (!(await env.FYP_KV.get(key))) {
     const name = from ? [from.first_name, from.last_name].filter(Boolean).join(' ') : '';
     await env.FYP_KV.put(key, JSON.stringify({ since: new Date().toISOString(), name, lang: L }));
+    await bumpEvent(env, 'care');
     if (env.ADMIN_CHAT_ID) {
       let total = 0, cursor;
       do {
@@ -2804,10 +2899,12 @@ async function db(env, action, data = {}) {
       return JSON.parse(txt);
     } catch {
       console.error('DB non-JSON response', res.status, txt.slice(0, 300));
+      await bumpFail(env, 'db');
       return { ok: false, error: 'db_bad_response' };
     }
   } catch (err) {
     console.error('DB request failed', action, String(err && err.message || err));
+    await bumpFail(env, 'db');
     return { ok: false, error: 'db_unreachable' };
   } finally {
     clearTimeout(timeout);
@@ -2900,10 +2997,14 @@ async function tg(env, method, payload) {
       body: JSON.stringify(payload),
     });
     const data = await res.json();
-    if (!data.ok) console.error('TG error', method, JSON.stringify(data));
+    if (!data.ok) {
+      console.error('TG error', method, JSON.stringify(data));
+      if (!(data.error_code < 500 && data.error_code !== 429)) await bumpFail(env, 'tg'); // 400/403 (бот заблокирован) — не сбой
+    }
     return data;
   } catch (e) {
     console.error('TG fetch failed', method, e);
+    await bumpFail(env, 'tg');
     return { ok: false };
   }
 }
