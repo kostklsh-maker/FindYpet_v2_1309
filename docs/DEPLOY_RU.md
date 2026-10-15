@@ -17,17 +17,32 @@
 2. **Проверить** на телефоне и компьютере: страницы, заказ, страницу жетона `/t/9001`.
 3. **Опубликовать** — перенести `test` в `main`:
    GitHub → **Pull requests** → **New pull request** → base: `main`, compare: `test` → **Create pull request** → **Merge**.
-   (Или написать Claude: «опубликуй тестовую версию».)
-4. Через ~1 минуту изменения на findy-pet.com.
+   (Или написать Claude: «опубликуй тестовую версию» — Claude откроет PR, вливаете вы.)
+4. **Подтвердить выкладку** (с 14.10.2026): GitHub → **Actions** → запуск «Deploy worker» с жёлтым значком **Waiting** →
+   **Review deployments** → галочка **production** → **Approve and deploy**. Без этого рабочий сайт не меняется.
+5. Через ~1 минуту после Approve изменения на findy-pet.com.
 
 Срочное исправление можно внести сразу в `main`, но потом перенести его и в `test`, чтобы ветки не разошлись.
 
 ## Как это устроено
 Любое изменение в ветке `test` или `main` (сайт в корне или `worker/`) запускает GitHub Actions «Deploy worker»:
-сборка `python3 worker/build.py` → 32 автотеста → выкладка в Cloudflare → проверка, что сайт открывается.
+сборка `python3 worker/build.py` → автотесты (76 на 15.10.2026) → выкладка в Cloudflare → проверка, что сайт открывается.
 Если тесты не прошли — выкладки не будет, сайт остаётся прежним.
 Запустить вручную: GitHub → Actions → Deploy worker → Run workflow (выбрать ветку).
-Секреты репозитория: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+Задание идёт в окружении GitHub (Settings → Environments): `staging` для ветки `test`, `production` для `main`.
+В `production` включено ручное подтверждение (Required reviewers) и разрешена только ветка `main`.
+
+Секреты (с 15.10.2026):
+| Где | Секрет | Что это |
+|---|---|---|
+| Репозиторий (Settings → Secrets and variables → Actions) | `CLOUDFLARE_ACCOUNT_ID` | номер аккаунта Cloudflare, общий |
+| Окружение `staging` | `CLOUDFLARE_API_TOKEN` | токен Cloudflare `findypet-staging-deploy` |
+| Окружение `production` | `CLOUDFLARE_API_TOKEN` | токен Cloudflare `findypet-prod-deploy` |
+
+Права обоих токенов (Cloudflare → My Profile → API Tokens): Account · Workers Scripts · Edit; зона findy-pet.com ·
+Workers Routes · Edit, Zone · Read, DNS · Edit. Ограничить токен одним воркером в интерфейсе Cloudflare не удалось,
+поэтому разделение держится на окружениях GitHub: токен рабочего сайта доступен только заданию для `main`, и только после Approve.
+Общего токена в секретах репозитория больше нет (старый токен удалён 15.10.2026).
 Переменные и секреты бота в панели Cloudflare выкладка не меняет (`keep_vars = true` в `worker/wrangler.toml`).
 
 **Зачем GitHub, если сайт на Cloudflare.** Сам сайт GitHub не показывает — оба сайта работают в Cloudflare.
@@ -44,7 +59,7 @@ GitHub → репозиторий → **Settings** → **Pages** → **Build and
 У Telegram-бота может быть только один адрес для сообщений, поэтому рабочий бот обслуживает только рабочий сайт.
 Без своего бота на тестовом сайте работают страницы, заказы и страницы жетонов, но не уведомления и не привязка Telegram.
 Чтобы проверять и бота:
-1. @BotFather → `/newbot` → имя «FindYpet TEST», username например `FindYpetTestBot` → скопировать токен.
+1. @BotFather → `/newbot` → имя «FindYpet TEST» (/setup потом сам выставит это имя), username например `FindYpetTestBot` → скопировать токен.
 2. Cloudflare → **Workers & Pages** → **findypet-app-staging** → **Settings** → **Variables and Secrets** → **Add**:
    - `BOT_TOKEN` (Secret) — токен тестового бота;
    - `BOT_USERNAME` (Text) — username тестового бота без @;
@@ -65,16 +80,19 @@ GitHub → репозиторий → **Settings** → **Pages** → **Build and
   Его можно сделать закрытым: Settings → General → Danger Zone → Change visibility → Private — выкладка продолжит работать.
 
 ## Где что лежит
-- Корень репозитория — сайт: `index.html`, `css/`, `js/`, `tag/`, `privacy/`, `assets/logo.png`.
+- Корень репозитория — сайт: `index.html`, `css/`, `js/`, `tag/`, `privacy/`, `accessibility/`, `assets/`.
+- Шрифты Rubik и M PLUS Rounded 1c лежат в самом сайте (`assets/fonts/*.woff2`, правила в `css/fonts.css`), Google Fonts не используются (с 14.10.2026).
 - `worker/src/worker.js` — API и Telegram-бот; `worker/build.py` встраивает сайт в `worker/dist/worker.js`.
-- Цены — только в `worker/src/worker.js` → `const PLANS`; `js/plans.js` генерируется сборкой.
+- `apps-script/Code.gs` — база в Google-таблице (Apps Script v2; `/setup` показывает версию в строке `db_version`).
+  `apps-script/FixOldRows.gs` — разовый скрипт, который привёл старые строки к формату v2 (пункт B8, 15.10.2026).
+- Цены — только в `worker/src/worker.js` → `const PRICING`; `js/plans.js` генерируется сборкой.
 
 ---
 
 # Ручная установка (запасной вариант)
 
 Всё готово в одном файле **`dist/worker.js`** (сайт встроен внутрь, как и раньше).
-Google-таблица и Apps Script **не меняются**.
+Google-таблица остаётся прежней; Apps Script должен быть версии v2 (`apps-script/Code.gs`, обновление описано в начале файла).
 
 ## Шаг 1. Подключить хранилище KV (1 минута)
 Хранилище для новых функций уже создано в вашем аккаунте Cloudflare: **`findypet-data`**.
@@ -119,12 +137,13 @@ Google-таблица и Apps Script **не меняются**.
 ## Что осталось заполнить вручную
 - Политика конфиденциальности: e-mail findypet0926@gmail.com вписан (30.09.2026). Черновик политики лучше показать юристу.
 - Тексты на иврите — проверить с носителем языка.
-- Цены: `worker/src/worker.js` → `const PRICING` (сейчас жетон 49 ₪ · 3 + 1 = 4 жетона за 147 ₪ · «Забота» 39 ₪/мес, скоро). Оттуда их берут и сайт, и бот; js/plans.js обновляется при сборке.
+- Цены: `worker/src/worker.js` → `const PRICING` (сейчас жетон 49 ₪ · 2 жетона 98 ₪ · 3 + 1 = 4 жетона за 147 ₪). Оттуда их берут и сайт, и бот; js/plans.js обновляется при сборке.
+  Цена «Заботы» (FindYpet Care) не объявлена: решение — на этапе C2 по опросу листа ожидания. В `PRICING.care` стоит черновое число, клиентам оно нигде не показывается.
 
 ## Как пересобрать и проверить после правок
 ```
 python3 worker/build.py        # собрать worker/dist/worker.js
-node worker/test/run.mjs       # 32 автотеста (моки таблицы, Telegram, KV, SMS; тестовый сайт)
+node worker/test/run.mjs       # все автотесты (76 на 15.10.2026) (моки таблицы, Telegram, KV, SMS; тестовый сайт)
 python3 worker/test/shots_v6.py  # скриншоты лендинга на 3 языках (нужен запущенный test/server.mjs)
 node worker/test/server.mjs    # локальный просмотр: http://localhost:8787 , /t/101 , /t/102 (Lost), /t/103 (сбой базы)
 ```
