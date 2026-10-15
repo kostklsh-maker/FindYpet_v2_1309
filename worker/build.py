@@ -9,7 +9,7 @@ here = pathlib.Path(__file__).resolve().parent
 repo = here.parent
 
 # Что из корня репозитория попадает на сайт внутри Worker'а
-SITE = ['index.html', 'css', 'js', 'tag', 'privacy', 'accessibility', 'assets/logo.png', 'assets/mark.png', 'assets/wordmark.png', 'assets/og.jpg', 'assets/fonts']
+SITE = ['index.html', 'css', 'js', 'tag', 'privacy', 'accessibility', 'assets/logo.png', 'assets/mark.png', 'assets/wordmark.png', 'assets/logo.svg', 'assets/mark.svg', 'assets/wordmark.svg', 'assets/og.jpg', 'assets/fonts']
 TYPES = {'.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
          '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml',
          '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.ico': 'image/x-icon',
