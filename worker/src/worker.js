@@ -1025,7 +1025,7 @@ async function bumpFail(env, kind) {
 // Неделя — 7 полных дней до сегодняшнего (по времени Израиля), сравнение с 7 днями до неё.
 // Заказы берутся из KV (o:FY…), остальное — из дневных счётчиков ev:<день>.
 // ---------------------------------------------------------------
-const WEEKLY_CRON = '30 6 * * 0'; // как в worker/wrangler.toml
+const WEEKLY_CRON = '30 6 * * SUN'; // как в worker/wrangler.toml
 const FAIL_KINDS = { db: 'database', tg: 'Telegram', sms: 'SMS', backup: 'backup', server: 'server' };
 
 function ilDay(env, ms) {
