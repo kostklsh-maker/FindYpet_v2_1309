@@ -1,7 +1,9 @@
 """Собирает worker/dist/worker.js — один файл: код Worker'а + встроенный сайт из корня репозитория.
 
 Запуск из любой папки:  python3 worker/build.py
-Заодно обновляет js/plans.js (копия цен) из const PRICING в worker/src/worker.js.
+Код лежит по частям в worker/src/*.js (модули, см. MODULES). Сборка склеивает их в один файл в этом порядке,
+убирая import/export между частями, — поэтому dist/worker.js, как и раньше, можно вставить в редактор Cloudflare.
+Заодно обновляет js/plans.js (копия цен) из const PRICING в worker/src/pricing.js.
 """
 import json, base64, pathlib, re, subprocess
 
@@ -15,15 +17,25 @@ TYPES = {'.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
          '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.ico': 'image/x-icon',
          '.woff2': 'font/woff2'}
 
-src = (here / 'src/worker.js').read_text()
+# Части кода по порядку (порядок важен: константы верхнего уровня объявлены раньше, чем используются)
+MODULES = ['i18n', 'pricing', 'api', 'store', 'bot', 'photo', 'admin', 'setup', 'poster', 'db', 'util', 'worker']
+IMPORT = re.compile(r"^import \{[^}]*\} from '\./[a-z0-9]+\.js';\n", re.M)
+EXPORT = re.compile(r'^export (?=(?:async function|function|const|class) (?!_test\b))', re.M)
+parts = []
+for name in MODULES:
+    code = (here / f'src/{name}.js').read_text()
+    parts.append(EXPORT.sub('', IMPORT.sub('', code)))
+extra = sorted(p.stem for p in (here / 'src').glob('*.js') if p.stem not in MODULES)
+assert not extra, f'новые файлы в worker/src не добавлены в MODULES: {extra}'
+src = '\n'.join(parts)
 assert '/*__EMBEDDED__*/null' in src, 'в src/worker.js нет метки /*__EMBEDDED__*/null'
 
 # 1) js/plans.js — копия цен (на сайте её отдаёт сам Worker)
 m = re.search(r'const PRICING = (\{.*?\});', src, re.S)
-assert m, 'const PRICING не найден в worker/src/worker.js'
+assert m, 'const PRICING не найден в worker/src/pricing.js'
 plans = json.loads(subprocess.check_output(['node', '-e', f'process.stdout.write(JSON.stringify({m.group(1)}))']))
 (repo / 'js/plans.js').write_text(
-    '// Сгенерировано worker/build.py из const PRICING в worker/src/worker.js — не редактируйте вручную.\n'
+    '// Сгенерировано worker/build.py из const PRICING в worker/src/pricing.js — не редактируйте вручную.\n'
     '// На сайте этот файл отдаёт сам Worker (/js/plans.js); здесь — копия для локального просмотра.\n'
     'const PRICING = ' + json.dumps(plans, ensure_ascii=False, indent=4) + ';\n')
 

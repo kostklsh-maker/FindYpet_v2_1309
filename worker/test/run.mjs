@@ -1272,7 +1272,7 @@ await test('English copy: no calques, one name for the mode ("Lost mode") on the
   const i18n = readFileSync(new URL('../../js/i18n.js', import.meta.url), 'utf8');
   const en = i18n.slice(0, i18n.indexOf('he: {'));
   const site = await (await call(env, '/')).text();
-  const worker = readFileSync(new URL('../src/worker.js', import.meta.url), 'utf8');
+  const worker = readFileSync(new URL('../dist/worker.js', import.meta.url), 'utf8');
   for (const bad of ['works without anything', '\u201cLost\u201d mode', 'Telegram tells you', 'always in your phone', 'Write to us in the bot', 'has everything']) {
     assert.ok(!en.includes(bad), `i18n en: ${bad}`); assert.ok(!site.includes(bad), `site: ${bad}`);
   }
