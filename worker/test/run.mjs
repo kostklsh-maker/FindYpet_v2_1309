@@ -12,9 +12,10 @@ const lastTg = (method) => [...state.tg].reverse().find((c) => !method || c.meth
 const env = makeEnv();
 
 await test('landing, tag page, privacy and /t/ short link are served', async () => {
-  for (const p of ['/', '/tag/?id=1', '/privacy/', '/t/101', '/js/i18n.js', '/assets/logo.png', '/assets/mark.png', '/assets/wordmark.png']) {
+  for (const p of ['/', '/tag/?id=1', '/privacy/', '/t/101', '/js/i18n.js', '/assets/logo.png', '/assets/mark.png', '/assets/wordmark.png', '/assets/logo.svg', '/assets/mark.svg', '/assets/wordmark.svg']) {
     const r = await call(env, p);
     assert.equal(r.status, 200, p);
+    if (p.endsWith('.svg')) assert.equal(r.headers.get('content-type'), 'image/svg+xml', p);
   }
   const t = await (await call(env, '/t/101')).text();
   assert.match(t, /Call my owner/);
