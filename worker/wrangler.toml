@@ -77,6 +77,13 @@ SITE_URL = "https://test.findy-pet.com"
 STAGE = "test"      # пометка «ТЕСТ» на страницах, запрет индексации, без напоминаний
 TEST_DB = "1"       # жетоны — в хранилище тестового сайта (номера с 9001), а не в Google-таблице
 TIMEZONE = "Asia/Jerusalem"
+DB_READ = "d1"      # D1: страница жетона читает из D1 (если жетона там нет — из тестовой базы)
+
+# D1 (этап D1): копия жетонов тестового сайта в Cloudflare D1. Таблицы воркер создаёт сам.
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "findypet-db-test"
+database_id = "35c93093-42df-4b5f-96bf-20a5fa73ee47"
 
 [[env.staging.kv_namespaces]]
 binding = "FYP_KV"
