@@ -583,7 +583,7 @@ await test('landing demo shows the real bot messages and the real tag page (kept
 
 // ---- Тестовый сайт (окружение staging: test.findy-pet.com) ----
 const testEnv = () => ({ STAGE: 'test', TEST_DB: '1', SITE_URL: 'https://test.findy-pet.com', BOT_USERNAME: 'FindYpetTestBot',
-  BOT_TOKEN: 'T', WEBHOOK_SECRET: 'sec', ADMIN_CHAT_ID: 'admin', TIMEZONE: 'Asia/Jerusalem', FYP_KV: makeKV() });
+  BOT_TOKEN: 'T', WEBHOOK_SECRET: 'sec', ADMIN_CHAT_ID: 'admin', TIMEZONE: 'Asia/Jerusalem', FYP_KV: makeKV(), TAG_CODES: '0' });
 
 await test('test site: TEST banner, [TEST] title, noindex, robots.txt; production pages unmarked', async () => {
   const tenv = testEnv();
@@ -1463,6 +1463,61 @@ await test('order queue: table down → order waits, customer gets a bot link; r
   assert.ok(last.some((c) => c.payload.chat_id === 'admin' && new RegExp(`Q${fq} was NOT written[\\s\\S]*Never[\\s\\S]*Akko 5[\\s\\S]*Lost ×1`).test(c.payload.text)));
   assert.ok(last.some((c) => c.payload.chat_id === 'QC3' && /לא הצלחנו/.test(c.payload.text)));
   await KV.delete(`pqd:${qid}`);
+});
+
+await test('tag codes (C4): new tags open only by a random code; the number stops working; old tags keep their numbers; /code for unprinted tags', async () => {
+  const e = makeEnv({ TAG_CODES: undefined });
+  const d = await (await call(e, '/api/register', { method: 'POST', body: { owner_name: 'Code Owner', phone: '050-555-0101', pet_name: 'Kiwi', address: 'Haifa', consent: true } })).json();
+  assert.equal(d.success, true);
+  const m = /\/t\/([A-HJ-NP-Z2-9]{8})$/.exec(d.tag_url);
+  assert.ok(m, d.tag_url);
+  const code = m[1], id = String(d.id_tag);
+  assert.equal(await KV.get(`k:${code}`), id);
+  assert.equal((await KV.get(`x:${id}`, 'json')).code, code);
+  // страница и API: по коду (в любом регистре) — да, по номеру — нет
+  assert.equal((await (await call(e, `/api/tag?id=${code}`)).json()).pet_name, 'Kiwi');
+  assert.equal((await (await call(e, `/api/tag?id=${code.toLowerCase()}`)).json()).found, true);
+  assert.equal((await (await call(e, `/api/tag?id=${id}`)).json()).found, false);
+  assert.equal((await (await call(e, '/api/tag?id=ZZZZZZZZ')).json()).found, false);
+  assert.equal((await call(e, `/t/${code}`)).status, 200);
+  const up = await call(e, `/T/${code}`);
+  assert.equal(up.status, 301);
+  assert.match(up.headers.get('Location'), new RegExp(`/t/${code}$`));
+  assert.equal((await call(e, '/api/scan', { method: 'POST', body: { id_tag: id } })).status, 400);
+  assert.equal((await (await call(e, '/api/scan', { method: 'POST', body: { id_tag: code } })).json()).success, true);
+  assert.equal((await call(e, `/p/${code}`)).status, 200);
+  assert.equal((await call(e, `/p/${id}`)).status, 404);
+  // лист производства и CSV крышек — с кодом
+  const sheet = state.tg.filter((c) => c.payload.chat_id === 'admin' && /New order/.test(c.payload.text || '')).at(-1);
+  assert.match(sheet.payload.text, new RegExp(`medallion_v2\\.py lid ${code} "KIWI"`));
+  assert.match(sheet.payload.text, new RegExp(`/t/${code}</code>`));
+  // привязка Telegram: в сообщении ссылка с кодом, без номера
+  await tgUpdate(e, msg('C4OWNER', '/start ' + d.telegram_link.split('start=')[1]));
+  const reg = state.tg.filter((c) => c.payload.chat_id === 'C4OWNER' && /Kiwi/.test(c.payload.text || '')).at(-1);
+  assert.match(reg.payload.text, new RegExp(`/t/${code}`));
+  assert.doesNotMatch(reg.payload.text, new RegExp(`/t/${id}\\b`));
+  // старые жетоны без кода работают по номеру
+  const old = await (await call(env, '/api/register', { method: 'POST', body: { owner_name: 'Old Owner', phone: '050-555-0102', pet_name: 'Oldie', address: 'Haifa', consent: true } })).json();
+  assert.match(old.tag_url, /\/t\/\d+$/);
+  assert.equal((await (await call(e, `/api/tag?id=${old.id_tag}`)).json()).found, true);
+  // /code — только админ; после него номер не открывается, ссылка — по коду
+  await tgUpdate(e, msg('C4OWNER', `/code ${old.id_tag}`));
+  assert.equal((await (await call(e, `/api/tag?id=${old.id_tag}`)).json()).found, true, 'not an admin — nothing changes');
+  await tgUpdate(e, msg('admin', `/code ${old.id_tag}`));
+  const ans = lastTg('sendMessage').payload.text;
+  const oc = /\/t\/([A-HJ-NP-Z2-9]{8})/.exec(ans)[1];
+  assert.match(ans, new RegExp(`/T/${oc}`));
+  assert.equal((await (await call(e, `/api/tag?id=${old.id_tag}`)).json()).found, false);
+  assert.equal((await (await call(e, `/api/tag?id=${oc}`)).json()).pet_name, 'Oldie');
+  assert.equal((await KV.get(`o:${old.order_id}`, 'json')).items[0].code, oc);
+  await tgUpdate(e, msg('admin', `/code ${old.id_tag}`));
+  assert.match(lastTg('sendMessage').payload.text, /already has a code/);
+  // страница жетона понимает адрес /t/<код>
+  const { readFileSync } = await import('node:fs');
+  const page = readFileSync(new URL('../../tag/index.html', import.meta.url), 'utf8');
+  const re = new RegExp(/location\.pathname\.match\((\/.*\/)\)/.exec(page)[1].slice(1, -1));
+  assert.equal(re.exec(`/t/${code}`)[1], code);
+  assert.equal(re.exec('/t/101')[1], '101');
 });
 
 console.log(`\n${passed} tests passed`);

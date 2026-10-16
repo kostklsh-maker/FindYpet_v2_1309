@@ -3,7 +3,7 @@
  *  FindYpet — Cloudflare Worker  (v4, сентябрь 2026)
  * ============================================================
  *  Один сервис делает всё:
- *   • отдаёт сайт — главная, страница метки /tag/?id=101 (и короткая /t/101),
+ *   • отдаёт сайт — главная, страница метки /t/<код> (новые жетоны, C4) или /t/101 и /tag/?id=101 (старые),
  *     политика конфиденциальности /privacy/
  *   • API для сайта:
  *        POST /api/register   — заказ с сайта: 1, 2 или 4 жетона (3 + 1: питомцы + запасные)
@@ -846,11 +846,11 @@ async function route(request, env, ctx) {
     if (path.startsWith('/api/')) return json({ success: false, error: 'not_found' }, env, 404);
 
     // ---- QR на напечатанном медальоне: HTTPS://FINDY-PET.COM/T/101 (заглавные буквы — QR на 15 % меньше) ----
-    const upper = /^\/T\/(\d{1,9})$/.exec(path);
+    const upper = /^\/T\/(\d{1,9}|[A-Z0-9]{8})$/.exec(path);
     if (upper) return Response.redirect(`${url.origin}/t/${upper[1]}`, 301);
 
     // ---- Короткая ссылка /t/101 (для QR на жетоне) → та же страница метки ----
-    if (/^\/t\/\d{1,9}$/.test(path)) {
+    if (/^\/t\/(\d{1,9}|[A-Za-z0-9]{8})$/.test(path)) {
       const tagReq = new Request(new URL('/tag/index.html', url.origin), request);
       const res = env.ASSETS ? await env.ASSETS.fetch(tagReq) : serveEmbedded(new URL('/tag/index.html', url.origin), env);
       return noindex(res);
@@ -861,15 +861,15 @@ async function route(request, env, ctx) {
     if (path === '/sitemap.xml') return new Response(sitemapXml(env, url), { headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
 
     // ---- Объявление «Потерялся» для групп и печати ----
-    const pm = /^\/p\/(\d{1,9})$/.exec(path);
+    const pm = /^\/p\/(\d{1,9}|[A-Za-z0-9]{8})$/.exec(path);
     if (pm && request.method === 'GET') {
       if (await limited(env, 'RL_READ', `${clientIp(request)}:/p`)) return new Response('Too many requests', { status: 429 });
-      return await posterPage(env, url, pm[1], ctx);
+      return await posterPage(env, url, (await tagRef(env, pm[1])) || '0', ctx);
     }
 
     // ---- Фото питомца (загружено владельцем в боте, /photo) ----
-    const img = /^\/img\/(\d{1,9})$/.exec(path);
-    if (img && request.method === 'GET') return await servePhoto(env, img[1], url);
+    const img = /^\/img\/(\d{1,9}|[A-Za-z0-9]{8})$/.exec(path);
+    if (img && request.method === 'GET') return await servePhoto(env, (await tagRef(env, img[1])) || '0', url);
 
     // ---- Цены тарифов для сайта ----
     if (path === '/js/plans.js') {
@@ -1239,10 +1239,10 @@ async function apiRegister(request, env, url, ctx) {
     order_id: res.order.order_id,
     total_tags: res.order.tags_total,
     price: res.order.price,
-    tags: res.order.items.map((i) => ({ id_tag: i.tag_id, pet_name: i.pet_name, copies: i.copies, tag_url: shortUrl(env, url, i.tag_id) })),
+    tags: res.order.items.map((i) => ({ id_tag: i.tag_id, pet_name: i.pet_name, copies: i.copies, tag_url: shortUrl(env, url, i.code || i.tag_id) })),
     // первый жетон — для совместимости со старым кодом страницы
     id_tag: first.tag_id,
-    tag_url: shortUrl(env, url, first.tag_id),
+    tag_url: shortUrl(env, url, res.order.items[0].code || first.tag_id),
     telegram_link: `https://t.me/${env.BOT_USERNAME}?start=${first.link_token}`,
   };
   if (idem) await env.FYP_KV.put(idem, JSON.stringify(out), { expirationTtl: 600 });
@@ -1301,10 +1301,7 @@ async function alertAdmin(env, key, text) {
 // ---------------------------------------------------------------
 const Q_HOURS = 48;
 
-function queueId() {
-  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  return Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => abc[b % abc.length]).join('');
-}
+function queueId() { return randCode(8); }
 
 async function queueOrder(env, url, o) {
   const qid = queueId();
@@ -1422,8 +1419,10 @@ async function createOrder(env, url, o) { // + old_offer?: заказ со ст�
   const items = tags.map((t, i) => ({ tag_id: String(t.tag_id), pet_name: t.pet_name || o.items[i].pet_name, copies: o.items[i].copies }));
   const missing = o.items.slice(tags.length).map((i) => i.pet_name);
   for (let i = 0; i < tags.length; i++) {
+    const code = await newTagCode(env, tags[i].tag_id); // C4: адрес жетона — случайный код
+    if (code) items[i].code = code;
     await putExtras(env, tags[i].tag_id, {
-      order_id, copies: items[i].copies, lang: o.lang || 'en',
+      order_id, copies: items[i].copies, lang: o.lang || 'en', ...(code ? { code } : {}),
       consent_at: now, consent_via: o.source,
       ...(() => {
         // свои данные питомца (Семейный) — иначе общий второй контакт и заметки первого питомца
@@ -1463,8 +1462,8 @@ function orderTagsLine(order) {
 }
 
 async function apiTag(url, env, ctx) {
-  const id = url.searchParams.get('id') || url.searchParams.get('id_tag') || '';
-  if (!/^\d{1,9}$/.test(id)) return json({ found: false }, env);
+  const id = await tagRef(env, url.searchParams.get('id') || url.searchParams.get('id_tag') || '');
+  if (!id) return json({ found: false }, env);
   // Сначала — сохранённая копия из KV (мгновенно: нашедший стоит рядом с питомцем),
   // таблица (1–3 с) обновляет копию в фоне. Нет копии — ждём таблицу, как раньше.
   const [cached, extras] = await Promise.all([getCachedPublic(env, id), getExtras(env, id)]);
@@ -1499,8 +1498,8 @@ async function refreshPublic(env, id) {
 
 async function apiScan(request, env, url) {
   const b = await request.json().catch(() => ({}));
-  const id = String(b.id_tag || b.id || '');
-  if (!/^\d{1,9}$/.test(id)) return json({ success: false }, env, 400);
+  const id = await tagRef(env, b.id_tag || b.id);
+  if (!id) return json({ success: false }, env, 400);
   const r = await db(env, 'logScan', { id });
   if (!r.ok || !r.found || isOff(r.tag)) return json({ success: false }, env);
   if (kvOn(env)) await bumpEvent(env, 'scan');
@@ -1521,7 +1520,7 @@ async function apiScan(request, env, url) {
       reply_markup: { inline_keyboard: kb },
     });
   } else if (smsEnabled(env)) {
-    await sendSms(env, tag.phone, tr(L, 'smsScan', { pet: tag.pet_name, link: shortUrl(env, url, id) }));
+    await sendSms(env, tag.phone, tr(L, 'smsScan', { pet: tag.pet_name, link: shortUrl(env, url, await tagKey(env, id, extras)) }));
   }
   return json({ success: true }, env);
 }
@@ -1533,8 +1532,8 @@ async function apiScan(request, env, url) {
  */
 async function apiFound(request, env) {
   const b = await request.json().catch(() => ({}));
-  const id = String(b.id_tag || b.id || '');
-  if (!/^\d{1,9}$/.test(id)) return json({ success: false, error: 'bad_request' }, env, 400);
+  const id = await tagRef(env, b.id_tag || b.id);
+  if (!id) return json({ success: false, error: 'bad_request' }, env, 400);
   // не больше 3 оповещений в минуту на один жетон, с любых адресов (защита владельца от потока сообщений)
   if (await limited(env, 'RL_TAG', `tag:${id}`)) return json({ success: false, error: 'rate_limited' }, env, 429);
   const lat = Number(b.lat), lon = Number(b.lon), acc = Number(b.accuracy);
@@ -1573,10 +1572,10 @@ async function apiFound(request, env) {
 
 async function apiLocation(request, env) {
   const b = await request.json().catch(() => ({}));
-  const id = String(b.id_tag || b.id || '');
+  const id = await tagRef(env, b.id_tag || b.id);
   const lat = Number(b.lat), lon = Number(b.lon);
   const acc = Number(b.accuracy);
-  if (!/^\d{1,9}$/.test(id) || !isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+  if (!id || !isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
     return json({ success: false, error: 'bad_request' }, env, 400);
   }
   if (await limited(env, 'RL_TAG', `tag:${id}`)) return json({ success: false, error: 'rate_limited' }, env, 429);
@@ -1644,7 +1643,7 @@ function publicExtras(x, id) {
   if (!feats(x).extras) x = {};
   const phone2 = normalizePhone(x.phone2);
   return {
-    photo: x.photo_v && id ? `/img/${id}?v=${x.photo_v}` : '',
+    photo: x.photo_v && id ? `/img/${x.code || id}?v=${x.photo_v}` : '',
     lost: !!x.lost,
     lost_since: x.lost ? (x.lost_since || '') : '',
     lost_area: x.lost ? (x.lost_area || '') : '',
@@ -1733,7 +1732,7 @@ async function sendReminders(env) {
 // Резервная копия данных из KV (заказы, доп. данные жетонов, лист ожидания Care, языки чатов)
 // раз в день — файлом админу в Telegram. Таблица Google хранится у Google и сюда не входит.
 // ---------------------------------------------------------------
-const BACKUP_PREFIXES = ['o:', 'x:', 'care:', 'lang:', 'chat:', 'tok:'];
+const BACKUP_PREFIXES = ['o:', 'x:', 'k:', 'care:', 'lang:', 'chat:', 'tok:'];
 async function dailyBackup(env) {
   if (!kvOn(env) || !env.ADMIN_CHAT_ID) return;
   const data = {};
@@ -1832,6 +1831,7 @@ async function handleUpdate(update, env, url) {
   if (text === '/orders' && isAdmin(env, chatId)) return listOrders(env, chatId);
   if (text === '/stats' && isAdmin(env, chatId)) return send(env, chatId, await funnelStats(env));
   if (/^\/spend(\s|$)/.test(text) && isAdmin(env, chatId)) return send(env, chatId, await adSpend(env, text));
+  if (/^\/code(\s|$)/.test(text) && isAdmin(env, chatId)) return send(env, chatId, await adminTagCode(env, url, text));
   if (text === '/week' && isAdmin(env, chatId)) return send(env, chatId, kvOn(env) ? await weeklyText(env, Date.now()) : 'No storage connected.');
   if ((text === '/plate' || text === '/plate all') && isAdmin(env, chatId)) return plateCsv(env, chatId, text === '/plate all');
   if (text === '/help') return send(env, chatId, tr(L, 'help'), mainMenu(L));
@@ -1849,7 +1849,7 @@ async function handleUpdate(update, env, url) {
     if (!v) return send(env, chatId, tr(L, 'photoBad'), cancelKb(L));
     await db(env, 'clearState', { chat_id: chatId });
     await send(env, chatId, tr(L, 'photoSaved', { pet: esc(tag.pet_name) }), {
-      inline_keyboard: [[{ text: tr(L, 'btnPreview'), url: shortUrl(env, url, st.tag_id) }]],
+      inline_keyboard: [[{ text: tr(L, 'btnPreview'), url: shortUrl(env, url, await tagKey(env, st.tag_id)) }]],
     });
     return send(env, chatId, tr(L, 'useMyTags'), mainMenu(L));
   }
@@ -2168,7 +2168,7 @@ async function turnLostOn(chatId, id, area, env, url, L) {
   const since = new Date().toISOString();
   const x = await putExtras(env, id, { lost: true, lost_since: since, lost_area: area });
   if (!x) return send(env, chatId, tr(L, 'noKv'), mainMenu(L));
-  const poster = posterUrl(env, url, id);
+  const poster = posterUrl(env, url, x.code || id);
   // Текст для групп — на трёх языках (сначала язык владельца). Ссылка — на объявление /p/:
   // открытие объявления не считается сканом жетона и не будит владельца уведомлением.
   const order = [L, ...['he', 'ru', 'en'].filter((l) => l !== L)];
@@ -2213,7 +2213,7 @@ async function channelDecision(env, url, adminChat, cq, id, ok) {
   if (!r.ok || !r.found) return send(env, adminChat, `⚠️ Could not load #${id}.`);
   const post = await tg(env, 'sendMessage', {
     chat_id: env.LOST_CHANNEL_ID, parse_mode: 'HTML', disable_web_page_preview: false,
-    text: channelPost(env, r.tag, x.lost_area || '', posterUrl(env, url, id)),
+    text: channelPost(env, r.tag, x.lost_area || '', posterUrl(env, url, x.code || id)),
   });
   if (post && post.ok) await putExtras(env, id, { channel_msg_id: post.result.message_id });
   return send(env, adminChat, post && post.ok ? `✅ #${id} posted to the channel.` : '⚠️ The channel did not accept the post (is the bot an admin there?).');
@@ -2335,7 +2335,7 @@ async function deleteTagData(env, chatId, tag, L) {
   return send(env, chatId, tr(L, 'delDone', { pet: esc(tag.pet_name) }), mainMenu(L));
 }
 
-/** /plate для админа: CSV крышек (номер, КЛИЧКА, телефон) для оплаченных заказов — для medallion_v2.py plate. */
+/** /plate для админа: CSV крышек (номер или код жетона, КЛИЧКА, телефон) для оплаченных заказов — для medallion_v2.py plate. */
 async function plateCsv(env, chatId, all) {
   if (!kvOn(env)) return send(env, chatId, tr('en', 'noKv'));
   const rows = [];
@@ -2349,7 +2349,7 @@ async function plateCsv(env, chatId, all) {
       for (const it of o.items) {
         if (it.deleted) continue;
         const name = String(it.pet_name).toUpperCase().replace(/[",\r\n]/g, ' ').trim();
-        for (let c = 0; c < (it.copies || 1); c++) rows.push(`${it.tag_id},${name},${phone}`);
+        for (let c = 0; c < (it.copies || 1); c++) rows.push(`${it.code || it.tag_id},${name},${phone}`); // C4: код вместо номера — QR ведёт на /T/<код>
       }
     }
     cursor = page.list_complete ? undefined : page.cursor;
@@ -2374,8 +2374,9 @@ async function sendRegistered(chatId, tagsIn, env, url, order, L) {
   const tags = Array.isArray(tagsIn) ? tagsIn : [tagsIn];
   const first = tags[0];
   const copies = (id) => { const it = order && order.items.find((i) => i.tag_id === String(id)); return it ? it.copies : 1; };
-  const list = tags.map((t) => tr(L, 'regItem', {
-    pet: esc(t.pet_name), id: t.tag_id, c: copies(t.tag_id), link: esc(shortUrl(env, url, t.tag_id)),
+  const keys = await Promise.all(tags.map((t) => tagKey(env, t.tag_id)));
+  const list = tags.map((t, i) => tr(L, 'regItem', {
+    pet: esc(t.pet_name), id: t.tag_id, c: copies(t.tag_id), link: esc(shortUrl(env, url, keys[i])),
   })).join('\n\n');
   const nm = tags.map((t) => esc(t.pet_name));
   const names = nm.length > 1 ? nm.slice(0, -1).join(', ') + tr(L, 'or') + nm[nm.length - 1] : nm[0];
@@ -2385,7 +2386,7 @@ async function sendRegistered(chatId, tagsIn, env, url, order, L) {
       order: order ? tr(L, 'regOrder', { id: order.order_id, label: esc(orderLabel(order, L)) }) : '',
     }),
     { inline_keyboard: [
-      [{ text: tr(L, 'btnPreview'), url: shortUrl(env, url, first.tag_id) }],
+      [{ text: tr(L, 'btnPreview'), url: shortUrl(env, url, keys[0]) }],
       [{ text: tr(L, 'btnAddExtras'), callback_data: `set:${first.tag_id}` }],
     ] });
   return send(env, chatId, tr(L, 'useMyTags'), mainMenu(L));
@@ -2404,7 +2405,7 @@ async function myTags(chatId, env, url, L) {
     return tr(L, 'myTagLine', {
       pet: esc(t.pet_name), id: t.tag_id, lost: !!x.lost, copies: Number(x.copies) || 1,
       order: open ? o.order_id : '', status: open ? (ot[o.status] || o.status) : '',
-      link: esc(shortUrl(env, url, t.tag_id)),
+      link: esc(shortUrl(env, url, x.code || t.tag_id)),
       p2: x.phone2 ? ltr(L, esc(prettyPhone(normalizePhone(x.phone2)))) : '', notes: x.notes ? esc(x.notes) : '',
       scan: t.last_scan_at ? esc(t.last_scan_at) : '',
     });
@@ -2507,14 +2508,14 @@ async function notifyAdmin(env, url, order) {
   let k = 0;
   const blocks = [];
   for (const it of order.items) {
-    const short = shortUrl(env, url, it.tag_id);
+    const short = shortUrl(env, url, it.code || it.tag_id);
     const qr = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=8&data=${encodeURIComponent(short)}`;
     for (let c = 0; c < it.copies; c++) {
       k++;
       blocks.push(c === 0
         ? `🏷 <b>Tag ${k} of ${total} — #${it.tag_id}</b>\n` +
           `🖨 Lid: <b>${esc(String(it.pet_name).toUpperCase())}</b> · ${esc(phonePrint)}\n` +
-          `<code>python3 medallion_v2.py lid ${it.tag_id} "${esc(String(it.pet_name).toUpperCase().replace(/"/g, ''))}" ${esc(phonePrint)}</code>\n` +
+          `<code>python3 medallion_v2.py lid ${it.code || it.tag_id} "${esc(String(it.pet_name).toUpperCase().replace(/"/g, ''))}" ${esc(phonePrint)}</code>\n` +
           `✍️ NFC + 🔳 QR: <code>${esc(short)}</code>\n<a href="${esc(qr)}">Download QR image</a>`
         : `🏷 <b>Tag ${k} of ${total} — #${it.tag_id} (spare)</b>\n` +
           `Exact copy of the ${esc(it.pet_name)} tag above: same lid, same NFC link.`);
@@ -2555,7 +2556,7 @@ async function setOrderStatus(env, url, adminChat, orderId, status) {
 
   const names = order.items.map((i) => esc(i.pet_name)).join(', ');
   const total = order.items.reduce((n, i) => n + i.copies, 0);
-  const links = order.items.map((i) => `🐾 ${esc(i.pet_name)}: ${esc(shortUrl(env, url, i.tag_id))}`).join('\n');
+  const links = order.items.map((i) => `🐾 ${esc(i.pet_name)}: ${esc(shortUrl(env, url, i.code || i.tag_id))}`).join('\n');
   const L = await ownerLang(env, order.chat_id, order);
   const key = { paid: 'stPaid', made: 'stMade', shipped: 'stShipped' }[status];
   const text = tr(L, key, { id: order.order_id, n: total, names, address: esc(order.address), links });
@@ -2726,10 +2727,10 @@ async function posterPage(env, url, id, ctx) {
   }
   const x = await getExtras(env, id);
   const site = siteBase(env, url);
-  const self = posterUrl(env, url, id);
+  const self = posterUrl(env, url, x.code || id);
   const pet = pub.pet_name || '';
   const lost = !!x.lost;
-  const photo = x.photo_v ? `/img/${id}?v=${x.photo_v}` : '';
+  const photo = x.photo_v ? `/img/${x.code || id}?v=${x.photo_v}` : '';
   const ogImg = photo ? site + photo : `${site}/assets/logo.png`;
   const area = lost ? String(x.lost_area || '') : '';
   const since = lost && x.lost_since ? new Date(x.lost_since).toLocaleDateString('en-GB', { timeZone: env.TIMEZONE || 'Asia/Jerusalem' }).replace(/\//g, '.') : '';
@@ -3209,6 +3210,72 @@ function shortUrl(env, url, id) {
 /** Объявление «Потерялся» для групп и печати: /p/101 (открытие не считается сканом жетона) */
 function posterUrl(env, url, id) {
   return `${siteBase(env, url)}/p/${id}`;
+}
+
+// ---------------------------------------------------------------
+// Случайные коды жетонов (C4). Новый жетон получает код из 8 знаков (/t/K7QM2XAB):
+// номера идут подряд (101, 102…), а код не угадать перебором. Код хранится в доп. данных
+// жетона (x:<номер>.code, попадает в резервную копию) и в KV k:<код> = номер.
+// У жетона с кодом страница по номеру не открывается. Старые жетоны без кода работают по номеру.
+// Алфавит без 0/O и 1/I: код читается с крышки, а QR из заглавных букв и цифр меньше.
+// ---------------------------------------------------------------
+const CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const CODE_RE = /^[A-HJ-NP-Z2-9]{8}$/;
+
+function randCode(n) {
+  // 256 делится на 32 без остатка — все знаки равновероятны
+  return Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => CODE_ABC[b % CODE_ABC.length]).join('');
+}
+
+/** Выдаёт жетону новый код и записывает его в KV. Без KV или при TAG_CODES=0 — '' (жетон работает по номеру). */
+async function newTagCode(env, id, force) {
+  if (!kvOn(env) || (env.TAG_CODES === '0' && !force)) return ''; // TAG_CODES=0 — выключатель: новые жетоны снова по номерам
+  for (let i = 0; i < 5; i++) {
+    const code = randCode(8);
+    if ((await env.FYP_KV.get(`k:${code}`)) !== null) continue;
+    await env.FYP_KV.put(`k:${code}`, String(id));
+    return code;
+  }
+  return '';
+}
+
+/** Адрес из ссылки (номер или код) → номер жетона. '' — нет такого жетона или у него есть код, а пришёл номер. */
+async function tagRef(env, raw) {
+  const s = String(raw || '').trim();
+  if (/^\d{1,9}$/.test(s)) return (await getExtras(env, s)).code ? '' : s;
+  const code = s.toUpperCase();
+  if (!CODE_RE.test(code) || !kvOn(env)) return '';
+  try { return (await env.FYP_KV.get(`k:${code}`)) || ''; } catch (e) { console.error('kv code', e); return ''; }
+}
+
+/**
+ * /code 101 — админ даёт код жетону, который ещё не напечатан (например, 101 и 102).
+ * После этого /t/101 больше не открывается, работает только новая ссылка.
+ */
+async function adminTagCode(env, url, text) {
+  const m = /^\/code\s+(\d{1,9})\s*$/.exec(text);
+  if (!m) return 'Write: /code 101 — gives tag 101 a random code. Only for a tag that is not printed yet: after this /t/101 stops working.';
+  if (!kvOn(env)) return 'No storage connected.';
+  const id = m[1];
+  const x = await getExtras(env, id);
+  if (x.code) return `Tag #${id} already has a code: ${shortUrl(env, url, x.code)}`;
+  const r = await db(env, 'getTag', { id });
+  if (!r.ok) return '⚠️ The table did not answer. Try again in a minute.';
+  if (!r.found) return `Tag #${id} is not in the table.`;
+  const code = await newTagCode(env, id, true);
+  if (!code) return '⚠️ Could not create a code. Try again.';
+  await putExtras(env, id, { code });
+  const o = x.order_id ? await getOrder(env, x.order_id) : null;
+  const it = o && o.items.find((i) => i.tag_id === id);
+  if (it) { it.code = code; await saveOrder(env, o); }
+  const link = shortUrl(env, url, code);
+  return `✅ Tag #${id} now opens only by its code.\n✍️ NFC: <code>${esc(link)}</code>\n🔳 QR: <code>${esc(link.replace(/\/t\//, '/T/').toUpperCase())}</code>\n` +
+    `The old link /t/${id} no longer works.`;
+}
+
+/** Что ставить в адрес жетона: код, если он есть, иначе номер. */
+async function tagKey(env, id, x) {
+  return (x || await getExtras(env, id)).code || String(id);
 }
 
 /** Приводит номер к формату +972XXXXXXXXX. Возвращает '' если номер некорректный. */
