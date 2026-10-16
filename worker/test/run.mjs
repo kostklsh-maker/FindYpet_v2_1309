@@ -186,6 +186,57 @@ await test('/found → Lost mode off and channel post edited', async () => {
   assert.match(edit.payload.text, /is home/);
 });
 
+await test('D5: after /found the owner may share a story (with consent); /nostory deletes it; home is counted once', async () => {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+  const ev0 = (await KV.get(`ev:${today}`, 'json')) || {};
+  await putLost(true);
+  await tgUpdate(env, msg(CHAT, '/found'));
+  const ask = lastTg('sendMessage').payload;
+  assert.match(ask.text, /Bella is home/);
+  assert.deepEqual(ask.reply_markup.inline_keyboard[0].map((b) => b.callback_data), [`story:${tagId}`, 'storyno']);
+  await tgUpdate(env, cb(CHAT, `story:${tagId}`));
+  assert.equal(state.states[CHAT].step, 'story');
+  assert.match(lastTg('sendMessage').payload.text, /never publish your name, phone or address/);
+  await tgUpdate(env, msg(CHAT, 'A neighbour <b>saw</b> her near the shelter after the siren'));
+  const st = await KV.get(`story:${tagId}`, 'json');
+  assert.equal(st.consent, true); assert.equal(st.pet, 'Bella'); assert.match(st.text, /after the siren/);
+  const adm = state.tg.filter((c) => c.payload.chat_id === 'admin').at(-1).payload.text;
+  assert.match(adm, /Story: Bella is home/); assert.match(adm, /&lt;b&gt;saw/);
+  assert.match(lastTg('sendMessage').payload.text, /Thank you! We have your story/);
+  // /found без режима поиска — не возвращение и без вопроса об истории
+  const n = state.tg.length;
+  await tgUpdate(env, cb(CHAT, `found:${tagId}`));
+  assert.ok(!state.tg.slice(n).some((c) => /How was|is home!/.test(c.payload.text || '')));
+  // отказ от истории
+  await tgUpdate(env, cb(CHAT, 'storyno'));
+  assert.match(lastTg('sendMessage').payload.text, /ended well/);
+  const ev1 = await KV.get(`ev:${today}`, 'json');
+  assert.equal((ev1.home || 0) - (ev0.home || 0), 1);
+  assert.equal((ev1.story || 0) - (ev0.story || 0), 1);
+  await tgUpdate(env, msg(CHAT, '/nostory'));
+  assert.equal(await KV.get(`story:${tagId}`), null);
+  assert.match(lastTg('sendMessage').payload.text, /Your story is deleted/);
+  // чужой жетон — нельзя
+  await tgUpdate(env, cb('6666', `story:${tagId}`));
+  assert.match(lastTg('sendMessage').payload.text, /not linked to your Telegram/);
+  async function putLost(v) { const x = (await KV.get(`x:${tagId}`, 'json')) || {}; x.lost = v; await KV.put(`x:${tagId}`, JSON.stringify(x)); }
+});
+
+await test('D5: an order marked paid is counted once in the weekly summary', async () => {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+  const ev0 = (await KV.get(`ev:${today}`, 'json')) || {};
+  await KV.put('o:FY9909', JSON.stringify({ order_id: 'FY9909', status: 'new', created_at: new Date().toISOString(), items: [{ tag_id: '9', pet_name: 'P', copies: 1 }], history: [] }));
+  await tgUpdate(env, cb('admin', 'ord:FY9909:paid'));
+  await tgUpdate(env, cb('admin', 'ord:FY9909:made'));
+  await tgUpdate(env, cb('admin', 'ord:FY9909:paid'));
+  const ev1 = await KV.get(`ev:${today}`, 'json');
+  assert.equal((ev1.paid || 0) - (ev0.paid || 0), 1);
+  await tgUpdate(env, msg('admin', '/week'));
+  assert.match(lastTg('sendMessage').payload.text, /Marked paid: \d+/);
+  assert.match(lastTg('sendMessage').payload.text, /Back home after Lost mode: \d+ · stories shared: \d+/);
+  await KV.delete('o:FY9909');
+});
+
 await test('/settings → change notes, remove second contact', async () => {
   await tgUpdate(env, msg(CHAT, '/settings'));
   assert.match(lastTg('sendMessage').payload.text, /Second contact/);

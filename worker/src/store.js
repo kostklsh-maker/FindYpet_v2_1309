@@ -81,7 +81,7 @@ export async function sendReminders(env) {
 // Резервная копия данных из KV (заказы, доп. данные жетонов, лист ожидания Care, языки чатов)
 // раз в день — файлом админу в Telegram. Таблица Google хранится у Google и сюда не входит.
 // ---------------------------------------------------------------
-export const BACKUP_PREFIXES = ['o:', 'x:', 'k:', 'care:', 'lang:', 'chat:', 'tok:'];
+export const BACKUP_PREFIXES = ['o:', 'x:', 'k:', 'care:', 'lang:', 'chat:', 'tok:', 'story:'];
 export async function dailyBackup(env) {
   if (!kvOn(env) || !env.ADMIN_CHAT_ID) return;
   const data = {};

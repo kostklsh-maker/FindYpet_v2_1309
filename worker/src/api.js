@@ -187,9 +187,11 @@ export async function weeklyText(env, now) {
     `   1 tag ×${o.q1} · 2 tags ×${o.q2} · 3 + 1 ×${o.q4}\n` +
     `   3 + 1 share: ${pct(o.q4, o.n)}${was(pct(op.q4, op.n))}\n` +
     `   Tags: ${o.tags} · at list price: ${o.sum} ${PRICING.currency}${was(`${op.sum} ${PRICING.currency}`)}\n` +
+    `💰 Marked paid: ${n(0, 'paid')}${was(n(1, 'paid'))}\n` +
     `📲 Telegram linked after a site order: ${n(0, 'link')}${was(n(1, 'link'))}\n` +
     `🔎 Finder: tag page opened ${n(0, 'scan')} → call ${n(0, 'f_call')} · WhatsApp ${n(0, 'f_wa')} · ` +
     `Telegram ${n(0, 'f_tg')} · location ${n(0, 'f_geo')}${was(`${n(1, 'scan')} → ${finder(1)}`)}\n` +
+    `🏠 Back home after Lost mode: ${n(0, 'home')} · stories shared: ${n(0, 'story')}${was(`${n(1, 'home')} · ${n(1, 'story')}`)}\n` +
     adLine() +
     `💚 Care waitlist: +${n(0, 'care') + o.care} (bot ${n(0, 'care')} · order form ${o.care})${was(n(1, 'care') + op.care)}\n` +
     `⚠️ Failures: ${fails(0)}${failLine ? ` (${failLine})` : ''}${was(fails(1))}\n\n` +
