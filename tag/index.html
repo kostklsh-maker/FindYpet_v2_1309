@@ -506,6 +506,20 @@
     }
     $('retryBtn').addEventListener('click', load);
 
+    // Воронка нашедшего (без личных данных): что он сделал на странице. Админ видит итог в недельной сводке.
+    function track(e) {
+      try {
+        const body = JSON.stringify({ e, lang });
+        const url = `${API}/api/ev`;
+        if (!(navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: 'application/json' })))) {
+          fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
+        }
+      } catch (e) {}
+    }
+    $('callBtn').addEventListener('click', () => track('f_call'));
+    $('call2Btn').addEventListener('click', () => track('f_call'));
+    $('waBtn').addEventListener('click', () => track('f_wa'));
+
     function hearts() {
       const box = $('hearts');
       for (let i = 0; i < 6; i++) {
@@ -543,6 +557,7 @@
         if (!geoChk.checked) return;
         coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
         lastPos = pos;
+        track('f_geo');
         render();
         if (sendLocToOwner(pos) || locSent) {
           setStatus('sent', 'ok');

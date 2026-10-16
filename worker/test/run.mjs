@@ -1304,7 +1304,10 @@ await test('weekly summary: on Sunday the admin gets orders, 3 + 1 share, links,
   await KV.put('o:FYW2', JSON.stringify({ order_id: 'FYW2', created_at: '2030-06-01T18:00:00Z', source: 'telegram', tags_total: 1, price: 49, items: [] }));
   await KV.put('o:FYW3', JSON.stringify({ order_id: 'FYW3', created_at: '2030-05-22T10:00:00Z', source: 'site', tags_total: 2, price: 98, items: [] }));
   await KV.put('o:FYW4', JSON.stringify({ order_id: 'FYW4', created_at: '2030-06-02T06:00:00Z', source: 'site', tags_total: 1, price: 49, items: [] })); // сегодня — в следующую неделю
-  await KV.put('ev:2030-05-30', JSON.stringify({ scan: 3, link: 1, care: 1, err_db: 2, plan: 5, form: 3, submit: 2 }));
+  await KV.put('o:FYW5', JSON.stringify({ order_id: 'FYW5', created_at: '2030-05-31T10:00:00Z', source: 'site', tags_total: 1, price: 49, ad_src: 'facebook/autumn', items: [] }));
+  await KV.put('ev:2030-05-30', JSON.stringify({ scan: 3, link: 1, care: 1, err_db: 2, plan: 5, form: 3, submit: 2, f_call: 2, f_wa: 1, f_tg: 1, f_geo: 1 }));
+  await KV.put('sp:2030-05-30', JSON.stringify({ facebook: 120, google: 30 }));
+  await KV.put('sp:2030-05-23', JSON.stringify({ facebook: 50 }));
   await KV.put('ev:2030-05-24', JSON.stringify({ scan: 1, err_tg: 1 }));
   const run = async (ms, e = env) => {
     // как в рабочем cron: отдельный воскресный запуск
@@ -1317,19 +1320,21 @@ await test('weekly summary: on Sunday the admin gets orders, 3 + 1 share, links,
   assert.equal(sent.length, 1); assert.equal(sent[0].payload.chat_id, 'admin');
   const t = sent[0].payload.text;
   assert.match(t, /26\.05–01\.06/);
-  assert.match(t, /Orders: <b>2<\/b> \(site 1 · bot 1\) <i>\(prev 1\)<\/i>/);
-  assert.match(t, /1 tag ×1 · 2 tags ×0 · 3 \+ 1 ×1/);
-  assert.match(t, /3 \+ 1 share: 50% <i>\(prev 0%\)<\/i>/);
-  assert.match(t, /at list price: 196 ₪ <i>\(prev 98 ₪\)<\/i>/);
+  assert.match(t, /Orders: <b>3<\/b> \(site 2 · bot 1\) <i>\(prev 1\)<\/i>/);
+  assert.match(t, /1 tag ×2 · 2 tags ×0 · 3 \+ 1 ×1/);
+  assert.match(t, /3 \+ 1 share: 33% <i>\(prev 0%\)<\/i>/);
+  assert.match(t, /at list price: 245 ₪ <i>\(prev 98 ₪\)<\/i>/);
   assert.match(t, /Telegram linked after a site order: 1 <i>\(prev 0\)/);
-  assert.match(t, /Tag page scans: 3 <i>\(prev 1\)/);
+  assert.match(t, /Finder: tag page opened 3 → call 2 · WhatsApp 1 · Telegram 1 · location 1 <i>\(prev 1 → 0\)/);
+  assert.match(t, /Ads: spend 150 ₪ · orders from ads 1 · cost per order 150 ₪ <i>\(prev —\)/);
+  assert.match(t, /facebook: 1 orders \/ 120 ₪ · google: 0 orders \/ 30 ₪/);
   assert.match(t, /Care waitlist: \+2 \(bot 1 · order form 1\)/);
   assert.match(t, /Failures: 2 \(database 2\) <i>\(prev 1\)/);
   assert.match(t, /chose a plan 5 → started the form 3 → sent an order 2/);
   assert.equal((await run(SUN + 3600000)).length, 0, 'only once per Sunday');
   assert.equal((await run(Date.parse('2030-06-03T07:00:00Z'))).length, 0, 'not on Monday');
   assert.equal((await run(Date.parse('2030-06-09T07:00:00Z'), testEnv())).length, 0, 'not on the test site');
-  for (const k of ['o:FYW1', 'o:FYW2', 'o:FYW3', 'o:FYW4']) await KV.delete(k);
+  for (const k of ['o:FYW1', 'o:FYW2', 'o:FYW3', 'o:FYW4', 'o:FYW5', 'sp:2030-05-30', 'sp:2030-05-23']) await KV.delete(k);
 });
 
 await test('weekly summary: /week on demand for the admin only; failures and scans are counted', async () => {
@@ -1347,6 +1352,54 @@ await test('weekly summary: /week on demand for the admin only; failures and sca
   const before = state.tg.length;
   await tgUpdate(env, msg('stranger', '/week'));
   assert.ok(!state.tg.slice(before).some((c) => /weekly summary/.test(c.payload.text || '')));
+});
+
+await test('finder funnel: tag page sends call / WhatsApp / location events; Telegram button is counted by the worker', async () => {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+  const ev0 = (await KV.get(`ev:${today}`, 'json')) || {};
+  const ev = (e) => call(env, '/api/ev', { method: 'POST', body: { e, lang: 'he' } });
+  for (const e of ['f_call', 'f_call', 'f_wa', 'f_geo']) assert.equal((await ev(e)).status, 200);
+  assert.equal((await ev('f_bad')).status, 400);
+  const tag = state.tags.find((x) => x.tag_id === String(tagId));
+  const chat = tag.telegram_chat_id; tag.telegram_chat_id = '7171';
+  await call(env, '/api/found', { method: 'POST', body: { id_tag: tagId } });
+  tag.telegram_chat_id = chat;
+  const ev1 = await KV.get(`ev:${today}`, 'json');
+  const d = (k) => (ev1[k] || 0) - (ev0[k] || 0);
+  assert.equal(d('f_call'), 2); assert.equal(d('f_wa'), 1); assert.equal(d('f_geo'), 1); assert.equal(d('f_tg'), 1);
+  const page = await (await call(env, `/t/${tagId}`)).text();
+  for (const e of ['f_call', 'f_wa', 'f_geo']) assert.ok(page.includes(`track('${e}')`), e);
+});
+
+await test('ads: order keeps a clean ad label; /spend adds spend for the admin only and lists the week', async () => {
+  const d = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'Ad Client', phone: '050-555-1212', pet_name: 'Rex', address: 'Haifa', consent: true, src: 'FaceBook/Autumn<script>' } })).json();
+  assert.equal(d.success, true);
+  assert.equal((await KV.get(`o:${d.order_id}`, 'json')).ad_src, 'facebook/autumnscript');
+  const d2 = await (await call(env, '/api/register', { method: 'POST', body: {
+    owner_name: 'No Ad', phone: '050-555-1213', pet_name: 'Rex', address: 'Haifa', consent: true } })).json();
+  assert.equal((await KV.get(`o:${d2.order_id}`, 'json')).ad_src, undefined);
+  const day = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+  await KV.delete(`sp:${day}`);
+  await tgUpdate(env, msg('admin', '/spend 120 Facebook'));
+  assert.match(lastTg('sendMessage').payload.text, /Ad spend today: facebook 120 ₪/);
+  await tgUpdate(env, msg('admin', '/spend 30,5'));
+  await tgUpdate(env, msg('admin', '/spend -20 facebook'));
+  assert.deepEqual(await KV.get(`sp:${day}`, 'json'), { facebook: 100, ads: 30.5 });
+  await tgUpdate(env, msg('admin', '/spend abc'));
+  assert.match(lastTg('sendMessage').payload.text, /Write: \/spend 120 facebook/);
+  await tgUpdate(env, msg('admin', '/spend'));
+  assert.match(lastTg('sendMessage').payload.text, /last 7 days: facebook 100 ₪ · ads 30\.5 ₪/);
+  const before = state.tg.length;
+  await tgUpdate(env, msg('stranger', '/spend 999 google'));
+  assert.ok(!state.tg.slice(before).some((c) => /Ad spend/.test(c.payload.text || '')));
+  assert.deepEqual(await KV.get(`sp:${day}`, 'json'), { facebook: 100, ads: 30.5 });
+  await KV.delete(`sp:${day}`);
+});
+
+await test('landing remembers the ad label from the link and sends it with the order', async () => {
+  const js = await (await call(env, '/js/register-form.js')).text();
+  assert.match(js, /utm_source/); assert.match(js, /fbclid/); assert.match(js, /src: adSrc/);
 });
 
 console.log(`\n${passed} tests passed`);
