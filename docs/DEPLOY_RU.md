@@ -82,10 +82,10 @@ GitHub → репозиторий → **Settings** → **Pages** → **Build and
 ## Где что лежит
 - Корень репозитория — сайт: `index.html`, `css/`, `js/`, `tag/`, `privacy/`, `accessibility/`, `assets/`.
 - Шрифты Rubik и M PLUS Rounded 1c лежат в самом сайте (`assets/fonts/*.woff2`, правила в `css/fonts.css`), Google Fonts не используются (с 14.10.2026).
-- `worker/src/worker.js` — API и Telegram-бот; `worker/build.py` встраивает сайт в `worker/dist/worker.js`.
+- `worker/src/*.js` — код Worker'а по частям (D2): `worker.js` — вход и маршруты, `api.js` — API сайта, заказы, очередь и сводка, `bot.js` — Telegram-бот, `admin.js` — заказы для админа, `photo.js` — фото, `setup.js` — /setup, `poster.js` — объявление «Потерялся» и QR, `db.js` — база (таблица, тестовая база, D1) и Telegram API, `store.js` — KV, копия и SMS, `i18n.js` — тексты бота, `pricing.js` — цены, `util.js` — коды жетонов, телефоны, JSON. `worker/build.py` склеивает их в один файл `worker/dist/worker.js` и встраивает сайт. Новый файл в `worker/src` нужно добавить в список `MODULES` в `build.py`.
 - `apps-script/Code.gs` — база в Google-таблице (Apps Script v2; `/setup` показывает версию в строке `db_version`).
   `apps-script/FixOldRows.gs` — разовый скрипт, который привёл старые строки к формату v2 (пункт B8, 15.10.2026).
-- Цены — только в `worker/src/worker.js` → `const PRICING`; `js/plans.js` генерируется сборкой.
+- Цены — только в `worker/src/pricing.js` → `const PRICING`; `js/plans.js` генерируется сборкой.
 
 ---
 
@@ -153,7 +153,7 @@ Google-таблица остаётся прежней; Apps Script должен 
 ## Что осталось заполнить вручную
 - Политика конфиденциальности: e-mail findypet0926@gmail.com вписан (30.09.2026). Черновик политики лучше показать юристу.
 - Тексты на иврите — проверить с носителем языка.
-- Цены: `worker/src/worker.js` → `const PRICING` (сейчас жетон 49 ₪ · 2 жетона 98 ₪ · 3 + 1 = 4 жетона за 147 ₪). Оттуда их берут и сайт, и бот; js/plans.js обновляется при сборке.
+- Цены: `worker/src/pricing.js` → `const PRICING` (сейчас жетон 49 ₪ · 2 жетона 98 ₪ · 3 + 1 = 4 жетона за 147 ₪). Оттуда их берут и сайт, и бот; js/plans.js обновляется при сборке.
   Цена «Заботы» (FindYpet Care) не объявлена: решение — на этапе C2 по опросу листа ожидания. В `PRICING.care` стоит черновое число, клиентам оно нигде не показывается.
 
 ## Как пересобрать и проверить после правок
