@@ -6,7 +6,7 @@ import { _test } from '../dist/worker.js';
 let passed = 0;
 async function test(name, fn) {
   try { await fn(); passed++; console.log('✔', name); }
-  catch (e) { console.error("✘", name, "\n  ", e.stack); process.exitCode = 1; }
+  catch (e) { console.error('✘', name, '\n  ', e.message); process.exitCode = 1; }
 }
 const lastTg = (method) => [...state.tg].reverse().find((c) => !method || c.method === method);
 const env = makeEnv();
