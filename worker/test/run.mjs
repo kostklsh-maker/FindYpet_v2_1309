@@ -1,12 +1,12 @@
 // Сквозные тесты API и бота на мок-окружении. Запуск: node test/run.mjs
 import assert from 'node:assert/strict';
-import { state, KV, makeKV, makeEnv, call, tgUpdate, msg, cb, worker, setupCall } from './mock.mjs';
+import { state, KV, makeKV, makeD1, makeEnv, call, tgUpdate, msg, cb, worker, setupCall } from './mock.mjs';
 import { _test } from '../dist/worker.js';
 
 let passed = 0;
 async function test(name, fn) {
   try { await fn(); passed++; console.log('✔', name); }
-  catch (e) { console.error('✘', name, '\n  ', e.message); process.exitCode = 1; }
+  catch (e) { console.error("✘", name, "\n  ", e.stack); process.exitCode = 1; }
 }
 const lastTg = (method) => [...state.tg].reverse().find((c) => !method || c.method === method);
 const env = makeEnv();
@@ -1530,6 +1530,50 @@ await test('tag codes (C4): new tags open only by a random code; the number stop
   const re = new RegExp(/location\.pathname\.match\((\/.*\/)\)/.exec(page)[1].slice(1, -1));
   assert.equal(re.exec(`/t/${code}`)[1], code);
   assert.equal(re.exec('/t/101')[1], '101');
+});
+
+await test('D1: every tag answer is copied to D1; reads from D1; /delete-style erase; D1 failure never breaks the page', async () => {
+  const D1 = await makeD1();
+  const e = makeEnv({ FYP_KV: makeKV(), DB: D1 });
+  const reg = await (await call(e, '/api/register', { method: 'POST', body: { owner_name: 'Dana D', phone: '050-555-0199', pet_name: 'Luna', address: 'Haifa', consent: true } })).json();
+  const id = String(reg.id_tag);
+  let row = await D1.prepare('SELECT * FROM tags WHERE tag_id = ?').bind(id).first();
+  assert.equal(row.pet_name, 'Luna');
+  assert.equal(row.status, 'active');
+  // главная база изменилась (например, кличку поправили в таблице) — чтение из главной базы обновляет копию
+  const main = state.tags.find((t) => t.tag_id === id);
+  main.pet_name = 'Luna Bella';
+  await e.FYP_KV.delete(`pub:${id}`);
+  for (const k of (await e.FYP_KV.list({ prefix: '' })).keys) if (k.name.includes(id) && !k.name.startsWith('x:')) await e.FYP_KV.delete(k.name);
+  assert.equal((await (await call(e, `/api/tag?id=${id}`)).json()).pet_name, 'Luna Bella');
+  row = await D1.prepare('SELECT pet_name FROM tags WHERE tag_id = ?').bind(id).first();
+  assert.equal(row.pet_name, 'Luna Bella');
+  // DB_READ = d1: страница читает из D1, главная база не нужна
+  const e2 = { ...e, DB_READ: 'd1', FYP_KV: makeKV() };
+  state.gasDown = true;
+  try { assert.equal((await (await call(e2, `/api/tag?id=${id}`)).json()).pet_name, 'Luna Bella'); }
+  finally { state.gasDown = false; }
+  // жетона нет в D1 — берём из главной базы и сразу копируем
+  await D1.prepare('DELETE FROM tags WHERE tag_id = ?').bind(id).run();
+  assert.equal((await (await call(e2, `/api/tag?id=${id}`)).json()).pet_name, 'Luna Bella');
+  assert.ok(await D1.prepare('SELECT 1 FROM tags WHERE tag_id = ?').bind(id).first());
+  // в главной базе жетон удалён — копия в D1 стирает личные данные
+  main.status = 'deleted';
+  await call({ ...e, FYP_KV: makeKV() }, `/api/tag?id=${id}`);
+  row = await D1.prepare('SELECT * FROM tags WHERE tag_id = ?').bind(id).first();
+  assert.equal(row.status, 'deleted');
+  for (const c of ['owner_name', 'phone', 'pet_name', 'address', 'link_token']) assert.equal(row[c], '', c);
+  assert.equal((await (await call({ ...e2, FYP_KV: makeKV() }, `/api/tag?id=${id}`)).json()).found, false);
+  // D1 сломалась — заказ и страница работают как раньше
+  D1.broken = true;
+  const r = await (await call({ ...e, FYP_KV: makeKV() }, '/api/register', { method: 'POST', body: { owner_name: 'Eli E', phone: '050-555-0198', pet_name: 'Rex', address: 'Haifa', consent: true } })).json();
+  assert.ok(r.id_tag, JSON.stringify(r));
+  assert.equal((await (await call({ ...e2, FYP_KV: makeKV() }, `/api/tag?id=${r.id_tag}`)).json()).pet_name, 'Rex');
+  D1.broken = false;
+  // /setup показывает состояние D1
+  const s = await (await setupCall({ ...e, FYP_KV: makeKV() })).json();
+  assert.match(s.d1, /connected ✅ · \d+ tags copied/);
+  assert.match((await (await setupCall(makeEnv({ FYP_KV: makeKV() }))).json()).d1, /not connected/);
 });
 
 console.log(`\n${passed} tests passed`);

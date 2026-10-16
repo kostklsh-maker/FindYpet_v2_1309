@@ -87,6 +87,24 @@ globalThis.fetch = async (input, init = {}) => {
   throw new Error('unexpected fetch ' + url);
 };
 
+// Cloudflare D1 поверх встроенного в Node SQLite (node:sqlite, Node 22+): те же prepare/bind/first/all/run/batch.
+export async function makeD1() {
+  const { DatabaseSync } = await import('node:sqlite');
+  const sql = new DatabaseSync(':memory:');
+  const stmt = (q, args = []) => ({
+    bind: (...a) => stmt(q, a),
+    async first() { return sql.prepare(q).get(...args) ?? null; },
+    async all() { return { results: sql.prepare(q).all(...args), success: true }; },
+    async run() { const r = sql.prepare(q).run(...args); return { success: true, meta: { changes: r.changes } }; },
+  });
+  return {
+    broken: false,
+    prepare(q) { if (this.broken) throw new Error('D1 down'); return stmt(q); },
+    async batch(list) { const out = []; for (const s of list) out.push(await s.run()); return out; },
+    _sql: sql,
+  };
+}
+
 export function makeEnv(extra = {}) {
   return { GAS_URL: 'https://gas.mock/exec', GAS_KEY: 'k', BOT_TOKEN: 'T', BOT_USERNAME: 'YourPetLocatorBot',
     WEBHOOK_SECRET: 'sec', ADMIN_CHAT_ID: 'admin', TIMEZONE: 'Asia/Jerusalem', FYP_KV: KV,
