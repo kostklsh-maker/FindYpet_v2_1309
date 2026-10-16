@@ -1082,7 +1082,7 @@ async function bumpFail(env, kind) {
 const WEEKLY_CRON = '30 6 * * SUN'; // как в worker/wrangler.toml
 const DAILY_CRON = '0 7 * * *';
 const QUEUE_CRON = '*/10 * * * *';
-const FAIL_KINDS = { db: 'database', tg: 'Telegram', sms: 'SMS', backup: 'backup', server: 'server' };
+const FAIL_KINDS = { db: 'database', d1: 'D1 copy', tg: 'Telegram', sms: 'SMS', backup: 'backup', server: 'server' };
 
 function ilDay(env, ms) {
   return new Date(ms).toLocaleDateString('en-CA', { timeZone: env.TIMEZONE || 'Asia/Jerusalem' });
@@ -2677,6 +2677,7 @@ async function setup(env, url) {
   results.db = await db(env, 'getTag', { id: '0' }).catch((e) => ({ ok: false, error: String(e) }));
   const ver = await db(env, 'version', {}).catch(() => ({}));
   results.db_version = ver && ver.version ? `Apps Script v${ver.version}` : 'Apps Script v1 — update it (apps-script/Code.gs): /delete and relink protection need v2';
+  results.d1 = await d1Status(env);
   results.kv = kvOn(env) ? 'FYP_KV connected ✅' : 'FYP_KV NOT connected — /lost, /settings and backup cache are off';
   results.rate_limits = ['RL_READ', 'RL_SIGNAL', 'RL_ORDER', 'RL_TAG'].map((n) => `${n} ${env[n] && typeof env[n].limit === 'function' ? '✅' : '❌'}`).join(' · ');
   results.lostChannel = env.LOST_CHANNEL_ID ? `posting to ${env.LOST_CHANNEL_ID}` : 'not set (optional)';
@@ -3054,6 +3055,16 @@ function qrSvg(text, color = '#111') {
 // Helpers
 // ---------------------------------------------------------------
 async function db(env, action, data = {}) {
+  if (d1On(env) && env.DB_READ === 'd1' && action === 'getTag') {
+    const hit = await d1Read(env, data.id);
+    if (hit) return hit;                       // в D1 жетона нет (ещё не перенесён) — читаем из главной базы
+  }
+  const res = await dbMain(env, action, data);
+  if (d1On(env)) await d1Mirror(env, action, data, res);
+  return res;
+}
+
+async function dbMain(env, action, data) {
   if (env.TEST_DB === '1' || env.TEST_DB === true) return testDb(env, action, data);
   // Таймаут: если Google Apps Script завис (бывает при пиковой нагрузке на
   // бесплатной квоте), не заставляем прохожего у метки ждать бесконечно —
@@ -3161,6 +3172,93 @@ async function testDb(env, action, d) {
     case 'clearState': await kv.delete(`db:st:${d.chat_id}`); return { ok: true };
   }
   return { ok: false, error: 'unknown_action' };
+}
+
+// ---------------------------------------------------------------
+// D1 (этап D1, шаг 1): копия жетонов в Cloudflare D1.
+// Главная база пока прежняя (Google-таблица, на тестовом сайте — KV). Каждый ответ главной базы
+// о жетоне записывается в D1: так D1 заполняется сама, а удаление по /delete стирает данные и там.
+// DB_READ = "d1" — страница жетона читает из D1, а если жетона там нет, то из главной базы.
+// Нет привязки DB — всё работает как раньше. Ошибка D1 никогда не ломает ответ.
+// ---------------------------------------------------------------
+const D1_COLS = ['owner_name', 'phone', 'pet_name', 'address', 'telegram_chat_id', 'status', 'link_token',
+  'created_at', 'tag_url', 'source', 'scan_count', 'last_scan_at', 'last_scan_location'];
+const D1_PII = ['owner_name', 'phone', 'pet_name', 'address', 'telegram_chat_id', 'link_token', 'last_scan_location'];
+const D1_SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS tags (tag_id TEXT PRIMARY KEY, ${D1_COLS.map((c) => `${c} TEXT`).join(', ')}, updated_at TEXT)`,
+  'CREATE INDEX IF NOT EXISTS tags_chat ON tags (telegram_chat_id)',
+  'CREATE INDEX IF NOT EXISTS tags_token ON tags (link_token)',
+];
+const d1Schema = new WeakMap(); // таблица создаётся один раз на базу в каждом экземпляре воркера
+
+function d1On(env) { return !!(env && env.DB && typeof env.DB.prepare === 'function'); }
+
+async function d1Init(env) {
+  let p = d1Schema.get(env.DB);
+  if (!p) {
+    p = env.DB.batch(D1_SCHEMA.map((s) => env.DB.prepare(s)));
+    d1Schema.set(env.DB, p);
+    p.catch(() => d1Schema.delete(env.DB));
+  }
+  return p;
+}
+
+async function d1Put(env, t) {
+  if (!t || t.tag_id === undefined || t.tag_id === null || t.tag_id === '') return;
+  const v = (c) => {
+    const x = c === 'scan_count' && t[c] === undefined ? t.scans : t[c];
+    return x === undefined || x === null ? null : String(x);
+  };
+  await env.DB.prepare(
+    `INSERT INTO tags (tag_id, ${D1_COLS.join(', ')}, updated_at) VALUES (?${', ?'.repeat(D1_COLS.length + 1)}) ` +
+    `ON CONFLICT (tag_id) DO UPDATE SET ${D1_COLS.map((c) => `${c} = COALESCE(excluded.${c}, ${c})`).join(', ')}, updated_at = excluded.updated_at`,
+  ).bind(String(t.tag_id), ...D1_COLS.map(v), new Date().toISOString()).run();
+}
+
+async function d1Erase(env, id) {
+  await env.DB.prepare(`UPDATE tags SET ${D1_PII.map((c) => `${c} = ''`).join(', ')}, status = 'deleted', updated_at = ? WHERE tag_id = ?`)
+    .bind(new Date().toISOString(), String(id)).run();
+}
+
+/** Ответ главной базы → копия в D1. */
+async function d1Mirror(env, action, d, res) {
+  if (!res || !res.ok) return;
+  try {
+    await d1Init(env);
+    if (['register', 'getTag', 'logScan', 'linkTelegram'].includes(action) && res.tag && !res.conflict) await d1Put(env, res.tag);
+    else if (action === 'getTag' && res.found === false) await d1Erase(env, d.id); // в главной базе жетона нет или он удалён
+    else if (action === 'listByChat') for (const t of res.tags || []) await d1Put(env, t);
+    else if (action === 'deleteTag' && res.deleted) await d1Erase(env, d.id);
+  } catch (e) {
+    console.error('D1 mirror failed', action, String(e && e.message || e));
+    await bumpFail(env, 'd1');
+  }
+}
+
+/** Жетон из D1 в том же виде, что отдаёт главная база; null — в D1 его нет или D1 недоступна. */
+async function d1Read(env, id) {
+  try {
+    await d1Init(env);
+    const row = await env.DB.prepare('SELECT * FROM tags WHERE tag_id = ?').bind(String(id)).first();
+    if (!row) return null;
+    if (row.status === 'deleted') return { ok: true, found: false };
+    const tag = { tag_id: row.tag_id };
+    for (const c of D1_COLS) if (row[c] !== null && row[c] !== undefined) tag[c] = row[c];
+    return { ok: true, found: true, tag };
+  } catch (e) {
+    console.error('D1 read failed', String(e && e.message || e));
+    await bumpFail(env, 'd1');
+    return null;
+  }
+}
+
+async function d1Status(env) {
+  if (!d1On(env)) return 'not connected (optional for now)';
+  try {
+    await d1Init(env);
+    const r = await env.DB.prepare("SELECT COUNT(*) AS n, SUM(status = 'deleted') AS del FROM tags").first();
+    return `connected ✅ · ${r.n} tags copied (${r.del || 0} deleted) · reads: ${env.DB_READ === 'd1' ? 'D1 first' : 'main database'}`;
+  } catch (e) { return `error: ${String(e && e.message || e)}`; }
 }
 
 async function tg(env, method, payload) {
