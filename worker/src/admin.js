@@ -1,4 +1,4 @@
-import { getOrder, orderTagsLine, saveOrder } from './api.js';
+import { bumpEvent, getOrder, orderTagsLine, saveOrder } from './api.js';
 import { mainMenu, send, shortUrl, tg } from './db.js';
 import { ownerLang, tr } from './i18n.js';
 import { orderLabel } from './pricing.js';
@@ -69,6 +69,8 @@ export async function setOrderStatus(env, url, adminChat, orderId, status) {
   const order = await getOrder(env, orderId);
   if (!order) return send(env, adminChat, `⚠️ Order ${orderId} not found.`);
   if (order.status === status) return send(env, adminChat, `Order ${orderId} is already ${STATUS_LABEL[status]}.`);
+  // D5: оплату считаем один раз на заказ (повторное «Paid» после «Made» не считается)
+  if (status === 'paid' && !(order.history || []).some((h) => h.status === 'paid')) await bumpEvent(env, 'paid');
   order.status = status;
   order.history = [...(order.history || []), { status, at: new Date().toISOString() }];
   await saveOrder(env, order);
