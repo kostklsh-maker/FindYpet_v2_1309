@@ -34,6 +34,7 @@ export async function handleUpdate(update, env, url) {
   if (text === '/settings' || isBtn(text, 'btnSettings')) return pickTag(chatId, env, 'set', 'pickSet', L);
   if (text === '/photo') return pickTag(chatId, env, 'pho', 'pickPhoto', L);
   if (text === '/delete') return pickTag(chatId, env, 'del', 'pickDelete', L);
+  if (text === '/nostory') return removeStories(env, chatId, L);
   if (text === '/cancel' || isBtn(text, 'btnCancel')) {
     await db(env, 'clearState', { chat_id: chatId });
     return send(env, chatId, tr(L, 'cancelled'), mainMenu(L));
@@ -80,6 +81,11 @@ export async function handleUpdate(update, env, url) {
     await db(env, 'clearState', { chat_id: chatId });
     await putExtras(env, st.tag_id, { phone2: p2 });
     return send(env, chatId, tr(L, 'phone2Saved', { phone: ltr(L, esc(prettyPhone(p2))) }), mainMenu(L));
+  }
+  if (st.step === 'story') {
+    if (!text) return send(env, chatId, tr(L, 'askStory', { pet: '' }), cancelKb(L));
+    await db(env, 'clearState', { chat_id: chatId });
+    return saveStory(env, chatId, st.tag_id, text, L);
   }
   if (st.step === 'set_notes') {
     if (!text) return send(env, chatId, tr(L, 'askNotes'));
@@ -174,7 +180,11 @@ export async function handleCallback(cq, env, url) {
 
   // --- действия с конкретной меткой: lost:ID, found:ID, set:ID, pho:ID, set2:ID:field, clr:ID:field ---
   if (data === 'delno') return send(env, chatId, tr(L, 'delCancelled'), mainMenu(L));
-  const m = /^(lost|found|set|set2|clr|pho|del|delok):(\d{1,9})(?::(phone2|notes|photo))?$/.exec(data);
+  if (data === 'storyno') {
+    if (cq.message.message_id) await tg(env, 'editMessageReplyMarkup', { chat_id: chatId, message_id: cq.message.message_id, reply_markup: { inline_keyboard: [] } });
+    return send(env, chatId, tr(L, 'storyNo'), mainMenu(L));
+  }
+  const m = /^(lost|found|set|set2|clr|pho|del|delok|story):(\d{1,9})(?::(phone2|notes|photo))?$/.exec(data);
   if (m) {
     const [, act, id, field] = m;
     const tag = await ownedTag(chatId, id, env);
@@ -187,6 +197,11 @@ export async function handleCallback(cq, env, url) {
       });
     }
     if (act === 'found') return turnLostOff(chatId, tag, env, L);
+    if (act === 'story') {
+      if (cq.message.message_id) await tg(env, 'editMessageReplyMarkup', { chat_id: chatId, message_id: cq.message.message_id, reply_markup: { inline_keyboard: [] } });
+      await db(env, 'setState', { chat_id: chatId, state: { step: 'story', tag_id: id } });
+      return send(env, chatId, tr(L, 'askStory', { pet: esc(tag.pet_name) }), cancelKb(L));
+    }
     if (act === 'del') {
       return send(env, chatId, tr(L, 'delAsk', { pet: esc(tag.pet_name) }), { inline_keyboard: [[
         { text: tr(L, 'btnDelYes'), callback_data: `delok:${id}` }, { text: tr(L, 'btnDelNo'), callback_data: 'delno' },
@@ -449,7 +464,35 @@ export async function turnLostOff(chatId, tag, env, L) {
       text: '✅ ' + ['he', 'ru', 'en'].map((l) => tr(l, 'chanHome', { pet: esc(tag.pet_name) })).join('\n'),
     });
   }
-  return send(env, chatId, tr(L, 'lostOff', { pet: esc(tag.pet_name) }), mainMenu(L));
+  const done = await send(env, chatId, tr(L, 'lostOff', { pet: esc(tag.pet_name) }), mainMenu(L));
+  if (!x.lost) return done; // /found без режима поиска — не возвращение домой
+  await bumpEvent(env, 'home');
+  // D5: история «нашлась» — только с согласия владельца
+  return send(env, chatId, tr(L, 'storyAsk', { pet: esc(tag.pet_name) }), { inline_keyboard: [[
+    { text: tr(L, 'btnStory'), callback_data: `story:${tag.tag_id}` }, { text: tr(L, 'btnNoStory'), callback_data: 'storyno' },
+  ]] });
+}
+
+/** /nostory: владелец отзывает согласие — удаляем истории всех его жетонов, админ узнаёт об этом. */
+export async function removeStories(env, chatId, L) {
+  const r = await db(env, 'listByChat', { chat_id: chatId });
+  const ids = (r.tags || []).map((t) => String(t.tag_id));
+  if (kvOn(env)) await Promise.all(ids.map((id) => env.FYP_KV.delete(`story:${id}`).catch(() => {})));
+  if (env.ADMIN_CHAT_ID) await send(env, env.ADMIN_CHAT_ID, `🗑 The owner withdrew consent: stories for ${ids.map((i) => '#' + i).join(', ') || '—'} deleted. Remove them from the site and social pages too.`);
+  return send(env, chatId, tr(L, 'storyRemoved'), mainMenu(L));
+}
+
+/** История «нашлась»: текст с согласием на публикацию; админ решает, публиковать ли. Удаляется вместе с жетоном (/delete). */
+export async function saveStory(env, chatId, tagId, text, L) {
+  const tag = await ownedTag(chatId, tagId, env);
+  if (!tag) return send(env, chatId, tr(L, 'notLinked'), mainMenu(L));
+  const story = str(text, 1000);
+  await env.FYP_KV.put(`story:${tagId}`, JSON.stringify({ tag_id: String(tagId), pet: tag.pet_name, lang: L, text: story, consent: true, at: new Date().toISOString() }));
+  await bumpEvent(env, 'story');
+  if (env.ADMIN_CHAT_ID) {
+    await send(env, env.ADMIN_CHAT_ID, `💬 <b>Story: ${esc(tag.pet_name)} is home</b> (#${tagId}, ${L})\nThe owner agreed to publish it on the site and social pages.\n\n<i>${esc(story)}</i>`);
+  }
+  return send(env, chatId, tr(L, 'storySaved'), mainMenu(L));
 }
 
 export async function settingsMenu(chatId, tag, env, L) {
@@ -529,7 +572,7 @@ export async function deleteTagData(env, chatId, tag, L) {
   }
   const x = await getExtras(env, id);
   if (kvOn(env)) {
-    await Promise.all(['x:', 'c:', 'img:', 'f:'].map((p) => env.FYP_KV.delete(p + id).catch(() => {})));
+    await Promise.all(['x:', 'c:', 'img:', 'f:', 'story:'].map((p) => env.FYP_KV.delete(p + id).catch(() => {})));
     const o = x.order_id ? await getOrder(env, x.order_id) : null;
     if (o) {
       o.items = o.items.map((i) => (i.tag_id === id ? { ...i, pet_name: '', deleted: true } : i));

@@ -131,6 +131,14 @@ export const BOT = {
       (v.photo ? '' : '📷 No photo yet — send /photo: people recognise a pet by its photo.\n\n') +
       `When ${v.pet} is home, send /found.`,
     lostOff: (v) => `✅ Great news! Lost mode is OFF — ${v.pet}'s page is back to normal. ❤️`,
+    storyAsk: (v) => `🏠 We are so glad ${v.pet} is home!\n\nWould you tell us in a few words how ${v.pet} was found? With your permission we will share the story on findy-pet.com and our social pages. It helps other owners believe their pet can come home too.`,
+    btnStory: '✍️ Tell the story', btnNoStory: 'No, thanks',
+    askStory: (v) => `✍️ Write how ${v.pet || 'your pet'} was found: where, who helped, how long it took. One message is enough.\n\n` +
+      'By sending it you agree that we may publish it with the pet\'s name. We never publish your name, phone or address. ' +
+      'Changed your mind? Send /nostory and we will delete the story.',
+    storySaved: '❤️ Thank you! We have your story.',
+    storyRemoved: '🗑 Your story is deleted.',
+    storyNo: 'OK. We are happy everything ended well ❤️',
     btnChangeP2: '📞 Change second contact', btnAddP2: '📞 Add second contact',
     btnChangeNotes: '📝 Change notes', btnAddNotes: '📝 Add notes for the finder',
     btnRmP2: '🗑 Remove second contact', btnRmNotes: '🗑 Remove notes', btnPhoto: '📷 Pet photo',
@@ -329,6 +337,14 @@ export const BOT = {
       (v.photo ? '' : `📷 עדיין אין תמונה — שלחו ${LRM}/photo: אנשים מזהים חיה לפי התמונה.\n\n`) +
       `כשחיית המחמד חוזרת הביתה, שלחו ${LRM}/found.`,
     lostOff: (v) => `✅ חדשות טובות! מצב החיפוש כבוי — הדף של ${v.pet} חזר לרגיל. ❤️`,
+    storyAsk: (v) => `🏠 איזה כיף ש${v.pet} בבית!\n\nתספרו לנו בכמה מילים איך ${v.pet} נמצא/ה? באישורכם נשתף את הסיפור באתר findy-pet.com וברשתות החברתיות שלנו. זה נותן תקווה לבעלים אחרים.`,
+    btnStory: '✍️ לספר את הסיפור', btnNoStory: 'לא, תודה',
+    askStory: (v) => `✍️ כתבו איך ${v.pet || 'חיית המחמד'} נמצא/ה: איפה, מי עזר, כמה זמן זה לקח. הודעה אחת מספיקה.\n\n` +
+      'בשליחת ההודעה אתם מסכימים שנפרסם אותה עם השם של חיית המחמד. את השם, הטלפון והכתובת שלכם לא נפרסם אף פעם. ' +
+      'אם תתחרטו, שלחו /nostory ונמחק את הסיפור.',
+    storySaved: '❤️ תודה! קיבלנו את הסיפור.',
+    storyRemoved: '🗑 הסיפור שלכם נמחק.',
+    storyNo: 'בסדר. אנחנו שמחים שהכול נגמר טוב ❤️',
     btnChangeP2: '📞 שינוי איש קשר נוסף', btnAddP2: '📞 הוספת איש קשר נוסף',
     btnChangeNotes: '📝 שינוי הערות', btnAddNotes: '📝 הוספת הערות למוצא',
     btnRmP2: '🗑 הסרת איש הקשר הנוסף', btnRmNotes: '🗑 הסרת ההערות', btnPhoto: '📷 תמונה',
@@ -530,6 +546,14 @@ export const BOT = {
       (v.photo ? '' : '📷 Фото пока нет — отправьте /photo: питомца узнают по фото.\n\n') +
       'Когда питомец вернётся домой, отправьте /found.',
     lostOff: (v) => `✅ Отличные новости! Режим поиска выключен — страница питомца ${v.pet} снова обычная. ❤️`,
+    storyAsk: (v) => `🏠 Как здорово, что ${v.pet} дома!\n\nРасскажете в двух словах, как всё было? С вашего согласия мы поделимся историей на findy-pet.com и в наших соцсетях. Это даёт надежду другим хозяевам.`,
+    btnStory: '✍️ Рассказать историю', btnNoStory: 'Нет, спасибо',
+    askStory: (v) => `✍️ Напишите, как всё было${v.pet ? ` с ${v.pet}` : ''}: где нашли, кто помог, сколько времени прошло. Хватит одного сообщения.\n\n` +
+      'Отправляя его, вы соглашаетесь, что мы опубликуем историю с кличкой питомца. Ваше имя, телефон и адрес мы не публикуем никогда. ' +
+      'Передумаете — отправьте /nostory, и мы удалим историю.',
+    storySaved: '❤️ Спасибо! История у нас.',
+    storyRemoved: '🗑 Ваша история удалена.',
+    storyNo: 'Хорошо. Мы рады, что всё закончилось хорошо ❤️',
     btnChangeP2: '📞 Изменить второй контакт', btnAddP2: '📞 Добавить второй контакт',
     btnChangeNotes: '📝 Изменить заметки', btnAddNotes: '📝 Добавить заметки для нашедшего',
     btnRmP2: '🗑 Удалить второй контакт', btnRmNotes: '🗑 Удалить заметки', btnPhoto: '📷 Фото питомца',
