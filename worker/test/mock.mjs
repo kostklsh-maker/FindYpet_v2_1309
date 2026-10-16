@@ -89,7 +89,9 @@ globalThis.fetch = async (input, init = {}) => {
 
 export function makeEnv(extra = {}) {
   return { GAS_URL: 'https://gas.mock/exec', GAS_KEY: 'k', BOT_TOKEN: 'T', BOT_USERNAME: 'YourPetLocatorBot',
-    WEBHOOK_SECRET: 'sec', ADMIN_CHAT_ID: 'admin', TIMEZONE: 'Asia/Jerusalem', FYP_KV: KV, ...extra };
+    WEBHOOK_SECRET: 'sec', ADMIN_CHAT_ID: 'admin', TIMEZONE: 'Asia/Jerusalem', FYP_KV: KV,
+    TAG_CODES: '0', // старые тесты — жетоны по номерам; коды (C4) проверяет свой тест
+    ...extra };
 }
 
 export async function call(env, path, { method = 'GET', body, headers = {} } = {}) {

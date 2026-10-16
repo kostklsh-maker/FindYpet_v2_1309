@@ -467,7 +467,7 @@
     // ------------------------------------------------------------
     const API = (typeof API_URL !== 'undefined' ? API_URL : '').replace(/\/+$/, '');
     const params = new URLSearchParams(location.search);
-    const pathId = (location.pathname.match(/\/t\/(\d{1,9})\/?$/) || [])[1];
+    const pathId = (location.pathname.match(/\/t\/(\d{1,9}|[A-Za-z0-9]{8})\/?$/) || [])[1];
     const tagId = (params.get('id') || params.get('id_tag') || pathId || '').trim();
 
     const SCREENS = ['loading', 'pet', 'notFound', 'tempError'];
@@ -484,7 +484,7 @@
 
     async function load() {
       show('loading');
-      if (!/^\d{1,9}$/.test(tagId)) return show('notFound');
+      if (!/^(\d{1,9}|[A-Za-z0-9]{8})$/.test(tagId)) return show('notFound'); // номер (старые жетоны) или код из 8 знаков (C4)
       try {
         const res = await fetch(`${API}/api/tag?id=${encodeURIComponent(tagId)}`);
         const d = await res.json();
