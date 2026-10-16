@@ -1469,7 +1469,7 @@ await test('tag codes (C4): new tags open only by a random code; the number stop
   const e = makeEnv({ TAG_CODES: undefined });
   const d = await (await call(e, '/api/register', { method: 'POST', body: { owner_name: 'Code Owner', phone: '050-555-0101', pet_name: 'Kiwi', address: 'Haifa', consent: true } })).json();
   assert.equal(d.success, true);
-  const m = /\/t\/([A-HJ-NP-Z2-9]{8})$/.exec(d.tag_url);
+  const m = /\/t\/([A-HJ-NP-Z2-9]{7})$/.exec(d.tag_url);
   assert.ok(m, d.tag_url);
   const code = m[1], id = String(d.id_tag);
   assert.equal(await KV.get(`k:${code}`), id);
@@ -1483,6 +1483,16 @@ await test('tag codes (C4): new tags open only by a random code; the number stop
   const up = await call(e, `/T/${code}`);
   assert.equal(up.status, 301);
   assert.match(up.headers.get('Location'), new RegExp(`/t/${code}$`));
+  // QR на крышке: HTTPS://FINDY-PET.COM/<код> (29 знаков — QR версии 2, 20 мм) → страница жетона
+  const bare = await call(e, `/${code}`);
+  assert.equal(bare.status, 301);
+  assert.match(bare.headers.get('Location'), new RegExp(`/t/${code}$`));
+  assert.equal(`HTTPS://FINDY-PET.COM/${code}`.length, 29);
+  // первые коды (16.10) были из 8 знаков — продолжают работать
+  await KV.put('k:ABCDEFGH', id);
+  assert.equal((await (await call(e, '/api/tag?id=ABCDEFGH')).json()).pet_name, 'Kiwi');
+  assert.equal((await call(e, '/t/ABCDEFGH')).status, 200);
+  await KV.delete('k:ABCDEFGH');
   assert.equal((await call(e, '/api/scan', { method: 'POST', body: { id_tag: id } })).status, 400);
   assert.equal((await (await call(e, '/api/scan', { method: 'POST', body: { id_tag: code } })).json()).success, true);
   assert.equal((await call(e, `/p/${code}`)).status, 200);
@@ -1491,6 +1501,8 @@ await test('tag codes (C4): new tags open only by a random code; the number stop
   const sheet = state.tg.filter((c) => c.payload.chat_id === 'admin' && /New order/.test(c.payload.text || '')).at(-1);
   assert.match(sheet.payload.text, new RegExp(`medallion_v2\\.py lid ${code} "KIWI"`));
   assert.match(sheet.payload.text, new RegExp(`/t/${code}</code>`));
+  assert.match(sheet.payload.text, new RegExp(`🔳 QR: <code>HTTP://LOCALHOST:8787/${code}</code>`));
+  assert.match(sheet.payload.text, new RegExp(`data=${encodeURIComponent('HTTP://LOCALHOST:8787/' + code)}`));
   // привязка Telegram: в сообщении ссылка с кодом, без номера
   await tgUpdate(e, msg('C4OWNER', '/start ' + d.telegram_link.split('start=')[1]));
   const reg = state.tg.filter((c) => c.payload.chat_id === 'C4OWNER' && /Kiwi/.test(c.payload.text || '')).at(-1);
@@ -1505,8 +1517,8 @@ await test('tag codes (C4): new tags open only by a random code; the number stop
   assert.equal((await (await call(e, `/api/tag?id=${old.id_tag}`)).json()).found, true, 'not an admin — nothing changes');
   await tgUpdate(e, msg('admin', `/code ${old.id_tag}`));
   const ans = lastTg('sendMessage').payload.text;
-  const oc = /\/t\/([A-HJ-NP-Z2-9]{8})/.exec(ans)[1];
-  assert.match(ans, new RegExp(`/T/${oc}`));
+  const oc = /\/t\/([A-HJ-NP-Z2-9]{7})/.exec(ans)[1];
+  assert.match(ans, new RegExp(`QR: <code>HTTP://LOCALHOST:8787/${oc}</code>`));
   assert.equal((await (await call(e, `/api/tag?id=${old.id_tag}`)).json()).found, false);
   assert.equal((await (await call(e, `/api/tag?id=${oc}`)).json()).pet_name, 'Oldie');
   assert.equal((await KV.get(`o:${old.order_id}`, 'json')).items[0].code, oc);

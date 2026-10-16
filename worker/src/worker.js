@@ -846,11 +846,14 @@ async function route(request, env, ctx) {
     if (path.startsWith('/api/')) return json({ success: false, error: 'not_found' }, env, 404);
 
     // ---- QR на напечатанном медальоне: HTTPS://FINDY-PET.COM/T/101 (заглавные буквы — QR на 15 % меньше) ----
-    const upper = /^\/T\/(\d{1,9}|[A-Z0-9]{8})$/.exec(path);
+    const upper = /^\/T\/(\d{1,9}|[A-Z0-9]{7,8})$/.exec(path);
     if (upper) return Response.redirect(`${url.origin}/t/${upper[1]}`, 301);
+    // ---- QR жетона с кодом (C4): HTTPS://FINDY-PET.COM/K7QM2XA — без /T/, чтобы QR остался 20 мм (версия 2) ----
+    const bare = /^\/([A-HJ-NP-Z2-9]{7})$/.exec(path);
+    if (bare) return Response.redirect(`${url.origin}/t/${bare[1]}`, 301);
 
     // ---- Короткая ссылка /t/101 (для QR на жетоне) → та же страница метки ----
-    if (/^\/t\/(\d{1,9}|[A-Za-z0-9]{8})$/.test(path)) {
+    if (/^\/t\/(\d{1,9}|[A-Za-z0-9]{7,8})$/.test(path)) {
       const tagReq = new Request(new URL('/tag/index.html', url.origin), request);
       const res = env.ASSETS ? await env.ASSETS.fetch(tagReq) : serveEmbedded(new URL('/tag/index.html', url.origin), env);
       return noindex(res);
@@ -861,14 +864,14 @@ async function route(request, env, ctx) {
     if (path === '/sitemap.xml') return new Response(sitemapXml(env, url), { headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
 
     // ---- Объявление «Потерялся» для групп и печати ----
-    const pm = /^\/p\/(\d{1,9}|[A-Za-z0-9]{8})$/.exec(path);
+    const pm = /^\/p\/(\d{1,9}|[A-Za-z0-9]{7,8})$/.exec(path);
     if (pm && request.method === 'GET') {
       if (await limited(env, 'RL_READ', `${clientIp(request)}:/p`)) return new Response('Too many requests', { status: 429 });
       return await posterPage(env, url, (await tagRef(env, pm[1])) || '0', ctx);
     }
 
     // ---- Фото питомца (загружено владельцем в боте, /photo) ----
-    const img = /^\/img\/(\d{1,9}|[A-Za-z0-9]{8})$/.exec(path);
+    const img = /^\/img\/(\d{1,9}|[A-Za-z0-9]{7,8})$/.exec(path);
     if (img && request.method === 'GET') return await servePhoto(env, (await tagRef(env, img[1])) || '0', url);
 
     // ---- Цены тарифов для сайта ----
@@ -2509,14 +2512,17 @@ async function notifyAdmin(env, url, order) {
   const blocks = [];
   for (const it of order.items) {
     const short = shortUrl(env, url, it.code || it.tag_id);
-    const qr = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=8&data=${encodeURIComponent(short)}`;
+    // жетон с кодом: в QR — короткий текст заглавными (HTTPS://FINDY-PET.COM/<код>), в NFC — обычная ссылка
+    const qrData = it.code ? qrText(env, url, it.code) : short;
+    const qr = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=8&data=${encodeURIComponent(qrData)}`;
     for (let c = 0; c < it.copies; c++) {
       k++;
       blocks.push(c === 0
         ? `🏷 <b>Tag ${k} of ${total} — #${it.tag_id}</b>\n` +
           `🖨 Lid: <b>${esc(String(it.pet_name).toUpperCase())}</b> · ${esc(phonePrint)}\n` +
           `<code>python3 medallion_v2.py lid ${it.code || it.tag_id} "${esc(String(it.pet_name).toUpperCase().replace(/"/g, ''))}" ${esc(phonePrint)}</code>\n` +
-          `✍️ NFC + 🔳 QR: <code>${esc(short)}</code>\n<a href="${esc(qr)}">Download QR image</a>`
+          (it.code ? `✍️ NFC: <code>${esc(short)}</code>\n🔳 QR: <code>${esc(qrData)}</code>\n` : `✍️ NFC + 🔳 QR: <code>${esc(short)}</code>\n`) +
+          `<a href="${esc(qr)}">Download QR image</a>`
         : `🏷 <b>Tag ${k} of ${total} — #${it.tag_id} (spare)</b>\n` +
           `Exact copy of the ${esc(it.pet_name)} tag above: same lid, same NFC link.`);
     }
@@ -3213,14 +3219,17 @@ function posterUrl(env, url, id) {
 }
 
 // ---------------------------------------------------------------
-// Случайные коды жетонов (C4). Новый жетон получает код из 8 знаков (/t/K7QM2XAB):
+// Случайные коды жетонов (C4). Новый жетон получает код из 7 знаков (/t/K7QM2XA):
 // номера идут подряд (101, 102…), а код не угадать перебором. Код хранится в доп. данных
 // жетона (x:<номер>.code, попадает в резервную копию) и в KV k:<код> = номер.
 // У жетона с кодом страница по номеру не открывается. Старые жетоны без кода работают по номеру.
 // Алфавит без 0/O и 1/I: код читается с крышки, а QR из заглавных букв и цифр меньше.
+// 7 знаков (35 бит) — предел для QR версии 2 (20 мм на крышке) с защитой Q: HTTPS://FINDY-PET.COM/<код>
+// ровно 29 знаков. Первые коды 16.10 были из 8 знаков — они продолжают работать.
 // ---------------------------------------------------------------
 const CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const CODE_RE = /^[A-HJ-NP-Z2-9]{8}$/;
+const CODE_LEN = 7;
+const CODE_RE = /^[A-HJ-NP-Z2-9]{7,8}$/;
 
 function randCode(n) {
   // 256 делится на 32 без остатка — все знаки равновероятны
@@ -3231,7 +3240,7 @@ function randCode(n) {
 async function newTagCode(env, id, force) {
   if (!kvOn(env) || (env.TAG_CODES === '0' && !force)) return ''; // TAG_CODES=0 — выключатель: новые жетоны снова по номерам
   for (let i = 0; i < 5; i++) {
-    const code = randCode(8);
+    const code = randCode(CODE_LEN);
     if ((await env.FYP_KV.get(`k:${code}`)) !== null) continue;
     await env.FYP_KV.put(`k:${code}`, String(id));
     return code;
@@ -3269,8 +3278,14 @@ async function adminTagCode(env, url, text) {
   const it = o && o.items.find((i) => i.tag_id === id);
   if (it) { it.code = code; await saveOrder(env, o); }
   const link = shortUrl(env, url, code);
-  return `✅ Tag #${id} now opens only by its code.\n✍️ NFC: <code>${esc(link)}</code>\n🔳 QR: <code>${esc(link.replace(/\/t\//, '/T/').toUpperCase())}</code>\n` +
+  return `✅ Tag #${id} now opens only by its code.\n✍️ NFC: <code>${esc(link)}</code>\n🔳 QR: <code>${esc(qrText(env, url, code))}</code>\n` +
     `The old link /t/${id} no longer works.`;
+}
+
+/** Текст QR на крышке: заглавными (режим букв и цифр — QR меньше). С кодом — без /T/, с номером — /T/<номер>. */
+function qrText(env, url, key) {
+  const base = siteBase(env, url).toUpperCase();
+  return /^\d+$/.test(String(key)) ? `${base}/T/${key}` : `${base}/${key}`;
 }
 
 /** Что ставить в адрес жетона: код, если он есть, иначе номер. */
