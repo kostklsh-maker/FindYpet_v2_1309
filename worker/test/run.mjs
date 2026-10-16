@@ -1130,8 +1130,8 @@ await test('site order: the same idempotency key never creates a second order; T
 });
 
 await test('failures reach the admin: order the table refused; finder who could not reach the owner', async () => {
-  state.gasDown = true;
-  const r = await call(env, '/api/register', { method: 'POST', body: { owner_name: 'Down', phone: '050-999-0002', pet_name: 'Nope', address: 'Haifa', consent: true } });
+  state.gasDown = true; // без хранилища очереди нет — клиент видит «попробуйте ещё раз», админ получает данные
+  const r = await call({ ...env, FYP_KV: undefined }, '/api/register', { method: 'POST', body: { owner_name: 'Down', phone: '050-999-0002', pet_name: 'Nope', address: 'Haifa', consent: true } });
   state.gasDown = false;
   assert.equal(r.status, 502);
   assert.match(state.tg.filter((c) => c.payload.chat_id === 'admin').at(-1).payload.text, /Site order FAILED[\s\S]*Down · 📱 \+972 50-999-0002/);
@@ -1400,6 +1400,69 @@ await test('ads: order keeps a clean ad label; /spend adds spend for the admin o
 await test('landing remembers the ad label from the link and sends it with the order', async () => {
   const js = await (await call(env, '/js/register-form.js')).text();
   assert.match(js, /utm_source/); assert.match(js, /fbclid/); assert.match(js, /src: adSrc/);
+});
+
+await test('order queue: table down → order waits, customer gets a bot link; retries every 10 minutes; written later; Start before and after', async () => {
+  const T0 = Date.now();
+  const tick = async (ms, cron = '*/10 * * * *') => {
+    const pending = [];
+    await worker.scheduled({ cron, scheduledTime: ms }, env, { waitUntil: (p) => pending.push(p) });
+    await Promise.all(pending);
+  };
+  state.gasDown = true;
+  const body = { owner_name: 'Queue Q', phone: '050-444-0001', pet_name: 'Mila', address: 'Haifa', consent: true, lang: 'ru', idem: 'queue-test-0001' };
+  const d = await (await call(env, '/api/register', { method: 'POST', body })).json();
+  assert.equal(d.success, true); assert.equal(d.queued, true);
+  assert.match(d.order_id, /^Q[A-Z2-9]{8}$/);
+  const qid = d.order_id.slice(1);
+  assert.equal(d.telegram_link, `https://t.me/YourPetLocatorBot?start=q_${qid}`);
+  assert.match(lastTg('sendMessage').payload.text, new RegExp(`Site order Q${qid} is queued[\\s\\S]*Queue Q`));
+  // повтор того же нажатия — тот же ответ, вторая запись в очередь не появляется
+  const d2 = await (await call(env, '/api/register', { method: 'POST', body })).json();
+  assert.equal(d2.order_id, d.order_id);
+  assert.equal((await KV.list({ prefix: 'pq:' })).keys.length, 1);
+  // клиент нажал Start, пока заказ в очереди: бот запомнил чат и ответил на языке заказа
+  await tgUpdate(env, msg('QC1', `/start q_${qid}`));
+  assert.match(lastTg('sendMessage').payload.text, /Мы получили ваш заказ для <b>Mila<\/b>/);
+  await tgUpdate(env, msg('QC2', `/start q_${qid}`));
+  assert.match(lastTg('sendMessage').payload.text, /not valid/);
+  // первые 10 минут не трогаем; потом таблица всё ещё лежит — пауза растёт
+  const docs = state.tg.filter((c) => c.method === 'sendDocument').length;
+  await tick(T0 + 60000);
+  assert.equal((await KV.get(`pq:${qid}`, 'json')).tries, 0);
+  await tick(T0 + 11 * 60000);
+  const q1 = await KV.get(`pq:${qid}`, 'json');
+  assert.equal(q1.tries, 1); assert.ok(q1.next >= T0 + 30 * 60000);
+  assert.equal(state.tg.filter((c) => c.method === 'sendMessage' && /Reminder|reminder/.test(c.payload.text || '')).length >= 0, true);
+  assert.equal(state.tg.filter((c) => c.method === 'sendDocument').length, docs, 'queue run does not send the daily backup');
+  // таблица поднялась — заказ записан, клиент получил подтверждение, админ — заказ и отметку
+  state.gasDown = false;
+  const n = state.tg.length;
+  await tick(T0 + 40 * 60000);
+  assert.equal(await KV.get(`pq:${qid}`), null);
+  const out = state.tg.slice(n).filter((c) => c.method === 'sendMessage');
+  assert.ok(out.some((c) => c.payload.chat_id === 'admin' && /New order FY/.test(c.payload.text)));
+  assert.ok(out.some((c) => c.payload.chat_id === 'admin' && new RegExp(`Queued order Q${qid} is written`).test(c.payload.text)));
+  assert.ok(out.some((c) => c.payload.chat_id === 'QC1' && /Mila/.test(c.payload.text) && /№154|FY\d+/.test(c.payload.text)));
+  const tag = state.tags.filter((t) => t.pet_name === 'Mila').at(-1);
+  assert.equal(String(tag.telegram_chat_id), 'QC1');
+  // старая ссылка q_ после записи работает как обычная ссылка активации
+  await tgUpdate(env, msg('QC1', `/start q_${qid}`));
+  assert.ok(state.tg.slice(-2).some((c) => /Mila/.test(c.payload.text || '')));
+
+  // таблица лежит 48 часов — админ получает все данные для ручного заказа, клиент — сообщение
+  state.gasDown = true;
+  const f = await (await call(env, '/api/register', { method: 'POST', body: { owner_name: 'Never', phone: '050-444-0002', pet_name: 'Lost', address: 'Akko 5', consent: true, lang: 'he' } })).json();
+  const fq = f.order_id.slice(1);
+  await tgUpdate(env, msg('QC3', `/start q_${fq}`));
+  assert.match(lastTg('sendMessage').payload.text, /קיבלנו את ההזמנה/);
+  await tick(T0 + 49 * 3600000);
+  state.gasDown = false;
+  assert.equal(await KV.get(`pq:${fq}`), null);
+  const last = state.tg.slice(-2);
+  assert.ok(last.some((c) => c.payload.chat_id === 'admin' && new RegExp(`Q${fq} was NOT written[\\s\\S]*Never[\\s\\S]*Akko 5[\\s\\S]*Lost ×1`).test(c.payload.text)));
+  assert.ok(last.some((c) => c.payload.chat_id === 'QC3' && /לא הצלחנו/.test(c.payload.text)));
+  await KV.delete(`pqd:${qid}`);
 });
 
 console.log(`\n${passed} tests passed`);

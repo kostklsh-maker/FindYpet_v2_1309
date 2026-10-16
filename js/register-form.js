@@ -125,6 +125,9 @@
         document.getElementById("orderIdDisplay").textContent = d.order_id || ("#" + d.id_tag);
         const list = document.getElementById("doneTags");
         list.textContent = "";
+        const ct = document.getElementById("connectText");
+        // Таблица не ответила: заказ в очереди, номера жетонов придут в Telegram, когда он запишется
+        if (d.queued) { ct.dataset.t = "connectQueued"; ct.textContent = t(ct.dataset.t); return; }
         (d.tags || [{ id_tag: d.id_tag, pet_name: "", copies: 1, tag_url: d.tag_url }]).forEach(function (tg) {
             const li = document.createElement("li");
             const b = document.createElement("b");
@@ -137,7 +140,6 @@
             li.appendChild(b); li.appendChild(a);
             list.appendChild(li);
         });
-        const ct = document.getElementById("connectText");
         ct.dataset.t = "connectTg";
         ct.textContent = t(ct.dataset.t);
     }

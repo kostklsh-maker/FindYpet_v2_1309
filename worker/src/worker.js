@@ -78,6 +78,9 @@ const BOT = {
     askAddress: '🏠 Your <b>address</b> (city, street, apartment) — we ship the tag there. It is never shown on the pet page.',
     cancelled: 'Cancelled. Send /help to see what I can do.',
     notFoundToken: '⚠️ This activation link is not valid (or expired).\nYou can register a new pet here: /register',
+    queuedWait: (v) => '⏳ We got your order for <b>' + v.pet + '</b>. Our system was busy, so it is being finished automatically. ' +
+      'When it is done, the confirmation and the tag link will come right here. You don\'t need to do anything.',
+    queuedFail: (v) => '⚠️ We could not finish your order for <b>' + v.pet + '</b> automatically. Nothing is lost: we will call you soon to complete it.',
     tokenUsed: '⚠️ This activation link has already been used by another Telegram account. ' +
       'If that was you on another device, write to us here and we will move the tag to this chat.',
     noTags: 'You have no registered pets yet. Tap /register to add one.',
@@ -275,6 +278,9 @@ const BOT = {
     askAddress: '🏠 <b>הכתובת</b> שלכם (עיר, רחוב, דירה) — לשם נשלח את התג. היא אף פעם לא מוצגת בדף החיה.',
     cancelled: `בוטל. שלחו ${LRM}/help כדי לראות מה אני יודע לעשות.`,
     notFoundToken: `⚠️ קישור ההפעלה הזה לא תקף (או שפג תוקפו).\nאפשר לרשום חיית מחמד חדשה כאן: ${LRM}/register`,
+    queuedWait: (v) => '⏳ קיבלנו את ההזמנה שלכם עבור <b>' + v.pet + '</b>. המערכת הייתה עמוסה, ולכן ההזמנה מושלמת אוטומטית. ' +
+      'כשהיא תושלם, האישור והקישור לתג יגיעו לכאן. אין צורך לעשות דבר.',
+    queuedFail: (v) => '⚠️ לא הצלחנו להשלים אוטומטית את ההזמנה עבור <b>' + v.pet + '</b>. שום דבר לא אבד: נתקשר אליכם בקרוב כדי להשלים אותה.',
     tokenUsed: '⚠️ קישור ההפעלה הזה כבר שימש חשבון טלגרם אחר. אם אלה הייתם אתם ממכשיר אחר, כתבו לנו כאן ונעביר את התג לצ׳אט הזה.',
     noTags: `עדיין אין לכם חיות מחמד רשומות. לחצו ${LRM}/register כדי להוסיף.`,
     noKv: '⚠️ האפשרות הזו עדיין לא פעילה. נסו שוב מאוחר יותר.',
@@ -469,6 +475,9 @@ const BOT = {
     askAddress: '🏠 Ваш <b>адрес</b> (город, улица, квартира) — туда отправим жетон. На странице питомца он никогда не показывается.',
     cancelled: 'Отменено. Отправьте /help, чтобы увидеть, что я умею.',
     notFoundToken: '⚠️ Эта ссылка для активации недействительна (или устарела).\nЗарегистрировать нового питомца можно здесь: /register',
+    queuedWait: (v) => '⏳ Мы получили ваш заказ для <b>' + v.pet + '</b>. Система была занята, поэтому заказ оформляется автоматически. ' +
+      'Когда он будет готов, подтверждение и ссылка на жетон придут сюда. Ничего делать не нужно.',
+    queuedFail: (v) => '⚠️ Не получилось автоматически оформить заказ для <b>' + v.pet + '</b>. Ничего не потерялось: мы скоро позвоним и закончим оформление.',
     tokenUsed: '⚠️ Эта ссылка активации уже использована другим аккаунтом Telegram. ' +
       'Если это были вы с другого устройства, напишите нам здесь — мы перенесём жетон в этот чат.',
     noTags: 'У вас пока нет зарегистрированных питомцев. Нажмите /register, чтобы добавить.',
@@ -772,9 +781,14 @@ export default {
   // по воскресеньям — ещё недельная сводка админу (B10)
   // (у сводки свой cron WEEKLY_CRON — отдельный запуск со своим лимитом операций KV)
   async scheduled(event, env, ctx) {
-    if (isTestSite(env)) return; // тестовый сайт напоминаний и копий не рассылает
     const cron = event && event.cron;
-    if (cron !== WEEKLY_CRON) {
+    // очередь заказов (C3) — и на тестовом сайте, чтобы её можно было проверить
+    if (cron === QUEUE_CRON || !cron) {
+      const now = (event && event.scheduledTime) || Date.now();
+      ctx.waitUntil(processQueue(env, now).catch((e) => console.error('queue error', e)));
+    }
+    if (isTestSite(env)) return; // тестовый сайт напоминаний и копий не рассылает
+    if (cron === DAILY_CRON || !cron) {
       ctx.waitUntil(sendReminders(env).catch((e) => console.error('reminders error', e)));
       ctx.waitUntil(dailyBackup(env).catch((e) => console.error('backup error', e)));
     }
@@ -1063,6 +1077,8 @@ async function bumpFail(env, kind) {
 // Заказы берутся из KV (o:FY…), остальное — из дневных счётчиков ev:<день>.
 // ---------------------------------------------------------------
 const WEEKLY_CRON = '30 6 * * SUN'; // как в worker/wrangler.toml
+const DAILY_CRON = '0 7 * * *';
+const QUEUE_CRON = '*/10 * * * *';
 const FAIL_KINDS = { db: 'database', tg: 'Telegram', sms: 'SMS', backup: 'backup', server: 'server' };
 
 function ilDay(env, ms) {
@@ -1190,13 +1206,24 @@ async function apiRegister(request, env, url, ctx) {
     if (prev) return json(JSON.parse(prev), env);
     await env.FYP_KV.put(idem, 'pending', { expirationTtl: 120 });
   }
-  const res = await createOrder(env, url, {
+  const args = {
     source: 'site', qty, lang, owner_name: owner, phone, address, items, phone2, notes,
     care_interest: b.care === true,
     ad_src: adSrc(b.src),
     // 3 жетона присылала только страница 2 + 1, открытая до 07.10 (там было «98 ₪») — админ уточнит цену
     old_offer: Number(b.tags) === 3,
-  });
+  };
+  const res = await createOrder(env, url, args);
+  if (!res.ok && kvOn(env)) {
+    // Таблица не ответила: заказ ждёт в очереди и запишется сам, клиент получает ссылку на бота сразу
+    const qid = await queueOrder(env, url, args);
+    const out = { success: true, queued: true, order_id: `Q${qid}`, tags: [], telegram_link: `https://t.me/${env.BOT_USERNAME}?start=q_${qid}` };
+    if (idem) await env.FYP_KV.put(idem, JSON.stringify(out), { expirationTtl: 600 });
+    ctx.waitUntil(send(env, env.ADMIN_CHAT_ID,
+      `⏳ <b>Site order Q${qid} is queued</b> — the table did not answer. It is retried every 10 minutes for ${Q_HOURS} hours; ` +
+      `you get a message when it is written.\n👤 ${esc(owner)} · 📱 ${esc(prettyPhone(phone))} · 🐾 ${esc(pet)} · ${qty} tag(s)`));
+    return json(out, env);
+  }
   if (!res.ok) {
     if (idem) await env.FYP_KV.delete(idem);
     ctx.waitUntil(alertAdmin(env, `order:${phone}`,
@@ -1264,6 +1291,85 @@ async function alertAdmin(env, key, text) {
     try { if (await env.FYP_KV.get(k)) return; await env.FYP_KV.put(k, '1', { expirationTtl: 600 }); } catch (e) { /* без замка */ }
   }
   await send(env, env.ADMIN_CHAT_ID, text);
+}
+
+// ---------------------------------------------------------------
+// Очередь заказов (C3). Таблица не ответила — заказ сохраняется в KV (pq:<id>) и записывается позже:
+// каждые 10 минут (cron), паузы растут до 2 часов, всего до Q_HOURS часов. Клиент сразу получает
+// ссылку на бота (start=q_<id>). Нажал Start раньше записи — бот запоминает чат и потом сам
+// привязывает жетоны и присылает подтверждение. Записанный заказ: pqd:<id> = ссылка активации.
+// ---------------------------------------------------------------
+const Q_HOURS = 48;
+
+function queueId() {
+  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => abc[b % abc.length]).join('');
+}
+
+async function queueOrder(env, url, o) {
+  const qid = queueId();
+  const now = Date.now();
+  const q = { qid, o, origin: url.origin, at: now, tries: 0, next: now + 10 * 60000, chat_id: '' };
+  await env.FYP_KV.put(`pq:${qid}`, JSON.stringify(q), { expirationTtl: (Q_HOURS + 24) * 3600 });
+  return qid;
+}
+
+async function processQueue(env, now = Date.now()) {
+  if (!kvOn(env)) return;
+  const page = await env.FYP_KV.list({ prefix: 'pq:', limit: 20 });
+  for (const k of page.keys) {
+    const q = await env.FYP_KV.get(k.name, 'json').catch(() => null);
+    if (!q) continue;
+    const url = new URL(q.origin);
+    const pet = esc((q.o.items[0] || {}).pet_name || '');
+    // уже записан (Start нажали в ту же минуту) — только привязываем чат
+    const done = await env.FYP_KV.get(`pqd:${q.qid}`);
+    if (done !== null) {
+      await env.FYP_KV.delete(k.name);
+      if (q.chat_id && done) await linkFromSite(q.chat_id, done, env, url, null);
+      continue;
+    }
+    if (q.next > now) continue;
+    const res = await createOrder(env, url, q.o);
+    if (res.ok) {
+      const token = res.tags[0].link_token || '';
+      await env.FYP_KV.put(`pqd:${q.qid}`, token, { expirationTtl: 30 * 86400 });
+      await env.FYP_KV.delete(k.name);
+      await Promise.all(res.tags.map((t) => cachePublic(env, t)));
+      await send(env, env.ADMIN_CHAT_ID, `✅ Queued order Q${q.qid} is written: <b>${res.order.order_id}</b> (attempt ${q.tries + 1}).` +
+        (q.chat_id ? ' The customer already pressed Start and gets the confirmation now.' : ' The customer has not opened the bot yet.'));
+      if (q.chat_id && token) await linkFromSite(q.chat_id, token, env, url, null);
+      continue;
+    }
+    q.tries++;
+    if (now - q.at >= Q_HOURS * 3600000) {
+      await env.FYP_KV.delete(k.name);
+      const o = q.o;
+      await send(env, env.ADMIN_CHAT_ID,
+        `❌ <b>Queued order Q${q.qid} was NOT written</b> after ${q.tries} attempts in ${Q_HOURS} hours. Create it by hand and call the customer.\n` +
+        `👤 ${esc(o.owner_name)} · 📱 ${esc(prettyPhone(o.phone))}\n🏠 ${esc(o.address)}\n` +
+        `🐾 ${o.items.map((i) => `${esc(i.pet_name)} ×${i.copies}`).join(', ')} · ${o.qty} tag(s)` +
+        (o.phone2 ? `\n📱2 ${esc(prettyPhone(o.phone2))}` : '') + (o.notes ? `\n📝 ${esc(o.notes)}` : ''));
+      if (q.chat_id) await send(env, q.chat_id, tr(await chatLang(env, q.chat_id), 'queuedFail', { pet }));
+      continue;
+    }
+    q.next = now + Math.min(120, 10 * 2 ** Math.min(q.tries, 4)) * 60000; // 20, 40, 80, 120… минут
+    await env.FYP_KV.put(k.name, JSON.stringify(q), { expirationTtl: (Q_HOURS + 24) * 3600 });
+  }
+}
+
+/** Start по ссылке из очереди (q_<id>): записанный заказ — обычная привязка; ещё в очереди — запоминаем чат. */
+async function queuedStart(chatId, qid, env, url, from, L) {
+  if (!/^[A-Z2-9]{8}$/.test(qid) || !kvOn(env)) return send(env, chatId, tr(L, 'notFoundToken'), mainMenu(L));
+  const done = await env.FYP_KV.get(`pqd:${qid}`);
+  if (done) return linkFromSite(chatId, done, env, url, from);
+  const q = await env.FYP_KV.get(`pq:${qid}`, 'json');
+  if (!q || (q.chat_id && q.chat_id !== chatId)) return send(env, chatId, tr(L, 'notFoundToken'), mainMenu(L));
+  q.chat_id = chatId;
+  await env.FYP_KV.put(`pq:${qid}`, JSON.stringify(q), { expirationTtl: (Q_HOURS + 24) * 3600 });
+  await rememberChat(env, chatId);
+  const L2 = await keepChatLang(env, chatId, q.o.lang || L);
+  return send(env, chatId, tr(L2, 'queuedWait', { pet: esc((q.o.items[0] || {}).pet_name || '') }), mainMenu(L2));
 }
 
 // ---------------------------------------------------------------
@@ -1703,6 +1809,7 @@ async function handleUpdate(update, env, url) {
   if (text.startsWith('/start')) {
     const token = text.split(/\s+/)[1];
     if (token === 'care') return careInfo(chatId, env, L);
+    if (token && token.startsWith('q_')) return queuedStart(chatId, token.slice(2), env, url, msg.from, L);
     if (token) return linkFromSite(chatId, token, env, url, msg.from);
     await db(env, 'clearState', { chat_id: chatId });
     return send(env, chatId, tr(L, 'welcome'), mainMenu(L));
