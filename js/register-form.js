@@ -49,6 +49,21 @@
             }
         } catch (err) { /* аналитика не должна мешать заказу */ }
     }
+    // Откуда пришёл посетитель (реклама): метка первого захода хранится 30 дней и уходит с заказом.
+    // Только название источника и кампании, никаких личных данных.
+    const adSrc = (function () {
+        const K = "fyp_src", DAY = 86400000;
+        try {
+            const q = new URLSearchParams(location.search);
+            const clean = function (v) { return String(v || "").toLowerCase().replace(/[^a-z0-9_.-]/g, "").slice(0, 30); };
+            let src = clean(q.get("utm_source")) || (q.get("fbclid") ? "facebook" : q.get("gclid") ? "google" : q.get("ttclid") ? "tiktok" : "");
+            if (src && q.get("utm_campaign")) src += "/" + clean(q.get("utm_campaign"));
+            const old = JSON.parse(localStorage.getItem(K) || "null");
+            if (old && old.v && Date.now() - old.t < 30 * DAY) return old.v;
+            if (src) { localStorage.setItem(K, JSON.stringify({ v: src, t: Date.now() })); return src; }
+        } catch (err) { /* без хранилища просто не знаем источник */ }
+        return "";
+    })();
     // Ключ повтора: если ответ потерялся и человек нажал «Заказать» ещё раз, второй заказ не создастся
     const newIdem = () => { try { return crypto.randomUUID(); } catch (e) { return Date.now().toString(36) + Math.random().toString(36).slice(2, 12); } };
     let idem = newIdem();
@@ -150,6 +165,7 @@
             pet_extras: multi ? fam.pet_extras : [],
             lang: currentLang,
             idem: idem,
+            src: adSrc,
             ts: tsToken
         };
         clearErrors();

@@ -965,8 +965,9 @@ async function markTestSite(res) {
 // ---------------------------------------------------------------
 // Воронка заказа: сайт присылает 4 события, счётчики по дням лежат в KV (ev:ГГГГ-ММ-ДД).
 // Админ видит итог командой /stats. Посещения считает Cloudflare Web Analytics.
+// Воронка нашедшего (B12): страница жетона присылает f_call, f_wa, f_geo; f_tg и scan считает сам Worker.
 // ---------------------------------------------------------------
-const EVENTS = ['plan', 'form', 'submit', 'tg'];
+const EVENTS = ['plan', 'form', 'submit', 'tg', 'f_call', 'f_wa', 'f_geo'];
 
 async function apiEvent(request, env, ctx) {
   const b = await request.json().catch(() => ({}));
@@ -1015,6 +1016,42 @@ async function funnelStats(env) {
     '\n\nVisits: Cloudflare dashboard → Web Analytics.';
 }
 
+// ---------------------------------------------------------------
+// Реклама (B12): откуда пришёл заказ и сколько стоит заказ из рекламы.
+// Сайт запоминает метку первого захода из рекламы (utm_source/utm_campaign, gclid, fbclid, ttclid)
+// и присылает её с заказом (src). Расходы админ вносит в боте: /spend 120 facebook.
+// ---------------------------------------------------------------
+function adSrc(v) {
+  const s = String(v || '').toLowerCase().replace(/[^a-z0-9_./-]/g, '').slice(0, 60);
+  return /^[a-z0-9]/.test(s) ? s : '';
+}
+const adKey = (src) => src.split('/')[0]; // facebook/autumn → facebook
+
+async function adSpend(env, text) {
+  if (!kvOn(env)) return 'No storage connected.';
+  const m = text.match(/^\/spend\s+(-?\d+(?:[.,]\d+)?)(?:\s+(\S+))?\s*$/);
+  if (m) {
+    const sum = Math.round(Number(m[1].replace(',', '.')) * 100) / 100;
+    const src = adKey(adSrc(m[2] || 'ads') || 'ads');
+    if (!sum || Math.abs(sum) > 100000) return 'Amount must be a number, for example: /spend 120 facebook';
+    const key = `sp:${ilDay(env, Date.now())}`;
+    const cur = (await env.FYP_KV.get(key, 'json')) || {};
+    cur[src] = Math.round(((cur[src] || 0) + sum) * 100) / 100;
+    await env.FYP_KV.put(key, JSON.stringify(cur), { expirationTtl: 400 * 86400 });
+    return `✅ Ad spend today: ${src} ${cur[src]} ${PRICING.currency}\nTo fix a mistake, send a minus: /spend -${Math.abs(sum)} ${src}`;
+  }
+  if (text.trim() !== '/spend') return 'Write: /spend 120 facebook (amount in ₪, then where the ad ran)';
+  const days = Array.from({ length: 7 }, (_, i) => ilDay(env, Date.now() - i * 86400000));
+  const t = addUp(await Promise.all(days.map((d) => env.FYP_KV.get(`sp:${d}`, 'json').catch(() => null))));
+  const list = Object.entries(t).filter(([, v]) => v).map(([k, v]) => `${k} ${v} ${PRICING.currency}`).join(' · ');
+  return `📣 Ad spend, last 7 days: ${list || 'nothing yet'}\n\nAdd: /spend 120 facebook (amount in ₪, then where the ad ran).\n` +
+    'In the ad link add ?utm_source=facebook — then orders from it are counted. The weekly summary shows the cost per order.';
+}
+
+function addUp(list) {
+  return list.reduce((t, v) => { for (const k of Object.keys(v || {})) t[k] = (t[k] || 0) + v[k]; return t; }, {});
+}
+
 /** Сбои для недельной сводки: db (таблица), tg (Telegram), sms, backup, server. Только на рабочем сайте. */
 async function bumpFail(env, kind) {
   if (kvOn(env) && !isTestSite(env)) await bumpEvent(env, `err_${kind}`);
@@ -1047,12 +1084,13 @@ async function weeklyText(env, now) {
   const daysOf = (from) => Array.from({ length: 7 }, (_, i) => ilDay(env, now - (from + i) * dayMs));
   const cur = daysOf(1), prev = daysOf(8);
   const evs = await Promise.all([...cur, ...prev].map((d) => env.FYP_KV.get(`ev:${d}`, 'json').catch(() => null)));
-  const add = (list) => list.reduce((t, v) => { for (const k of Object.keys(v || {})) t[k] = (t[k] || 0) + v[k]; return t; }, {});
-  const ev = [add(evs.slice(0, 7)), add(evs.slice(7))];
+  const ev = [addUp(evs.slice(0, 7)), addUp(evs.slice(7))];
+  const sps = await Promise.all([...cur, ...prev].map((d) => env.FYP_KV.get(`sp:${d}`, 'json').catch(() => null)));
+  const sp = [addUp(sps.slice(0, 7)), addUp(sps.slice(7))];
 
   // Заказы за две недели (лимит чтений KV на запуск — как у резервной копии)
   const wk = new Map([...cur.map((d) => [d, 0]), ...prev.map((d) => [d, 1])]);
-  const ord = [0, 1].map(() => ({ n: 0, site: 0, bot: 0, q1: 0, q2: 0, q4: 0, tags: 0, sum: 0, care: 0 }));
+  const ord = [0, 1].map(() => ({ n: 0, site: 0, bot: 0, q1: 0, q2: 0, q4: 0, tags: 0, sum: 0, care: 0, ad: {} }));
   let reads = 0, cursor;
   do {
     const page = await env.FYP_KV.list({ prefix: 'o:', cursor });
@@ -1070,6 +1108,7 @@ async function weeklyText(env, now) {
       s[tags >= PRICING.bundle ? 'q4' : tags === 2 ? 'q2' : 'q1']++;
       s.tags += tags; s.sum += Number(o.price) || 0;
       if (o.care_interest) s.care++;
+      if (o.ad_src) s.ad[adKey(o.ad_src)] = (s.ad[adKey(o.ad_src)] || 0) + 1;
     }
     cursor = page.list_complete || reads >= 600 ? undefined : page.cursor;
   } while (cursor);
@@ -1081,13 +1120,28 @@ async function weeklyText(env, now) {
   const fails = (i) => Object.keys(FAIL_KINDS).reduce((t, k) => t + n(i, `err_${k}`), 0);
   const failLine = Object.entries(FAIL_KINDS).filter(([k]) => n(0, `err_${k}`)).map(([k, name]) => `${name} ${n(0, `err_${k}`)}`).join(' · ');
   const fmt = (d) => d.slice(8, 10) + '.' + d.slice(5, 7);
+  const finder = (i) => n(i, 'f_call') + n(i, 'f_wa') + n(i, 'f_tg') + n(i, 'f_geo');
+  // Реклама: расходы (/spend) и заказы с меткой рекламы; цена заказа = расходы / заказы из рекламы
+  const cur$ = PRICING.currency;
+  const adSum = (i) => Object.values(sp[i]).reduce((a, b) => a + b, 0);
+  const adN = (i) => Object.values(ord[i].ad).reduce((a, b) => a + b, 0);
+  const cpo = (i) => (adN(i) ? `${Math.round(adSum(i) / adN(i))} ${cur$}` : '—');
+  function adLine() {
+    if (!adSum(0) && !adN(0) && !adSum(1) && !adN(1)) return '';
+    const srcs = [...new Set([...Object.keys(sp[0]), ...Object.keys(ord[0].ad)])].sort();
+    const by = srcs.map((k) => `${k}: ${ord[0].ad[k] || 0} orders / ${Math.round(sp[0][k] || 0)} ${cur$}`).join(' · ');
+    return `📣 Ads: spend ${Math.round(adSum(0))} ${cur$} · orders from ads ${adN(0)} · cost per order ${cpo(0)}${was(cpo(1))}\n` +
+      (by ? `   ${by}\n` : '');
+  }
   return `📈 <b>FindYpet weekly summary</b> · ${fmt(cur[6])}–${fmt(cur[0])}\n\n` +
     `🧾 Orders: <b>${o.n}</b> (site ${o.site} · bot ${o.bot})${was(op.n)}\n` +
     `   1 tag ×${o.q1} · 2 tags ×${o.q2} · 3 + 1 ×${o.q4}\n` +
     `   3 + 1 share: ${pct(o.q4, o.n)}${was(pct(op.q4, op.n))}\n` +
     `   Tags: ${o.tags} · at list price: ${o.sum} ${PRICING.currency}${was(`${op.sum} ${PRICING.currency}`)}\n` +
     `📲 Telegram linked after a site order: ${n(0, 'link')}${was(n(1, 'link'))}\n` +
-    `🔎 Tag page scans: ${n(0, 'scan')}${was(n(1, 'scan'))}\n` +
+    `🔎 Finder: tag page opened ${n(0, 'scan')} → call ${n(0, 'f_call')} · WhatsApp ${n(0, 'f_wa')} · ` +
+    `Telegram ${n(0, 'f_tg')} · location ${n(0, 'f_geo')}${was(`${n(1, 'scan')} → ${finder(1)}`)}\n` +
+    adLine() +
     `💚 Care waitlist: +${n(0, 'care') + o.care} (bot ${n(0, 'care')} · order form ${o.care})${was(n(1, 'care') + op.care)}\n` +
     `⚠️ Failures: ${fails(0)}${failLine ? ` (${failLine})` : ''}${was(fails(1))}\n\n` +
     `<b>Site funnel</b>: chose a plan ${n(0, 'plan')} → started the form ${n(0, 'form')} → sent an order ${n(0, 'submit')}` +
@@ -1139,6 +1193,7 @@ async function apiRegister(request, env, url, ctx) {
   const res = await createOrder(env, url, {
     source: 'site', qty, lang, owner_name: owner, phone, address, items, phone2, notes,
     care_interest: b.care === true,
+    ad_src: adSrc(b.src),
     // 3 жетона присылала только страница 2 + 1, открытая до 07.10 (там было «98 ₪») — админ уточнит цену
     old_offer: Number(b.tags) === 3,
   });
@@ -1277,6 +1332,7 @@ async function createOrder(env, url, o) { // + old_offer?: заказ со ст�
     order_id, created_at: now, source: o.source, lang: o.lang || 'en',
     ...(() => { const pr = orderPrice(o.qty); return { tags_total: pr.tags, free: pr.free, price: pr.total }; })(),
     ...(o.care_interest ? { care_interest: true } : {}),
+    ...(o.ad_src ? { ad_src: o.ad_src } : {}),
     ...(o.old_offer ? { old_offer: true } : {}),
     owner_name: o.owner_name, phone: o.phone, address: o.address,
     items, missing, chat_id: o.chat_id || '',
@@ -1401,7 +1457,10 @@ async function apiFound(request, env) {
   text += tr(L, 'safety');
   const sent = await tg(env, 'sendMessage', { chat_id: tag.telegram_chat_id, parse_mode: 'HTML', disable_web_page_preview: true, text });
   if (hasLoc) await tg(env, 'sendLocation', { chat_id: tag.telegram_chat_id, latitude: lat, longitude: lon });
-  if (sent && sent.ok && kvOn(env)) await env.FYP_KV.put(key, '1', { expirationTtl: 60 });
+  if (sent && sent.ok && kvOn(env)) {
+    await env.FYP_KV.put(key, '1', { expirationTtl: 60 });
+    await bumpEvent(env, 'f_tg');
+  }
   if (!(sent && sent.ok)) await ownerUnreachable(env, tag, hasLoc ? `https://maps.google.com/?q=${lat},${lon}` : '');
   return json({ success: !!(sent && sent.ok) }, env);
 }
@@ -1665,6 +1724,7 @@ async function handleUpdate(update, env, url) {
   // сообщения админу — по-английски
   if (text === '/orders' && isAdmin(env, chatId)) return listOrders(env, chatId);
   if (text === '/stats' && isAdmin(env, chatId)) return send(env, chatId, await funnelStats(env));
+  if (/^\/spend(\s|$)/.test(text) && isAdmin(env, chatId)) return send(env, chatId, await adSpend(env, text));
   if (text === '/week' && isAdmin(env, chatId)) return send(env, chatId, kvOn(env) ? await weeklyText(env, Date.now()) : 'No storage connected.');
   if ((text === '/plate' || text === '/plate all') && isAdmin(env, chatId)) return plateCsv(env, chatId, text === '/plate all');
   if (text === '/help') return send(env, chatId, tr(L, 'help'), mainMenu(L));
