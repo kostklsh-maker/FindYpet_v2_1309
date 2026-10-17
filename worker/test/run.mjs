@@ -1213,7 +1213,7 @@ await test('/setup: form only, key never in the address, wrong key refused, sepa
   assert.equal(r.status, 403); assert.match(await r.text(), /no longer accepted in the address/);
   assert.ok(!state.tg.slice(n).some((c) => c.method === 'setWebhook'), 'a key in the URL does nothing');
   r = await call(env, '/setup');
-  assert.equal(r.status, 200); assert.equal(r.headers.get('Cache-Control'), 'no-store');
+  assert.equal(r.status, 200); assert.equal(r.headers.get('Cache-Control'), 'no-store, no-transform'); // Н3: /setup вне Web Analytics
   const page = await r.text();
   assert.match(page, /<form method="post" action="\/setup">/); assert.match(page, /type="password"/);
   assert.equal((await setupCall(env, 'wrong')).status, 403);
@@ -1700,6 +1700,44 @@ await test('D1: every tag answer is copied to D1; reads from D1; /delete-style e
   const s = await (await setupCall({ ...e, FYP_KV: makeKV() })).json();
   assert.match(s.d1, /connected ✅ · \d+ tags copied/);
   assert.match((await (await setupCall(makeEnv({ FYP_KV: makeKV() }))).json()).d1, /not connected/);
+});
+
+await test('Н4: order without Telegram → admin reminder after 24 hours, once; linked orders skipped; bot QR for the order page', async () => {
+  const kv = makeKV();
+  const e = makeEnv({ FYP_KV: kv });
+  const reg = await (await call(e, '/api/register', { method: 'POST', body: { owner_name: 'Noa N', phone: '050-333-0071', pet_name: 'Mimi', address: 'Haifa', consent: true } })).json();
+  assert.ok(reg.order_id, JSON.stringify(reg));
+  const daily = async (ms) => {
+    const n = state.tg.length; const pending = [];
+    await worker.scheduled({ cron: '0 7 * * *', scheduledTime: ms }, e, { waitUntil: (p) => pending.push(p) });
+    await Promise.all(pending);
+    return state.tg.slice(n).filter((c) => c.method === 'sendMessage' && /Notifications are not on yet/.test(c.payload.text || ''));
+  };
+  assert.equal((await daily(Date.now() + 3600000)).length, 0, 'less than a day');
+  const ord = await kv.get(`o:${reg.order_id}`, 'json');
+  assert.ok(!ord.chat_id);
+  const got = await daily(Date.now() + 25 * 3600000);
+  assert.equal(got.length, 1);
+  assert.match(got[0].payload.text, new RegExp(reg.order_id));
+  assert.equal((await daily(Date.now() + 26 * 3600000)).length, 0, 'only once');
+  // привязанный заказ не напоминается
+  const reg2 = await (await call(e, '/api/register', { method: 'POST', body: { owner_name: 'Ron R', phone: '050-333-0072', pet_name: 'Bobo', address: 'Haifa', consent: true } })).json();
+  const o2 = await kv.get(`o:${reg2.order_id}`, 'json'); o2.chat_id = '777'; await kv.put(`o:${reg2.order_id}`, JSON.stringify(o2));
+  assert.equal((await daily(Date.now() + 50 * 3600000)).length, 0);
+  // страница заказа: QR на ссылку нашего бота; чужое не рисуем
+  const q = await call(e, '/qr/bot.svg?c=abc_123');
+  assert.equal(q.status, 200); assert.match(await q.text(), /^<svg/);
+  assert.equal((await call(e, '/qr/bot.svg?c=' + encodeURIComponent('x/../y'))).status, 400);
+});
+
+await test('Н3: tag pages and the test site are kept out of Web Analytics (no-transform); the home page is not; ?src= labels count like utm_source', async () => {
+  const cc = async (e, path) => (await call(e, path)).headers.get('Cache-Control') || '';
+  const e = makeEnv({ FYP_KV: makeKV() });
+  assert.match(await cc(e, '/t/101'), /no-transform/);
+  assert.doesNotMatch(await cc(e, '/'), /no-transform/);
+  assert.match(await cc(makeEnv({ FYP_KV: makeKV(), STAGE: 'test' }), '/'), /no-transform/);
+  const { readFileSync } = await import('node:fs');
+  assert.match(readFileSync(new URL('../../js/register-form.js', import.meta.url), 'utf8'), /clean\(q\.get\("src"\)\)/);
 });
 
 console.log(`\n${passed} tests passed`);

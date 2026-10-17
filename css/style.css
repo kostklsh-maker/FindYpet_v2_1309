@@ -447,6 +447,9 @@ input[type="text"]:focus, input[type="tel"]:focus, textarea:focus { outline: non
 .done-tags b { font-size: 15px; }
 .done-tags a { font-size: 13px; word-break: break-all; }
 .done-lead { font-weight: 500; }
+.notify-warn { background: #fff4d6; border: 1px solid #f0c24b; border-radius: 10px; padding: 10px 12px; font-weight: 600; margin: 0 0 10px; }
+.tg-qr { text-align: center; margin: 12px 0; }
+.tg-qr img { border-radius: 8px; border: 1px solid #ddd; }
 .next-title { font-weight: 800; font-size: 17px; margin: 22px 0 10px; text-align: start; }
 .next-steps { list-style: none; counter-reset: nx; text-align: start; display: flex; flex-direction: column; gap: 10px; }
 .next-steps li { counter-increment: nx; position: relative; padding-inline-start: 42px; min-height: 30px; }
