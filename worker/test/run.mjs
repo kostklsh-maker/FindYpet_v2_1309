@@ -1213,7 +1213,7 @@ await test('/setup: form only, key never in the address, wrong key refused, sepa
   assert.equal(r.status, 403); assert.match(await r.text(), /no longer accepted in the address/);
   assert.ok(!state.tg.slice(n).some((c) => c.method === 'setWebhook'), 'a key in the URL does nothing');
   r = await call(env, '/setup');
-  assert.equal(r.status, 200); assert.equal(r.headers.get('Cache-Control'), 'no-store');
+  assert.equal(r.status, 200); assert.equal(r.headers.get('Cache-Control'), 'no-store, no-transform'); // Н3: /setup вне Web Analytics
   const page = await r.text();
   assert.match(page, /<form method="post" action="\/setup">/); assert.match(page, /type="password"/);
   assert.equal((await setupCall(env, 'wrong')).status, 403);
@@ -1728,6 +1728,16 @@ await test('Н4: order without Telegram → admin reminder after 24 hours, once;
   const q = await call(e, '/qr/bot.svg?c=abc_123');
   assert.equal(q.status, 200); assert.match(await q.text(), /^<svg/);
   assert.equal((await call(e, '/qr/bot.svg?c=' + encodeURIComponent('x/../y'))).status, 400);
+});
+
+await test('Н3: tag pages and the test site are kept out of Web Analytics (no-transform); the home page is not; ?src= labels count like utm_source', async () => {
+  const cc = async (e, path) => (await call(e, path)).headers.get('Cache-Control') || '';
+  const e = makeEnv({ FYP_KV: makeKV() });
+  assert.match(await cc(e, '/t/101'), /no-transform/);
+  assert.doesNotMatch(await cc(e, '/'), /no-transform/);
+  assert.match(await cc(makeEnv({ FYP_KV: makeKV(), STAGE: 'test' }), '/'), /no-transform/);
+  const { readFileSync } = await import('node:fs');
+  assert.match(readFileSync(new URL('../../js/register-form.js', import.meta.url), 'utf8'), /clean\(q\.get\("src"\)\)/);
 });
 
 console.log(`\n${passed} tests passed`);

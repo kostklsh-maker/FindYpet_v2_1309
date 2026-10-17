@@ -56,7 +56,7 @@
         try {
             const q = new URLSearchParams(location.search);
             const clean = function (v) { return String(v || "").toLowerCase().replace(/[^a-z0-9_.-]/g, "").slice(0, 30); };
-            let src = clean(q.get("utm_source")) || (q.get("fbclid") ? "facebook" : q.get("gclid") ? "google" : q.get("ttclid") ? "tiktok" : "");
+            let src = clean(q.get("utm_source")) || clean(q.get("src")) || (q.get("fbclid") ? "facebook" : q.get("gclid") ? "google" : q.get("ttclid") ? "tiktok" : "");
             if (src && q.get("utm_campaign")) src += "/" + clean(q.get("utm_campaign"));
             const old = JSON.parse(localStorage.getItem(K) || "null");
             if (old && old.v && Date.now() - old.t < 30 * DAY) return old.v;
