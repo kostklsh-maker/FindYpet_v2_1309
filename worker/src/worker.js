@@ -44,12 +44,13 @@
  * ============================================================
  */
 
+import { remindUnlinked } from './admin.js';
 import { DAILY_CRON, QUEUE_CRON, QUEUE_CRON_TEST, WEEKLY_CRON, apiEvent, apiFound, apiLocation, apiRegister, apiScan, apiTag, bumpFail, orderItems, processQueue, publicExtras, publicTag, weeklyDigest } from './api.js';
 import { handleUpdate } from './bot.js';
 import { d1Cleanup, siteBase } from './db.js';
 import { BOT, tr } from './i18n.js';
 import { servePhoto } from './photo.js';
-import { posterPage, qrMatrix } from './poster.js';
+import { posterPage, qrMatrix, qrSvg } from './poster.js';
 import { PRICING, feats, orderPrice } from './pricing.js';
 import { setupRoute } from './setup.js';
 import { dailyBackup, sendReminders } from './store.js';
@@ -61,12 +62,12 @@ import { checkOrigin, clientIp, cors, json, limited, normalizePhone, prettyPhone
 // ---------------------------------------------------------------
 export default {
   async fetch(request, env, ctx) {
-    if (!isTestSite(env)) return secure(await route(request, env, ctx));
+    if (!isTestSite(env)) return keepOutOfAnalytics(request, env, await secure(await route(request, env, ctx)));
     // Тестовый сайт: не индексируется поисковиками, на каждой странице — пометка «ТЕСТ»
     if (new URL(request.url).pathname === '/robots.txt') {
       return new Response('User-agent: *\nDisallow: /\n', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
     }
-    return markTestSite(await secure(await route(request, env, ctx)));
+    return keepOutOfAnalytics(request, env, await markTestSite(await secure(await route(request, env, ctx))));
   },
 
   // Cron Trigger (раз в день): напоминание проверить контакты + резервная копия данных админу;
@@ -83,6 +84,7 @@ export default {
     if (cron === DAILY_CRON || !cron) {
       ctx.waitUntil(sendReminders(env).catch((e) => console.error('reminders error', e)));
       ctx.waitUntil(dailyBackup(env).catch((e) => console.error('backup error', e)));
+      ctx.waitUntil(remindUnlinked(env, (event && event.scheduledTime) || Date.now()).catch((e) => console.error('unlinked error', e)));
       ctx.waitUntil(processQueue(env, Date.now(), true).catch((e) => console.error('queue check error', e)));
       ctx.waitUntil(d1Cleanup(env, new Date(Date.now() - 2 * 86400000).toLocaleDateString('en-CA', { timeZone: env.TIMEZONE || 'Asia/Jerusalem' })));
     }
@@ -154,6 +156,12 @@ export async function route(request, env, ctx) {
     }
 
     // ---- Для поисковиков: robots.txt и карта сайта (лендинг на трёх языках) ----
+    // Н4: QR кнопки «Открыть бота» для компьютера (только ссылки на нашего бота)
+    if (path === '/qr/bot.svg') {
+      const c = url.searchParams.get('c') || '';
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(c)) return new Response('bad', { status: 400 });
+      return new Response(qrSvg(`https://t.me/${env.BOT_USERNAME}?start=${c}`), { headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'private, max-age=3600' } });
+    }
     if (path === '/robots.txt') return new Response(robotsTxt(env, url), { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
     if (path === '/sitemap.xml') return new Response(sitemapXml(env, url), { headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
 
@@ -208,6 +216,18 @@ export function csp(nonce) {
     "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'", "object-src 'none'",
   ].join('; ');
 }
+// Н3: Web Analytics Cloudflare не вставляет счётчик в страницы с Cache-Control: no-transform.
+// Не считаем в «визитах сайта» тестовый сайт, /setup и страницы жетонов (их открывают нашедшие питомцев, не покупатели).
+export function keepOutOfAnalytics(request, env, res) {
+  const path = new URL(request.url).pathname;
+  const skip = isTestSite(env) || path === '/setup' || /^\/(t|tag)(\/|$)/.test(path);
+  if (!skip || !(res.headers.get('Content-Type') || '').startsWith('text/html')) return res;
+  const h = new Headers(res.headers);
+  const cc = h.get('Cache-Control') || '';
+  if (!/no-transform/i.test(cc)) h.set('Cache-Control', cc ? `${cc}, no-transform` : 'no-transform');
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
+}
+
 export async function secure(res) {
   const h = new Headers(res.headers);
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) if (!h.has(k)) h.set(k, v);

@@ -56,7 +56,7 @@
         try {
             const q = new URLSearchParams(location.search);
             const clean = function (v) { return String(v || "").toLowerCase().replace(/[^a-z0-9_.-]/g, "").slice(0, 30); };
-            let src = clean(q.get("utm_source")) || (q.get("fbclid") ? "facebook" : q.get("gclid") ? "google" : q.get("ttclid") ? "tiktok" : "");
+            let src = clean(q.get("utm_source")) || clean(q.get("src")) || (q.get("fbclid") ? "facebook" : q.get("gclid") ? "google" : q.get("ttclid") ? "tiktok" : "");
             if (src && q.get("utm_campaign")) src += "/" + clean(q.get("utm_campaign"));
             const old = JSON.parse(localStorage.getItem(K) || "null");
             if (old && old.v && Date.now() - old.t < 30 * DAY) return old.v;
@@ -221,6 +221,11 @@
                 const step = document.getElementById("telegramStep");
                 step.hidden = false;
                 document.getElementById("telegramLinkBtn").href = data.telegram_link;
+                const startTok = String(data.telegram_link || "").split("?start=")[1];
+                if (startTok && /^[A-Za-z0-9_-]{1,64}$/.test(startTok)) {
+                    document.getElementById("tgQr").src = API_URL + "/qr/bot.svg?c=" + startTok;
+                    document.getElementById("tgQrBox").hidden = false;
+                }
                 renderDone();
                 step.scrollIntoView({ behavior: "smooth", block: "center" });
             } else {
