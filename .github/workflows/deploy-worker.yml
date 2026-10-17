@@ -21,6 +21,7 @@ on:
       - 'assets/logo.png'
       - 'assets/mark.png'
       - 'assets/wordmark.png'
+      - 'assets/*.svg'
       - 'assets/og.jpg'
       - 'assets/fonts/**'
       - 'worker/**'
