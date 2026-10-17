@@ -82,8 +82,8 @@ h3 { font-size: 19px; line-height: 1.3; font-weight: 700; }
 
 /* ---------- Hero ---------- */
 .hero { position: relative; padding: 64px 20px 56px; overflow: hidden; background: linear-gradient(180deg, #F2F8F7 0%, #fff 100%); }
-.hero-bg { position: absolute; inset: 0; pointer-events: none; }
-.blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .55; }
+.hero-bg { position: absolute; inset: 0; pointer-events: none; contain: layout paint; } /* Н9: пятна не влияют на вёрстку */
+.blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .55; will-change: transform; }
 .b1 { width: 520px; height: 520px; background: #5CC8CB; top: -180px; inset-inline-start: -160px; }
 .b2 { width: 420px; height: 420px; background: #FF9A55; top: 80px; inset-inline-end: -120px; }
 .b3 { width: 300px; height: 300px; background: #7FD6D8; bottom: -160px; inset-inline-start: 38%; opacity: .45; }
