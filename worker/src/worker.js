@@ -44,9 +44,9 @@
  * ============================================================
  */
 
-import { DAILY_CRON, QUEUE_CRON, WEEKLY_CRON, apiEvent, apiFound, apiLocation, apiRegister, apiScan, apiTag, bumpFail, orderItems, processQueue, publicExtras, publicTag, weeklyDigest } from './api.js';
+import { DAILY_CRON, QUEUE_CRON, QUEUE_CRON_TEST, WEEKLY_CRON, apiEvent, apiFound, apiLocation, apiRegister, apiScan, apiTag, bumpFail, orderItems, processQueue, publicExtras, publicTag, weeklyDigest } from './api.js';
 import { handleUpdate } from './bot.js';
-import { siteBase } from './db.js';
+import { d1Cleanup, siteBase } from './db.js';
 import { BOT, tr } from './i18n.js';
 import { servePhoto } from './photo.js';
 import { posterPage, qrMatrix } from './poster.js';
@@ -75,7 +75,7 @@ export default {
   async scheduled(event, env, ctx) {
     const cron = event && event.cron;
     // очередь заказов (C3) — и на тестовом сайте, чтобы её можно было проверить
-    if (cron === QUEUE_CRON || !cron) {
+    if (cron === QUEUE_CRON || cron === QUEUE_CRON_TEST || !cron) {
       const now = (event && event.scheduledTime) || Date.now();
       ctx.waitUntil(processQueue(env, now).catch((e) => console.error('queue error', e)));
     }
@@ -83,6 +83,8 @@ export default {
     if (cron === DAILY_CRON || !cron) {
       ctx.waitUntil(sendReminders(env).catch((e) => console.error('reminders error', e)));
       ctx.waitUntil(dailyBackup(env).catch((e) => console.error('backup error', e)));
+      ctx.waitUntil(processQueue(env, Date.now(), true).catch((e) => console.error('queue check error', e)));
+      ctx.waitUntil(d1Cleanup(env, new Date(Date.now() - 2 * 86400000).toLocaleDateString('en-CA', { timeZone: env.TIMEZONE || 'Asia/Jerusalem' })));
     }
     if (cron === WEEKLY_CRON || !cron) {
       const now = (event && event.scheduledTime) || Date.now();

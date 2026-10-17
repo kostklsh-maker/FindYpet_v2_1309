@@ -1583,6 +1583,81 @@ await test('tag codes (C4): new tags open only by a random code; the number stop
   assert.equal(re.exec('/t/101')[1], '101');
 });
 
+await test('Н2: funnel counters go to D1, not KV; two events at once both counted; one address is capped; /week reads D1', async () => {
+  const D1 = await makeD1();
+  const kv = makeKV();
+  const e = makeEnv({ FYP_KV: kv, DB: D1 });
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+  const ev = (ev, ip = '203.0.113.7') => call(e, '/api/ev', { method: 'POST', body: { e: ev, lang: 'he' }, headers: { 'CF-Connecting-IP': ip } });
+  await Promise.all([ev('plan'), ev('plan')]);
+  const n = async (k) => Number(((await D1.prepare('SELECT n FROM events WHERE day = ? AND k = ?').bind(today, k).first()) || {}).n || 0);
+  assert.equal(await n('plan'), 2);
+  assert.equal(await n('plan_he'), 2);
+  assert.equal(await kv.get(`ev:${today}`), null, 'no KV write for a funnel event');
+  // 1000 событий с одного адреса: считаются только первые 60, заказ после этого проходит
+  for (let i = 0; i < 1000; i++) await ev('form', '198.51.100.9');
+  assert.equal(await n('form'), 60);
+  assert.equal(await kv.get(`ev:${today}`), null);
+  const ip = await D1.prepare('SELECT h FROM ev_ip').all();
+  assert.ok(ip.results.every((r) => /^[0-9a-f]{16}$/.test(r.h)), 'only a hash of the address is stored');
+  await ev('submit', '192.0.2.1');
+  assert.equal(await n('submit'), 1, 'another address is still counted');
+  const reg = await (await call(e, '/api/register', { method: 'POST', body: { owner_name: 'Cap C', phone: '050-555-0123', pet_name: 'Rex', address: 'Haifa', consent: true } })).json();
+  assert.ok(reg.id_tag, 'an order goes through after 1000 events');
+  // события бота (скан, привязка) — тоже в D1; /stats и /week их видят, старые дни из KV тоже
+  await call(e, '/api/scan', { method: 'POST', body: { id_tag: reg.id_tag } });
+  assert.equal(await n('scan'), 1);
+  const yesterday = new Date(Date.now() - 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+  await kv.put(`ev:${yesterday}`, JSON.stringify({ plan: 3 }));
+  await D1.prepare('INSERT INTO events (day, k, n) VALUES (?, ?, ?)').bind(yesterday, 'plan', 4).run();
+  await tgUpdate(e, msg('admin', '/stats'));
+  assert.match(lastTg('sendMessage').payload.text, /Chose a plan: 9/);
+  await tgUpdate(e, msg('admin', '/week'));
+  assert.match(lastTg('sendMessage').payload.text, /chose a plan 7 →/);
+  // D1 недоступна — событие уходит в KV, страница отвечает
+  D1.broken = true;
+  assert.equal((await ev('tg', '192.0.2.2')).status, 200);
+  assert.equal((await kv.get(`ev:${today}`, 'json')).tg, 1);
+  D1.broken = false;
+});
+
+await test('Н2: order queue does not list KV while the queue is empty; the flag is set by a queued order', async () => {
+  const kv = makeKV();
+  let lists = 0;
+  const list = kv.list.bind(kv);
+  kv.list = (o) => { if ((o.prefix || '') === 'pq:') lists++; return list(o); };
+  const e = makeEnv({ FYP_KV: kv });
+  const tick = async (ms, cron = '*/10 * * * *') => {
+    const pending = [];
+    await worker.scheduled({ cron, scheduledTime: ms }, e, { waitUntil: (p) => pending.push(p) });
+    await Promise.all(pending);
+  };
+  const T0 = Date.now();
+  for (let i = 0; i < 6; i++) await tick(T0 + i * 600000);
+  assert.equal(lists, 0, 'empty queue: no list requests');
+  state.gasDown = true;
+  const d = await (await call(e, '/api/register', { method: 'POST', body: { owner_name: 'Flag F', phone: '050-444-0099', pet_name: 'Bim', address: 'Haifa', consent: true, idem: 'flag-test-0001' } })).json();
+  state.gasDown = false;
+  assert.equal(d.queued, true);
+  assert.ok(await kv.get('pq_on'));
+  await tick(T0 + 11 * 60000);
+  assert.equal(lists, 1);
+  assert.equal((await kv.list({ prefix: 'pq:' })).keys.length, 0, 'written');
+  await tick(T0 + 40 * 60000); // очередь пуста и флаг старше 15 минут — флаг снят
+  assert.equal(await kv.get('pq_on'), null);
+  const before = lists;
+  await tick(T0 + 50 * 60000);
+  assert.equal(lists, before);
+  // заказ в очереди без флага (флаг потерян) — ежедневный запуск всё равно его находит
+  await kv.put('pq:LOSTFLAG', JSON.stringify({ qid: 'LOSTFLAG', o: { items: [] }, origin: 'http://localhost:8787', at: T0, tries: 0, next: T0 + 10 * 60000, chat_id: '' }));
+  await kv.put('pqd:LOSTFLAG', '');
+  await tick(T0 + 60 * 60000, '0 7 * * *');
+  assert.equal(await kv.get('pq:LOSTFLAG'), null);
+  // тестовый сайт: очередь по своему расписанию раз в час
+  const { readFileSync } = await import('node:fs');
+  assert.match(readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8'), /\[env\.staging\.triggers\]\s*crons = \["0 \* \* \* \*"\]/);
+});
+
 await test('D1: every tag answer is copied to D1; reads from D1; /delete-style erase; D1 failure never breaks the page', async () => {
   const D1 = await makeD1();
   const e = makeEnv({ FYP_KV: makeKV(), DB: D1 });
