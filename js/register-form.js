@@ -221,6 +221,11 @@
                 const step = document.getElementById("telegramStep");
                 step.hidden = false;
                 document.getElementById("telegramLinkBtn").href = data.telegram_link;
+                const startTok = String(data.telegram_link || "").split("?start=")[1];
+                if (startTok && /^[A-Za-z0-9_-]{1,64}$/.test(startTok)) {
+                    document.getElementById("tgQr").src = API_URL + "/qr/bot.svg?c=" + startTok;
+                    document.getElementById("tgQrBox").hidden = false;
+                }
                 renderDone();
                 step.scrollIntoView({ behavior: "smooth", block: "center" });
             } else {

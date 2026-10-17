@@ -44,12 +44,13 @@
  * ============================================================
  */
 
+import { remindUnlinked } from './admin.js';
 import { DAILY_CRON, QUEUE_CRON, QUEUE_CRON_TEST, WEEKLY_CRON, apiEvent, apiFound, apiLocation, apiRegister, apiScan, apiTag, bumpFail, orderItems, processQueue, publicExtras, publicTag, weeklyDigest } from './api.js';
 import { handleUpdate } from './bot.js';
 import { d1Cleanup, siteBase } from './db.js';
 import { BOT, tr } from './i18n.js';
 import { servePhoto } from './photo.js';
-import { posterPage, qrMatrix } from './poster.js';
+import { posterPage, qrMatrix, qrSvg } from './poster.js';
 import { PRICING, feats, orderPrice } from './pricing.js';
 import { setupRoute } from './setup.js';
 import { dailyBackup, sendReminders } from './store.js';
@@ -83,6 +84,7 @@ export default {
     if (cron === DAILY_CRON || !cron) {
       ctx.waitUntil(sendReminders(env).catch((e) => console.error('reminders error', e)));
       ctx.waitUntil(dailyBackup(env).catch((e) => console.error('backup error', e)));
+      ctx.waitUntil(remindUnlinked(env, (event && event.scheduledTime) || Date.now()).catch((e) => console.error('unlinked error', e)));
       ctx.waitUntil(processQueue(env, Date.now(), true).catch((e) => console.error('queue check error', e)));
       ctx.waitUntil(d1Cleanup(env, new Date(Date.now() - 2 * 86400000).toLocaleDateString('en-CA', { timeZone: env.TIMEZONE || 'Asia/Jerusalem' })));
     }
@@ -154,6 +156,12 @@ export async function route(request, env, ctx) {
     }
 
     // ---- Для поисковиков: robots.txt и карта сайта (лендинг на трёх языках) ----
+    // Н4: QR кнопки «Открыть бота» для компьютера (только ссылки на нашего бота)
+    if (path === '/qr/bot.svg') {
+      const c = url.searchParams.get('c') || '';
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(c)) return new Response('bad', { status: 400 });
+      return new Response(qrSvg(`https://t.me/${env.BOT_USERNAME}?start=${c}`), { headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'private, max-age=3600' } });
+    }
     if (path === '/robots.txt') return new Response(robotsTxt(env, url), { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
     if (path === '/sitemap.xml') return new Response(sitemapXml(env, url), { headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
 

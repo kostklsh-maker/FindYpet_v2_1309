@@ -108,11 +108,36 @@ export async function listOrders(env, chatId) {
   if (!open.length) return send(env, chatId, 'No open orders 🎉');
   open.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
   return send(env, chatId, '<b>Open orders</b>\n\n' + open.map((o) =>
-    `${STATUS_LABEL[o.status] || o.status} · <b>${o.order_id}</b> · ${esc(orderLabel(o))}\n` +
+    `${STATUS_LABEL[o.status] || o.status} · <b>${o.order_id}</b> · ${esc(orderLabel(o))}${o.chat_id ? '' : ' · 🔕 no notifications'}\n` +
     `${esc(orderTagsLine(o))}\n📱 ${esc(prettyPhone(normalizePhone(o.phone)))} · ${esc(String(o.created_at).slice(0, 10))}`).join('\n\n'),
     { inline_keyboard: open.slice(0, 20).flatMap((o) => [[
       { text: `${o.order_id} → ${STATUS_LABEL.paid}`, callback_data: `ord:${o.order_id}:paid` },
       { text: STATUS_LABEL.made, callback_data: `ord:${o.order_id}:made` },
       { text: STATUS_LABEL.shipped, callback_data: `ord:${o.order_id}:shipped` },
     ]]) });
+}
+
+// Н4: через сутки после заказа без привязанного Telegram — один раз напомнить админу позвонить клиенту
+const UNLINKED_AFTER_MS = 24 * 3600000;
+export async function remindUnlinked(env, now = Date.now()) {
+  if (!kvOn(env) || !env.ADMIN_CHAT_ID) return 0;
+  const due = [];
+  let cursor;
+  do {
+    const page = await env.FYP_KV.list({ prefix: 'o:', cursor });
+    for (const k of page.keys) {
+      const o = await env.FYP_KV.get(k.name, 'json');
+      if (!o || o.chat_id || o.unlinked_reminded) continue;
+      const at = Date.parse(o.created_at) || 0;
+      if (!at || now - at < UNLINKED_AFTER_MS) continue;
+      due.push(o);
+    }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  if (!due.length) return 0;
+  await send(env, env.ADMIN_CHAT_ID,
+    '🔕 <b>Notifications are not on yet</b> — these customers will not learn about a scan. Please call and ask them to open the bot:\n\n' +
+    due.map((o) => `<b>${o.order_id}</b> · ${esc(o.owner_name)} · 📱 ${esc(prettyPhone(normalizePhone(o.phone)))}`).join('\n'));
+  for (const o of due) { o.unlinked_reminded = new Date(now).toISOString(); await saveOrder(env, o); }
+  return due.length;
 }

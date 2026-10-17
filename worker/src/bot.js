@@ -595,13 +595,14 @@ export async function deleteTagData(env, chatId, tag, L) {
 /** /plate для админа: CSV крышек (номер или код жетона, КЛИЧКА, телефон) для оплаченных заказов — для medallion_v2.py plate. */
 export async function plateCsv(env, chatId, all) {
   if (!kvOn(env)) return send(env, chatId, tr('en', 'noKv'));
-  const rows = [];
+  const rows = [], noTg = [];
   let cursor;
   do {
     const page = await env.FYP_KV.list({ prefix: 'o:', cursor });
     for (const k of page.keys) {
       const o = await env.FYP_KV.get(k.name, 'json');
       if (!o || !(o.status === 'paid' || (all && o.status === 'new'))) continue;
+      if (!o.chat_id) noTg.push(o.order_id);
       const phone = prettyPhone(normalizePhone(o.phone)).replace(/^\+972 /, '0');
       for (const it of o.items) {
         if (it.deleted) continue;
@@ -614,7 +615,7 @@ export async function plateCsv(env, chatId, all) {
   if (!rows.length) return send(env, chatId, all ? 'No new or paid orders.' : 'No paid orders waiting to be made. Use /plate all to include new orders.');
   const form = new FormData();
   form.append('chat_id', String(chatId));
-  form.append('caption', `🖨 ${rows.length} lid(s) — python3 medallion_v2.py plate orders.csv`);
+  form.append('caption', `🖨 ${rows.length} lid(s) — python3 medallion_v2.py plate orders.csv` + (noTg.length ? `\n🔕 No notifications yet (call the customer): ${noTg.join(', ')}` : ''));
   form.append('document', new Blob(['id,name,phone\n' + rows.join('\n') + '\n'], { type: 'text/csv' }), 'orders.csv');
   const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendDocument`, { method: 'POST', body: form }).then((x) => x.json()).catch(() => ({ ok: false }));
   if (!res.ok) return send(env, chatId, '⚠️ Could not send the CSV:\n<code>' + esc(rows.join('\n')) + '</code>');
