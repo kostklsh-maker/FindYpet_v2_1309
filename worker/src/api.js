@@ -1,6 +1,6 @@
 import { notifyAdmin } from './admin.js';
 import { linkFromSite } from './bot.js';
-import { db, mainMenu, send, shortUrl, tagUrlBase, tg } from './db.js';
+import { d1Bump, d1Events, d1On, db, evIpOver, mainMenu, send, shortUrl, tagUrlBase, tg } from './db.js';
 import { chatLang, keepChatLang, mapsLine, ownerLang, tr } from './i18n.js';
 import { PRICING, feats, normQty, orderPrice } from './pricing.js';
 import { cachePublic, getCachedPublic, getExtras, kvOn, putExtras, rememberChat, sendSms, smsEnabled } from './store.js';
@@ -10,7 +10,8 @@ import { isTestSite } from './worker.js';
 // Site API
 // ---------------------------------------------------------------
 // ---------------------------------------------------------------
-// Воронка заказа: сайт присылает 4 события, счётчики по дням лежат в KV (ev:ГГГГ-ММ-ДД).
+// Воронка заказа: сайт присылает 4 события, счётчики по дням лежат в D1 (таблица events, Н2);
+// без D1 и в старых днях — в KV (ev:ГГГГ-ММ-ДД). Чтение складывает оба места.
 // Админ видит итог командой /stats. Посещения считает Cloudflare Web Analytics.
 // Воронка нашедшего (B12): страница жетона присылает f_call, f_wa, f_geo; f_tg и scan считает сам Worker.
 // ---------------------------------------------------------------
@@ -21,12 +22,20 @@ export async function apiEvent(request, env, ctx) {
   const e = String(b.e || '');
   if (!EVENTS.includes(e)) return json({ success: false }, env, 400);
   const lang = ['en', 'he', 'ru'].includes(b.lang) ? b.lang : 'en';
-  if (kvOn(env)) ctx.waitUntil(bumpEvent(env, e, lang));
+  const day = ilDay(env, Date.now());
+  if (kvOn(env) || d1On(env)) {
+    ctx.waitUntil((async () => {
+      if (await evIpOver(env, day, clientIp(request))) return; // один адрес не накручивает воронку
+      await bumpEvent(env, e, lang);
+    })());
+  }
   return json({ success: true }, env);
 }
 
 export async function bumpEvent(env, e, lang) {
-  const day = new Date().toLocaleDateString('en-CA', { timeZone: env.TIMEZONE || 'Asia/Jerusalem' });
+  const day = ilDay(env, Date.now());
+  if (await d1Bump(env, day, lang ? [e, `${e}_${lang}`] : [e])) return;
+  if (!kvOn(env)) return;
   const key = `ev:${day}`;
   try {
     const cur = (await env.FYP_KV.get(key, 'json')) || {};
@@ -36,14 +45,26 @@ export async function bumpEvent(env, e, lang) {
   } catch (err) { console.error('event', err); }
 }
 
+/** Счётчики за дни (в том же порядке): D1 + старые дни из KV. 30 чтений KV — в пределах 50 подзапросов. */
+export async function readEvents(env, days) {
+  const [d1, kv] = await Promise.all([
+    d1Events(env, days),
+    Promise.all(days.map((d) => (kvOn(env) ? env.FYP_KV.get(`ev:${d}`, 'json').catch(() => null) : null))),
+  ]);
+  return days.map((d, i) => {
+    const a = kv[i], b = d1[d];
+    if (!a && !b) return null;
+    const t = { ...(a || {}) };
+    for (const k of Object.keys(b || {})) t[k] = (t[k] || 0) + b[k];
+    return t;
+  });
+}
+
 /** /stats для админа: воронка за 7 и 30 дней. */
 export async function funnelStats(env) {
   if (!kvOn(env)) return 'No storage connected.';
   // 30 чтений KV за раз (лимит бесплатного плана — 50 подзапросов на вызов)
-  const days = await Promise.all(Array.from({ length: 30 }, (_, i) => {
-    const d = new Date(Date.now() - i * 86400000).toLocaleDateString('en-CA', { timeZone: env.TIMEZONE || 'Asia/Jerusalem' });
-    return env.FYP_KV.get(`ev:${d}`, 'json').catch(() => null);
-  }));
+  const days = await readEvents(env, Array.from({ length: 30 }, (_, i) => ilDay(env, Date.now() - i * 86400000)));
   const sum = async (n) => {
     const tot = {};
     for (const v of days.slice(0, n)) for (const k of Object.keys(v || {})) tot[k] = (tot[k] || 0) + v[k];
@@ -101,7 +122,7 @@ export function addUp(list) {
 
 /** Сбои для недельной сводки: db (таблица), tg (Telegram), sms, backup, server. Только на рабочем сайте. */
 export async function bumpFail(env, kind) {
-  if (kvOn(env) && !isTestSite(env)) await bumpEvent(env, `err_${kind}`);
+  if ((kvOn(env) || d1On(env)) && !isTestSite(env)) await bumpEvent(env, `err_${kind}`);
 }
 
 // ---------------------------------------------------------------
@@ -112,6 +133,7 @@ export async function bumpFail(env, kind) {
 export const WEEKLY_CRON = '30 6 * * SUN'; // как в worker/wrangler.toml
 export const DAILY_CRON = '0 7 * * *';
 export const QUEUE_CRON = '*/10 * * * *';
+export const QUEUE_CRON_TEST = '0 * * * *'; // тестовый сайт проверяет очередь раз в час (Н2)
 export const FAIL_KINDS = { db: 'database', d1: 'D1 copy', tg: 'Telegram', sms: 'SMS', backup: 'backup', server: 'server' };
 
 export function ilDay(env, ms) {
@@ -132,7 +154,7 @@ export async function weeklyText(env, now) {
   const dayMs = 86400000;
   const daysOf = (from) => Array.from({ length: 7 }, (_, i) => ilDay(env, now - (from + i) * dayMs));
   const cur = daysOf(1), prev = daysOf(8);
-  const evs = await Promise.all([...cur, ...prev].map((d) => env.FYP_KV.get(`ev:${d}`, 'json').catch(() => null)));
+  const evs = await readEvents(env, [...cur, ...prev]);
   const ev = [addUp(evs.slice(0, 7)), addUp(evs.slice(7))];
   const sps = await Promise.all([...cur, ...prev].map((d) => env.FYP_KV.get(`sp:${d}`, 'json').catch(() => null)));
   const sp = [addUp(sps.slice(0, 7)), addUp(sps.slice(7))];
@@ -343,12 +365,21 @@ export async function queueOrder(env, url, o) {
   const now = Date.now();
   const q = { qid, o, origin: url.origin, at: now, tries: 0, next: now + 10 * 60000, chat_id: '' };
   await env.FYP_KV.put(`pq:${qid}`, JSON.stringify(q), { expirationTtl: (Q_HOURS + 24) * 3600 });
+  await env.FYP_KV.put(Q_FLAG, String(now), { expirationTtl: (Q_HOURS + 48) * 3600 });
   return qid;
 }
 
-export async function processQueue(env, now = Date.now()) {
+// Н2: флаг «в очереди есть заказы». Без него cron не делает list (лимит list-запросов KV — 1000 в сутки на аккаунт).
+export const Q_FLAG = 'pq_on';
+
+export async function processQueue(env, now = Date.now(), force = false) {
   if (!kvOn(env)) return;
+  const flag = await env.FYP_KV.get(Q_FLAG);
+  if (flag === null && !force) return; // раз в сутки (force) — проверка без флага: на случай потерянного флага
   const page = await env.FYP_KV.list({ prefix: 'pq:', limit: 20 });
+  // очередь пуста — снимаем флаг; свежий не трогаем (заказ мог встать в очередь только что, а list его ещё не видит)
+  if (!page.keys.length && flag !== null && now - Number(flag) > 15 * 60000) await env.FYP_KV.delete(Q_FLAG);
+  if (page.keys.length && flag === null) await env.FYP_KV.put(Q_FLAG, String(now), { expirationTtl: (Q_HOURS + 48) * 3600 });
   for (const k of page.keys) {
     const q = await env.FYP_KV.get(k.name, 'json').catch(() => null);
     if (!q) continue;

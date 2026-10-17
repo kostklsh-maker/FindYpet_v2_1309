@@ -138,6 +138,10 @@ export const D1_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS tags (tag_id TEXT PRIMARY KEY, ${D1_COLS.map((c) => `${c} TEXT`).join(', ')}, updated_at TEXT)`,
   'CREATE INDEX IF NOT EXISTS tags_chat ON tags (telegram_chat_id)',
   'CREATE INDEX IF NOT EXISTS tags_token ON tags (link_token)',
+  // Н2: счётчики воронки по дням (раньше — KV ev:<день>, тратили суточную квоту записей KV)
+  'CREATE TABLE IF NOT EXISTS events (day TEXT NOT NULL, k TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, k))',
+  // потолок событий сайта с одного адреса в сутки; хранится хеш адреса, не сам адрес
+  'CREATE TABLE IF NOT EXISTS ev_ip (day TEXT NOT NULL, h TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, h))',
 ];
 export const d1Schema = new WeakMap(); // таблица создаётся один раз на базу в каждом экземпляре воркера
 
@@ -264,4 +268,59 @@ export function shortUrl(env, url, id) {
 /** Объявление «Потерялся» для групп и печати: /p/101 (открытие не считается сканом жетона) */
 export function posterUrl(env, url, id) {
   return `${siteBase(env, url)}/p/${id}`;
+}
+
+// ---------------------------------------------------------------
+// Н2: счётчики событий в D1. Одно событие — один SQL-запрос (прибавление на месте),
+// поэтому два события в одну секунду оба посчитаны. Без D1 счётчики остаются в KV.
+// ---------------------------------------------------------------
+export const EV_IP_MAX = 60; // событий сайта с одного адреса в сутки
+
+/** Прибавляет счётчики; true — записано в D1. */
+export async function d1Bump(env, day, keys) {
+  if (!d1On(env)) return false;
+  try {
+    await d1Init(env);
+    await env.DB.batch(keys.map((k) => env.DB.prepare(
+      'INSERT INTO events (day, k, n) VALUES (?, ?, 1) ON CONFLICT (day, k) DO UPDATE SET n = n + 1').bind(day, k)));
+    return true;
+  } catch (e) {
+    console.error('D1 events', e);
+    return false;
+  }
+}
+
+/** Счётчики за дни: { день: { событие: n } }; без D1 или при сбое — пусто. */
+export async function d1Events(env, days) {
+  const out = {};
+  if (!d1On(env) || !days.length) return out;
+  try {
+    await d1Init(env);
+    const r = await env.DB.prepare(`SELECT day, k, n FROM events WHERE day IN (${days.map(() => '?').join(', ')})`).bind(...days).all();
+    for (const row of r.results || []) (out[row.day] ||= {})[row.k] = Number(row.n) || 0;
+  } catch (e) { console.error('D1 events read', e); }
+  return out;
+}
+
+/** true — с этого адреса сегодня уже слишком много событий. Сбой D1 — пропускаем (сайт важнее счётчика). */
+export async function evIpOver(env, day, ip) {
+  if (!d1On(env) || !ip || ip === 'unknown') return false;
+  try {
+    await d1Init(env);
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${day}|${ip}`));
+    const h = [...new Uint8Array(buf).slice(0, 8)].map((b) => b.toString(16).padStart(2, '0')).join('');
+    const row = await env.DB.prepare(
+      'INSERT INTO ev_ip (day, h, n) VALUES (?, ?, 1) ON CONFLICT (day, h) DO UPDATE SET n = n + 1 RETURNING n').bind(day, h).first();
+    return !!row && Number(row.n) > EV_IP_MAX;
+  } catch (e) {
+    console.error('D1 ev_ip', e);
+    return false;
+  }
+}
+
+/** Ежедневно: старые записи потолка по адресам больше не нужны. */
+export async function d1Cleanup(env, day) {
+  if (!d1On(env)) return;
+  try { await d1Init(env); await env.DB.prepare('DELETE FROM ev_ip WHERE day < ?').bind(day).run(); }
+  catch (e) { console.error('D1 cleanup', e); }
 }
