@@ -1740,4 +1740,30 @@ await test('Н3: tag pages and the test site are kept out of Web Analytics (no-t
   assert.match(readFileSync(new URL('../../js/register-form.js', import.meta.url), 'utf8'), /clean\(q\.get\("src"\)\)/);
 });
 
+await test('/new/ redesign preview: noindex, everything self-hosted (CSP), 3D model served as JSON, order button opens the real form', async () => {
+  const e = makeEnv({ FYP_KV: makeKV() });
+  assert.equal((await call(e, '/new')).status, 301);
+  const r = await call(e, '/new/');
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get('X-Robots-Tag') || '', /noindex/);
+  const html = (await r.text()).replace(/<!--[\s\S]*?-->/g, '');   // без комментариев (там выключенный GA4)
+  assert.match(html, /<meta name="robots" content="noindex/);
+  assert.doesNotMatch(html, /<script[^>]+src="https?:/, 'scripts only from this site (CSP script-src self)');
+  assert.doesNotMatch(html, /fonts\.(googleapis|gstatic)\.com/);
+  for (const s of html.match(/<script[^>]+src="([^"]+)"/g)) {
+    const src = s.match(/src="([^"]+)"/)[1];
+    const js = await call(e, src);
+    assert.equal(js.status, 200, src); assert.match(js.headers.get('Content-Type'), /javascript/, src);
+  }
+  const m = await call(e, '/new/findypet-tag-model.json');
+  assert.equal(m.status, 200); assert.match(m.headers.get('Content-Type'), /application\/json/);
+  const model = await m.json();
+  assert.equal(model.unit, 'mm'); assert.ok(model.body.p && model.body.i && model.lid.p);
+  assert.match(html, /id="checkout" href="\/\?qty=1#order"/);
+  const { readFileSync } = await import('node:fs');
+  assert.match(readFileSync(new URL('../../js/register-form.js', import.meta.url), 'utf8'), /openOrder\(\+new URLSearchParams\(location\.search\)\.get\("qty"\) \|\| 0\)/);
+  // главная страница по-прежнему индексируется
+  assert.doesNotMatch((await call(e, '/')).headers.get('X-Robots-Tag') || '', /noindex/);
+});
+
 console.log(`\n${passed} tests passed`);

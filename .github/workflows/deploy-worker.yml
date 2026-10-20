@@ -24,6 +24,7 @@ on:
       - 'assets/*.svg'
       - 'assets/og.jpg'
       - 'assets/fonts/**'
+      - 'new/**'
       - 'worker/**'
       - '.github/workflows/deploy-worker.yml'
   workflow_dispatch:

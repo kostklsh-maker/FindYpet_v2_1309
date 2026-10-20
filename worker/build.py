@@ -11,11 +11,11 @@ here = pathlib.Path(__file__).resolve().parent
 repo = here.parent
 
 # Что из корня репозитория попадает на сайт внутри Worker'а
-SITE = ['index.html', 'css', 'js', 'tag', 'privacy', 'accessibility', 'assets/logo.png', 'assets/mark.png', 'assets/wordmark.png', 'assets/logo.svg', 'assets/mark.svg', 'assets/wordmark.svg', 'assets/og.jpg', 'assets/fonts']
+SITE = ['index.html', 'css', 'js', 'tag', 'privacy', 'accessibility', 'assets/logo.png', 'assets/mark.png', 'assets/wordmark.png', 'assets/logo.svg', 'assets/mark.svg', 'assets/wordmark.svg', 'assets/og.jpg', 'assets/fonts', 'new']
 TYPES = {'.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
          '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml',
          '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.ico': 'image/x-icon',
-         '.woff2': 'font/woff2'}
+         '.woff2': 'font/woff2', '.json': 'application/json; charset=utf-8'}
 
 # Части кода по порядку (порядок важен: константы верхнего уровня объявлены раньше, чем используются)
 MODULES = ['i18n', 'pricing', 'api', 'store', 'bot', 'photo', 'admin', 'setup', 'poster', 'db', 'util', 'worker']
