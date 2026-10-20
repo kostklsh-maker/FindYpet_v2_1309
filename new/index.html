@@ -483,12 +483,12 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
 .rail{display:none}
 @media (max-width:760px){
   .road-svg{display:none}
-  .road{display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px}
-  .rail{display:block;position:relative;width:44px}
-  .rail::before{content:"";position:absolute;left:21px;top:10px;bottom:10px;width:3px;border-radius:3px;background:repeating-linear-gradient(var(--trail-faint) 0 6px,transparent 6px 14px)}
+  .road{display:grid;grid-template-columns:52px minmax(0,1fr);gap:8px}
+  .rail{display:block;position:relative;width:52px}
+  .rail::before{content:"";position:absolute;left:25px;top:10px;bottom:10px;width:3px;border-radius:3px;background:repeating-linear-gradient(var(--trail-faint) 0 6px,transparent 6px 14px)}
   .road-steps{grid-template-columns:minmax(0,1fr);gap:28px;margin:0}
-  .road-steps li{padding:0 0 0 18px}
-  .token{width:60px;height:60px;margin:-30px 0 0 -30px}
+  .road-steps li{padding:0 0 0 26px}
+  .token{width:46px;height:46px;margin:-23px 0 0 -23px}
   .token-badge{display:none}
 }
 
@@ -1819,14 +1819,30 @@ const Story = (() => {
     } else {
       const centers = lis.map(li => li.offsetTop + 17);
       const y0 = centers[0] - 30, y1 = centers[3];
-      y = lerp(y0, y1, pr); x = rail.offsetLeft + 22;
+      y = lerp(y0, y1, pr); x = rail.offsetLeft + 26;
       centers.forEach((c, i) => { if (y >= c - 4) s = i + 1; });
     }
     token.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${(Math.sin(pr * 30) * 6).toFixed(1)}deg)`;
     if (s !== lastS) { lastS = s; setStage(s); if (s > 0 && !reduce && hasGsap) track('order_journey_view', { stage: s }, 'oj' + s); }
   }
   let pr = reduce || !hasGsap ? 1 : 0;
+  let lastScroll = 0;
+  addEventListener('scroll', () => { lastScroll = performance.now(); }, { passive: true });
   if (!reduce && hasGsap) ScrollTrigger.create({ trigger: road, start: 'top 75%', end: 'bottom 45%', scrub: .6, onUpdate: self => { pr = self.progress; render(pr); }, onRefresh: () => render(pr) });
+  // Where this page doesn't scroll itself (shown inside another app that scrolls it from outside), scroll events never
+  // come: follow how much of the road is on screen instead. The token glides to the new value.
+  if (!reduce && 'IntersectionObserver' in window) {
+    let goal = pr, raf = 0;
+    const glide = () => { pr += (goal - pr) * .12; if (Math.abs(goal - pr) < .002) pr = goal; render(pr); raf = pr === goal ? 0 : requestAnimationFrame(glide); };
+    new IntersectionObserver(es => es.forEach(e => {
+      if (performance.now() - lastScroll < 800) return;           // normal page: ScrollTrigger drives it
+      const r = e.boundingClientRect, ir = e.intersectionRect, h = Math.max(1, r.height);
+      if (!e.isIntersecting) { goal = pr > .5 ? 1 : 0; }
+      else if (ir.top - r.top > 2) goal = 1;                         // top already scrolled past
+      else goal = clamp(((ir.bottom - r.top) / h - .2) / .75);       // entering from below
+      if (!raf) raf = requestAnimationFrame(glide);
+    }), { threshold: Array.from({ length: 51 }, (_, i) => i / 50) }).observe(road);
+  }
   render(pr);
   addEventListener('resize', () => render(pr));
 })();
