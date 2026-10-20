@@ -121,7 +121,7 @@ button{font-family:inherit}
 /* ---------- Main + trail ---------- */
 main{position:relative;overflow-x:clip;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-bottom:40px}
 .trail{position:absolute;left:0;top:0;width:100%;z-index:1;pointer-events:none;overflow:visible}
-.trail-dog{position:absolute;left:0;top:0;width:44px;height:44px;z-index:1;pointer-events:none;will-change:transform}
+.trail-dog{position:absolute;left:0;top:0;width:44px;height:44px;z-index:4;pointer-events:none;will-change:transform}
 .trail-dog img{width:100%;height:100%;display:block;border-radius:50%;object-fit:cover;box-shadow:0 0 0 3px var(--surface),0 6px 14px -6px var(--shadow)}
 .trail-dog.arrived img{animation:hop .6s var(--ease-back) 2}
 @keyframes hop{50%{translate:0 -12px}}
@@ -216,15 +216,15 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
 .sec-head h2,.h2{font-size:clamp(2.05rem,4.2vw,3.5rem);font-weight:750;letter-spacing:-.035em}
 .sec-head p{color:var(--ink-soft);font-size:clamp(1.05rem,1.3vw,1.2rem);max-width:52ch}
 
-/* ---------- Story (pinned) ---------- */
-.story{position:relative;z-index:3;width:min(1320px,calc(100% - 8vw));height:100svh;min-height:560px;margin:clamp(80px,13vh,150px) auto 0;
+/* ---------- Story (plays by itself, never holds the scroll) ---------- */
+.story{position:relative;z-index:3;width:min(1320px,calc(100% - 8vw));height:auto;min-height:0;margin:clamp(80px,13vh,150px) auto 0;
   background:var(--night);color:var(--night-ink);display:flex;flex-direction:column;overflow:hidden;
   border-radius:var(--r-capsule);clip-path:inset(0 calc(var(--roll,0) * 9%) round calc(var(--r-capsule) + var(--roll,0) * 220px))}
 .story-head{display:flex;justify-content:space-between;align-items:flex-end;gap:10px 24px;flex-wrap:wrap;
-  padding:calc(env(safe-area-inset-top,0px) + 84px) clamp(18px,3.5vw,44px) 14px}
+  padding:clamp(22px,3vw,36px) clamp(18px,3.5vw,44px) 14px}
 .story-head h2{font-size:clamp(1.8rem,3.6vw,3rem);font-weight:750}
 .story-head p{color:var(--night-soft);font-size:1rem}
-.story-stage{position:relative;flex:1;min-height:0;margin:0 clamp(10px,1.6vw,22px);border-radius:calc(var(--r-capsule) - 12px);overflow:hidden;background:#BDE6E0}
+.story-stage{position:relative;flex:none;aspect-ratio:16/9;max-height:74svh;min-height:300px;margin:0 clamp(10px,1.6vw,22px);border-radius:calc(var(--r-capsule) - 12px);overflow:hidden;background:#BDE6E0}
 .scene{position:absolute;inset:0;width:100%;height:100%;display:block}
 .scene .leg,.scene .oleg,.scene .tail{transform-box:fill-box;transform-origin:50% 0}
 .scene .tail{transform-origin:100% 100%;animation:wag .5s ease-in-out infinite alternate}
@@ -261,6 +261,30 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
 .step-btn[aria-current="step"] .step-text{color:#3F5C61}
 .step-caption{display:none}
 @media (max-width:860px){
+  .story-head h2{font-size:1.75rem;line-height:1.15}
+  .step-caption{padding:6px 20px 22px!important;min-height:0!important}
+  .step-caption b{font-size:1.3rem!important}
+  .step-caption span{font-size:1.08rem!important;line-height:1.45!important}
+}
+@media (max-width:600px){
+  .hero-stage .sat,.hero-stage .hint{display:none}
+  .hero-stage{margin-top:18px}
+  .price-line{gap:8px}
+  .pebbles{margin-top:30px;gap:12px}
+  .pebble{padding:12px 20px 12px 12px}
+  .pebble-text b{font-size:1.08rem}
+  .sec-head p{font-size:1.08rem;line-height:1.5}
+}
+.story-ctl{display:flex;align-items:center;gap:14px}
+.story-play{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 18px 0 14px;border:0;border-radius:999px;background:var(--night-2);color:var(--night-ink);font:inherit;font-weight:600;font-size:.95rem;cursor:pointer;transition:background-color .3s}
+.story-play:hover{background:#26475A}
+.story-play:focus-visible{outline:3px solid #6DFF9A;outline-offset:2px}
+.story-play svg{width:18px;height:18px;fill:currentColor}
+.story-play .i-play,.story-play[aria-pressed="false"] .i-pause{display:none}
+.story-play[aria-pressed="false"] .i-play{display:block}
+.story-progress{position:absolute;left:18px;right:18px;bottom:14px;z-index:3;height:4px;border-radius:4px;background:rgba(255,255,255,.28);overflow:hidden;pointer-events:none}
+.story-progress i{display:block;width:100%;height:100%;background:#6DFF9A;transform-origin:0 50%;transform:scaleX(0)}
+@media (max-width:860px){
   .story-steps{grid-template-columns:repeat(4,auto);justify-content:center;gap:10px;padding-top:12px;padding-bottom:4px}
   .step-btn{grid-template-columns:auto;padding:5px;border-radius:50%;width:auto;height:auto}
   .step-btn .step-title,.step-btn .step-text{display:none}
@@ -268,8 +292,9 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
   .step-caption{display:block;padding:4px clamp(18px,4vw,30px) 18px;min-height:96px}
   .step-caption b{display:block;font-size:1.1rem;line-height:1.25}
   .step-caption span{display:block;color:var(--night-soft);font-size:.95rem;line-height:1.4;margin-top:4px}
-  .story-head{padding-bottom:10px}
+  .story-head{padding-bottom:12px;align-items:center}
   .story-head p{display:none}
+  .story-stage{aspect-ratio:4/5;max-height:66svh}
 }
 @media (max-width:600px){.story{width:calc(100% - 3vw)}}
 .story.static{height:auto;min-height:0}
@@ -422,7 +447,8 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
 .packs legend{padding:0;margin-bottom:8px}
 .pack{position:relative;cursor:pointer}
 .pack input{position:absolute;opacity:0;inset:0;cursor:pointer}
-.pack-body{display:grid;justify-items:center;gap:2px;padding:16px 8px;border-radius:30px;background:var(--ground);box-shadow:inset 0 0 0 1.5px var(--line);text-align:center;transition:transform .45s var(--ease-back),background-color .25s,box-shadow .25s}
+.pack-body{display:grid;justify-items:center;gap:2px;padding:16px 8px;border-radius:30px;background:var(--ground);box-shadow:inset 0 0 0 1.5px var(--line);text-align:center;transition:transform .22s var(--ease-out)}
+.pack,.pack input,.upsell-btn,.btn,.step-btn,.story-play,.night-switch,.view-switch button{-webkit-tap-highlight-color:transparent}
 .pack-body b{font-size:1.02rem}
 .pack-body span{color:var(--ink-soft);font-size:.95rem;font-variant-numeric:tabular-nums}
 .pack-body small{font-size:.78rem;color:var(--teal-ink);font-weight:600}
@@ -458,12 +484,12 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
 .rail{display:none}
 @media (max-width:760px){
   .road-svg{display:none}
-  .road{display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px}
-  .rail{display:block;position:relative;width:44px}
-  .rail::before{content:"";position:absolute;left:21px;top:10px;bottom:10px;width:3px;border-radius:3px;background:repeating-linear-gradient(var(--trail-faint) 0 6px,transparent 6px 14px)}
+  .road{display:grid;grid-template-columns:52px minmax(0,1fr);gap:8px}
+  .rail{display:block;position:relative;width:52px}
+  .rail::before{content:"";position:absolute;left:25px;top:10px;bottom:10px;width:3px;border-radius:3px;background:repeating-linear-gradient(var(--trail-faint) 0 6px,transparent 6px 14px)}
   .road-steps{grid-template-columns:minmax(0,1fr);gap:28px;margin:0}
-  .road-steps li{padding:0 0 0 18px}
-  .token{width:60px;height:60px;margin:-30px 0 0 -30px}
+  .road-steps li{padding:0 0 0 26px}
+  .token{width:46px;height:46px;margin:-23px 0 0 -23px}
   .token-badge{display:none}
 }
 
@@ -529,7 +555,7 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
 .photo-layer::after{content:"";position:absolute;inset:0;background:#061430;mix-blend-mode:multiply;opacity:0;transition:opacity .8s ease}
 .hero-disc[data-night="true"] .photo-layer::after{opacity:.66}
 .hero-disc[data-night="true"] .sam-photo{filter:saturate(.5)}
-.hero-disc .tag-fallback{inset:auto;left:0;top:0;height:auto;transform-origin:50% 50%}
+.hero-disc .tag-fallback{inset:auto;left:0;top:0;height:auto;transform-origin:50% 50%;opacity:0}
 .glow-veil{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0;
   background:radial-gradient(1.6px 1.6px at 18% 22%,#EAF6F0 50%,transparent 51%),radial-gradient(1.2px 1.2px at 72% 16%,#EAF6F0 50%,transparent 51%),radial-gradient(1.8px 1.8px at 84% 42%,#EAF6F0 50%,transparent 51%),
   radial-gradient(1.2px 1.2px at 30% 70%,#EAF6F0 50%,transparent 51%),radial-gradient(1.4px 1.4px at 60% 84%,#EAF6F0 50%,transparent 51%),radial-gradient(1px 1px at 44% 12%,#EAF6F0 50%,transparent 51%),
@@ -543,17 +569,105 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
 .md-strap{--mslot:#0B5E62}
 .md-night{--mb:#45F07E;--mr:#7DFFA6;--ml:#6DFF9A;filter:drop-shadow(0 0 6px rgba(109,255,154,.7))}
 .avatar img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
-.upsell{display:grid;gap:10px;justify-items:start;padding:14px 18px 16px;border-radius:26px;background:var(--apricot-soft);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--apricot) 55%,transparent);animation:sheetIn .5s var(--ease-out)}
+.pack-extra{display:grid;min-width:0}
+.upsell-wrap{display:grid;grid-template-rows:0fr;opacity:0;transition:grid-template-rows .38s var(--ease-out),opacity .25s}
+.upsell-wrap.open{grid-template-rows:1fr;opacity:1}
+.upsell-wrap .upsell{margin-bottom:16px}
+.upsell-wrap>div{min-height:0;overflow:hidden}
+.upsell{display:grid;gap:10px;justify-items:start;padding:14px 18px 16px;border-radius:26px;background:var(--apricot-soft);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--apricot) 55%,transparent)}
+@media (prefers-reduced-motion: reduce){.upsell-wrap{transition:none}}
 .upsell p{color:var(--apricot-ink);font-weight:500;line-height:1.45}
 .upsell-btn{border:0;min-height:44px;padding:0 20px;border-radius:999px;background:var(--apricot);color:#3A1C04;font:700 .95rem var(--font);cursor:pointer;transition:transform .35s var(--ease-back)}
 .upsell-btn:hover{transform:translateY(-2px)}
 
+/* ---------- Phone: calm, roomy, readable ---------- */
+@media (max-width:600px){
+  body{font-size:1.125rem}
+  /* the walk path runs in a lane beside each section: sections alternate sides, so the dog zigzags down */
+  main{padding-left:8px;padding-right:8px}
+  .hero,.pebbles{padding-left:8px;padding-right:8px}
+  .capsule[data-trail="l"],.story[data-trail="l"]{width:calc(100% - 40px);margin-left:40px;margin-right:0}
+  .capsule[data-trail="r"],.story[data-trail="r"]{width:calc(100% - 40px);margin-left:0;margin-right:40px}
+  .trail-dog{width:34px;height:34px}
+  .trail-dog img{box-shadow:0 0 0 2.5px var(--surface),0 4px 10px -4px var(--shadow)}
+  .capsule,.story,.home{width:calc(100% - 24px);margin-top:56px;transform:none!important;border-radius:36px}
+  .capsule{padding:34px 20px 30px}
+  .story{clip-path:none;border-radius:36px}
+  .sec-head{gap:12px}
+  .sec-head h2,.h2{font-size:2.2rem}
+  .sec-head p{font-size:1.12rem;line-height:1.5}
+  /* hero badges: one clean column, headline only */
+  .pebbles{gap:10px;margin-top:22px}
+  .pebble:nth-child(odd),.pebble:nth-child(even){margin:0;translate:0 0}
+  .pebble{padding:8px 18px 8px 8px}
+  .pebble-ball{width:52px;height:52px}
+  .pebble-text b{font-size:1.1rem}
+  .pebble-text span{display:none}
+  /* story */
+  .story-head{padding:28px 22px 14px}
+  .story-head h2{font-size:2rem}
+  .story-stage{margin:0 10px}
+  .story-steps{padding-top:16px}
+  .step-num{width:46px;height:46px;font-size:1.1rem}
+  .step-caption{padding:6px 22px 26px;min-height:132px}
+  .step-caption b{font-size:1.4rem;line-height:1.2}
+  .step-caption span{font-size:1.12rem;line-height:1.45;margin-top:8px}
+  .scene-bubble{font-size:1.02rem;max-width:230px}
+  .alert-card{width:min(300px,86%)}
+  .alert-card h3{font-size:1.15rem}
+  .alert-card p{font-size:1rem}
+  /* microchip vs tag: one card per question, big type, the tag answer stands out */
+  .compare-grid{gap:14px;margin-top:26px}
+  .cmp-minor{display:none}
+  .cmp-row{gap:8px;padding:18px 16px;border-radius:30px}
+  .cmp-label{padding:0 6px 4px;font-size:1.3rem;font-weight:700;line-height:1.2}
+  .cmp-a,.cmp-b{display:block;padding:14px 18px;border-radius:22px;font-size:1.08rem;line-height:1.4}
+  .cmp-a::before,.cmp-b::before{display:block;min-width:0;margin-bottom:3px;font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;opacity:.8}
+  .cmp-b::before{content:"FindYpet tag"}
+  .cmp-note{margin-top:20px;padding:16px 18px;font-size:1rem}
+  /* order + after order + found */
+  .pack-body b{font-size:1.12rem}
+  .pack-body span{font-size:1.05rem}
+  .pack-body small{font-size:.9rem}
+  .fine{font-size:1rem}
+  .road-steps b{font-size:1.2rem}
+  .road-steps span{font-size:1.05rem}
+  .way b{font-size:1.25rem}
+  .page-fine{display:none}
+}
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto}
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
   .capsule{transform:none!important}
 }
 </style>
+<script id="fyPhoneFix">
+/* A phone in "desktop site" mode lays the page out 980 px wide and shrinks it: tiny text, desktop columns.
+   Then zoom the page to the real screen width and scale the width breakpoints by the same factor. */
+(function () {
+  try {
+    var d = document.documentElement, sw = Math.min(screen.width, screen.height), iw = d.clientWidth || innerWidth;
+    if (!matchMedia('(pointer: coarse)').matches || !sw || sw > 600 || iw < sw * 1.6) return;
+    var k = iw / sw;
+    window.__fyZoom = k; d.style.zoom = k; d.classList.add('phone-desktop-mode');
+    var VU = /(-?\d*\.?\d+)(s|d|l)?(vw|vh|vmin|vmax)\b/g;
+    var fix = function (rs) {
+      for (var j = 0; j < rs.length; j++) {
+        var r = rs[j];
+        if (r.media && /width/.test(r.media.mediaText)) r.media.mediaText = r.media.mediaText.replace(/(\d+(?:\.\d+)?)px/g, function (m, n) { return Math.round(n * k) + 'px'; });
+        if (r.cssRules) fix(r.cssRules);
+        // viewport units count the 980 px layout: bring them back to the real screen
+        if (r.style) for (var q = 0; q < r.style.length; q++) {
+          var pn = r.style[q], v = r.style.getPropertyValue(pn);
+          if (VU.test(v)) { VU.lastIndex = 0; r.style.setProperty(pn, v.replace(VU, function (m, n, a, u) { return (n / k).toFixed(3) + (a || '') + u; }), r.style.getPropertyPriority(pn)); }
+          VU.lastIndex = 0;
+        }
+      }
+    };
+    for (var i = 0; i < document.styleSheets.length; i++) { try { fix(document.styleSheets[i].cssRules); } catch (e) {} }
+  } catch (e) {}
+})();
+</script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -660,7 +774,7 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
   <section class="story" id="how" aria-labelledby="how-title" data-trail="r">
     <div class="story-head">
       <h2 id="how-title">From lost to home in 4 steps</h2>
-      <p>Scroll to follow Sam home.</p>
+      <div class="story-ctl"><p>Plays by itself. Tap a step to jump to it.</p><button class="story-play" id="storyPlay" type="button" aria-pressed="true" aria-label="Pause the story"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-pause" d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/><path class="i-play" d="M8 5.5v13l11-6.5z"/></svg><span>Pause</span></button></div>
     </div>
     <div class="story-stage" id="storyStage">
       <svg class="scene" id="scene" viewBox="0 0 1200 640" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Sam the dog slips out at dusk, is found under a street lamp at night, the finder taps his glowing tag, his owner gets an alert and they meet again at dawn.">
@@ -719,6 +833,7 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
         </g></g></g>
         <path id="heart" d="M0 8 C -26 -10 -22 -34 -6 -34 C 0 -34 0 -28 0 -26 C 0 -28 0 -34 6 -34 C 22 -34 26 -10 0 8 Z" fill="#FF7A6B" opacity="0" transform="translate(690 330)"/>
       </svg>
+      <div class="story-progress" aria-hidden="true"><i id="storyBar"></i></div>
       <div class="scene-bubble" id="finderBubble"><b>Hi! My name is Sam</b>Found me? Tap “Notify the owner”.</div>
       <div class="alert-card" id="alertCard">
         <div class="alert-top"><span class="app"><svg viewBox="440 215 555 433" aria-hidden="true"><use href="#lg-mark"/></svg></span>FindYpet<time>now</time></div>
@@ -729,10 +844,10 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
       </div>
     </div>
     <ol class="story-steps" id="storySteps">
-      <li><button class="step-btn" type="button" data-step="1"><span class="step-num">1</span><span class="step-title">Someone finds your pet</span><span class="step-text">They see the tag on the collar: your number and a QR code.</span></button></li>
-      <li><button class="step-btn" type="button" data-step="2"><span class="step-num">2</span><span class="step-title">They scan, tap or call</span><span class="step-text">Your pet's page opens in the camera or browser. No app, no sign-up.</span></button></li>
-      <li><button class="step-btn" type="button" data-step="3"><span class="step-num">3</span><span class="step-title">You get an alert</span><span class="step-text">Our bot messages you in Telegram the moment the page opens, with a map pin if the finder allows it.</span></button></li>
-      <li><button class="step-btn" type="button" data-step="4"><span class="step-num">4</span><span class="step-title">On the way home</span><span class="step-text">Call the finder back or meet up. Was Lost mode on? Send /found.</span></button></li>
+      <li><button class="step-btn" type="button" data-step="1"><span class="step-num">1</span><span class="step-title">Someone finds your pet</span><span class="step-text">They see your number and a QR code on the tag.</span></button></li>
+      <li><button class="step-btn" type="button" data-step="2"><span class="step-num">2</span><span class="step-title">They scan, tap or call</span><span class="step-text">Your pet's page opens. No app needed.</span></button></li>
+      <li><button class="step-btn" type="button" data-step="3"><span class="step-num">3</span><span class="step-title">You get an alert</span><span class="step-text">Telegram alerts you at once, with a map pin.</span></button></li>
+      <li><button class="step-btn" type="button" data-step="4"><span class="step-num">4</span><span class="step-title">On the way home</span><span class="step-text">Call back or meet up. Sam is home.</span></button></li>
     </ol>
     <p class="step-caption" id="stepCaption" aria-live="polite"><b>Someone finds your pet</b><span>They see the tag on the collar: your number and a QR code.</span></p>
   </section>
@@ -745,19 +860,19 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
     </div>
     <div class="compare-grid" role="table" aria-label="Microchip compared with FindYpet tag">
       <div class="cmp-head" role="row"><span role="columnheader"><span class="vh">Question</span></span><span role="columnheader">Microchip</span><span role="columnheader">FindYpet tag</span></div>
-      <div class="cmp-row" role="row"><span class="cmp-label" role="rowheader">Who can read it</span><span class="cmp-a" role="cell">A vet or the city vet service, with a special scanner</span><span class="cmp-b" role="cell">Anyone with a phone, or they just call the number</span></div>
-      <div class="cmp-row" role="row"><span class="cmp-label" role="rowheader">When you hear</span><span class="cmp-a" role="cell">After someone takes the pet to a vet</span><span class="cmp-b" role="cell">In seconds: the finder calls, or you get an alert</span></div>
+      <div class="cmp-row" role="row"><span class="cmp-label" role="rowheader">Who can read it</span><span class="cmp-a" role="cell">Only a vet, with a scanner</span><span class="cmp-b" role="cell">Anyone with a phone</span></div>
+      <div class="cmp-row" role="row"><span class="cmp-label" role="rowheader">When you hear</span><span class="cmp-a" role="cell">After a vet visit</span><span class="cmp-b" role="cell">In seconds</span></div>
       <div class="cmp-row" role="row"><span class="cmp-label" role="rowheader">At night</span><span class="cmp-a" role="cell">Not visible</span><span class="cmp-b" role="cell">Glows in the dark</span></div>
-      <div class="cmp-row" role="row"><span class="cmp-label" role="rowheader">Battery</span><span class="cmp-a" role="cell">Not needed</span><span class="cmp-b" role="cell">Not needed</span></div>
+      <div class="cmp-row cmp-minor" role="row"><span class="cmp-label" role="rowheader">Battery</span><span class="cmp-a" role="cell">Not needed</span><span class="cmp-b" role="cell">Not needed</span></div>
     </div>
-    <p class="cmp-note">FindYpet doesn't replace the microchip required by law. Keep both: the tag is the fast way home, and the chip stays as the backup.</p>
+    <p class="cmp-note">Keep the microchip too: the law requires it. The tag is the fast way home, the chip is the backup.</p>
   </section>
 
   <!-- ===== Two phones demo ===== -->
   <section class="capsule" id="try" aria-labelledby="try-title" data-trail="r">
     <div class="sec-head">
       <h2 id="try-title">Try both sides</h2>
-      <p>You found Sam in the park. Reach his owner from the finder's phone, then answer as Dana from her phone.</p>
+      <p>Reach Sam's owner as the finder, then answer as Dana.</p>
     </div>
     <div class="view-switch" role="tablist" aria-label="Choose a phone">
       <button type="button" role="tab" aria-selected="true" aria-controls="phoneFinder" data-view="finder">Finder's phone<span class="badge" aria-hidden="true"></span></button>
@@ -864,11 +979,11 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
           <label class="pack"><input type="radio" name="pack" value="2" data-price="98"><span class="pack-body"><b>2 tags</b><span>98 ₪</span></span></label>
           <label class="pack"><input type="radio" name="pack" value="4" data-price="147"><span class="pack-body"><b>3 + 1</b><span>147 ₪</span><small>4th tag free</small></span></label>
         </fieldset>
-        <div class="upsell" id="upsell" hidden>
+        <div class="pack-extra"><div class="upsell-wrap" id="upsell" aria-hidden="true" inert><div><div class="upsell">
           <p>Add one more tag for 49 ₪ and the fourth one is a gift: 4 tags for 147 ₪.</p>
           <button class="upsell-btn" type="button" id="upsellBtn">Switch to 3 + 1</button>
-        </div>
-        <div class="tag-row" id="tagRow" aria-hidden="true"></div>
+        </div></div></div>
+        <div class="tag-row" id="tagRow" aria-hidden="true"></div></div>
         <p class="total"><span>Total</span><b id="total">49 ₪</b><span>one-time, no subscription</span></p>
         <div class="cta-row" style="margin-top:0"><a class="btn btn-primary" id="checkout" href="/?qty=1#order">Continue to order</a></div>
         <p class="fine">Anyone who scans the tag sees your pet's name, your first name, your phone and any notes you add. Your address is never shown.</p>
@@ -1160,7 +1275,7 @@ const Medal = (() => {
   let renderer;
   try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' }); }
   catch (e) { runLoopOnly(); return { setText(n, p) { st.name = n; st.phone = p; fallbackText(); } }; }
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min((devicePixelRatio || 1) * (window.__fyZoom || 1), 2));
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.setClearColor(0x000000, 0);
@@ -1561,24 +1676,44 @@ const Story = (() => {
     }
   }
 
-  let st = null;
+  // The story plays by itself while it is on screen and never holds the page: scrolling always moves the page.
+  const playBtn = $('#storyPlay'), bar = $('#storyBar');
+  const DUR = 26, HOLD = 2.6, STARTS = [0, .38, .58, .78];
+  let playing = motion, inView = false, hold = 0, needs = true;
+  function setPlaying(on) {
+    playing = on; needs = true;
+    playBtn.setAttribute('aria-pressed', on); playBtn.setAttribute('aria-label', on ? 'Pause the story' : 'Play the story');
+    $('span', playBtn).textContent = on ? 'Pause' : 'Play';
+  }
   if (motion) {
-    st = ScrollTrigger.create({ trigger: story, start: 'top top', end: () => '+=' + Math.round(innerHeight * 3.2), pin: true, anticipatePin: 1, onUpdate: self => { target = self.progress; } });
     gsap.fromTo(story, { '--roll': 1 }, { '--roll': 0, ease: 'none', scrollTrigger: { trigger: story, start: 'top bottom', end: 'top 15%', scrub: .5 } });
+    new IntersectionObserver(es => es.forEach(e => { inView = e.isIntersecting; needs = true; }), { threshold: .2 }).observe(stage);
+    new ResizeObserver(() => { needs = true; }).observe(stage);
     let lt = performance.now();
-    const loop = now => { const dt = Math.min(.1, (now - lt) / 1000); lt = now; p += (target - p) * (1 - Math.exp(-dt * 9)); if (Math.abs(target - p) < .0004) p = target; render(p); requestAnimationFrame(loop); };
+    const loop = now => {
+      requestAnimationFrame(loop);
+      const dt = Math.min(.1, (now - lt) / 1000); lt = now;
+      if (!inView || document.hidden) return;
+      if (playing) {
+        if (hold > 0) { hold -= dt; if (hold <= 0) { p = 0; prevPositions = {}; } }
+        else { p = Math.min(1, p + dt / DUR); if (p >= 1) hold = HOLD; }
+        needs = true;
+      }
+      if (needs) { needs = false; render(p); bar.style.transform = `scaleX(${p.toFixed(4)})`; }
+    };
     requestAnimationFrame(loop);
+    playBtn.addEventListener('click', () => { setPlaying(!playing); track('story_play', { playing }); });
   } else {
-    story.classList.add('static'); p = STEP_AT[0]; render(p);
+    story.classList.add('static'); p = STEP_AT[0]; render(p); playBtn.hidden = true;
     new ResizeObserver(() => render(p)).observe(stage);
   }
   steps.forEach(b => b.addEventListener('click', () => {
     const i = +b.dataset.step - 1; trackOK = true;
-    if (st) { const y = st.start + (st.end - st.start) * STEP_AT[i]; window.scrollTo({ top: y, behavior: reduce ? 'auto' : 'smooth' }); }
-    else { p = STEP_AT[i]; render(p); }
+    p = motion && playing ? STARTS[i] : STEP_AT[i]; hold = 0; prevPositions = {}; needs = true;
+    if (!motion) render(p); else bar.style.transform = `scaleX(${p.toFixed(4)})`;
   }));
   render(p);
-  return { render: () => render(p) };
+  return { render: () => { needs = true; render(p); } };
 })();
 
 /* ---------------- Two-phones demo ---------------- */
@@ -1653,9 +1788,11 @@ const Story = (() => {
   function setPack(input, user) {
     const n = +input.value, price = +input.dataset.price;
     total.textContent = price + ' ₪';
-    row.innerHTML = Array.from({ length: n }, (_, i) => mini.replace('<svg class="mini-tag"', `<svg class="mini-tag" style="animation-delay:${i * 90}ms"`)).join('');
+    const have = row.children.length;                       // keep the tags already shown, animate only the new ones
+    for (let i = have - 1; i >= n; i--) row.children[i].remove();
+    for (let i = have; i < n; i++) row.insertAdjacentHTML('beforeend', mini.replace('<svg class="mini-tag"', `<svg class="mini-tag" style="animation-delay:${(i - have) * 90}ms"`));
     if (user) track('select_item', { item_list_name: 'packs', items: [{ item_id: 'pack_' + n, item_name: n + ' tags', price, quantity: 1 }], currency: 'ILS', value: price });
-    upsell.hidden = n !== 2;
+    const open = n === 2; upsell.classList.toggle('open', open); upsell.setAttribute('aria-hidden', !open); upsell.inert = !open;
     checkout.href = '/?qty=' + n + '#order';
     if (n === 2) track('upsell_view', { from_pack: 2 }, 'upsell_view');
   }
@@ -1697,14 +1834,30 @@ const Story = (() => {
     } else {
       const centers = lis.map(li => li.offsetTop + 17);
       const y0 = centers[0] - 30, y1 = centers[3];
-      y = lerp(y0, y1, pr); x = rail.offsetLeft + 22;
+      y = lerp(y0, y1, pr); x = rail.offsetLeft + 26;
       centers.forEach((c, i) => { if (y >= c - 4) s = i + 1; });
     }
     token.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${(Math.sin(pr * 30) * 6).toFixed(1)}deg)`;
     if (s !== lastS) { lastS = s; setStage(s); if (s > 0 && !reduce && hasGsap) track('order_journey_view', { stage: s }, 'oj' + s); }
   }
   let pr = reduce || !hasGsap ? 1 : 0;
+  let lastScroll = 0;
+  addEventListener('scroll', () => { lastScroll = performance.now(); }, { passive: true });
   if (!reduce && hasGsap) ScrollTrigger.create({ trigger: road, start: 'top 75%', end: 'bottom 45%', scrub: .6, onUpdate: self => { pr = self.progress; render(pr); }, onRefresh: () => render(pr) });
+  // Where this page doesn't scroll itself (shown inside another app that scrolls it from outside), scroll events never
+  // come: follow how much of the road is on screen instead. The token glides to the new value.
+  if (!reduce && 'IntersectionObserver' in window) {
+    let goal = pr, raf = 0;
+    const glide = () => { pr += (goal - pr) * .12; if (Math.abs(goal - pr) < .002) pr = goal; render(pr); raf = pr === goal ? 0 : requestAnimationFrame(glide); };
+    new IntersectionObserver(es => es.forEach(e => {
+      if (performance.now() - lastScroll < 800) return;           // normal page: ScrollTrigger drives it
+      const r = e.boundingClientRect, ir = e.intersectionRect, h = Math.max(1, r.height);
+      if (!e.isIntersecting) { goal = pr > .5 ? 1 : 0; }
+      else if (ir.top - r.top > 2) goal = 1;                         // top already scrolled past
+      else goal = clamp(((ir.bottom - r.top) / h - .2) / .75);       // entering from below
+      if (!raf) raf = requestAnimationFrame(glide);
+    }), { threshold: Array.from({ length: 51 }, (_, i) => i / 50) }).observe(road);
+  }
   render(pr);
   addEventListener('resize', () => render(pr));
 })();
@@ -1731,7 +1884,7 @@ $('#copyMail').addEventListener('click', () => {
     mask.setAttribute('x', 0); mask.setAttribute('y', 0); mask.setAttribute('width', W); mask.setAttribute('height', Hm);
     const pts = [];
     const hs = $('.hero-stage'); const h = docTop(hs);
-    pts.push([h.x - m.x + hs.offsetWidth * .5, h.y - m.y + hs.offsetHeight + 34]);
+    if (W >= 600) pts.push([h.x - m.x + hs.offsetWidth * .5, h.y - m.y + hs.offsetHeight + 34]);
     const pb = $('.pebbles'); const pbp = docTop(pb); pts.push([W * .5, pbp.y - m.y + pb.offsetHeight + 40]);
     $$('[data-trail]').forEach(el => {
       const box = el.closest('.pin-spacer') || el; const b = docTop(box);
@@ -1740,7 +1893,7 @@ $('#copyMail').addEventListener('click', () => {
       pts.push([x, top + 70]); pts.push([x, bottom - 70]);
     });
     const door = $('#homeDoor'); const home = $('#home'); const hp = docTop(home);
-    const art = $('.home-art'); const ar = art.getBoundingClientRect(), hr = home.getBoundingClientRect(); const ap = { x: hp.x + ar.left - hr.left, y: hp.y + ar.top - hr.top }; const k = ar.width / 440;
+    const art = $('.home-art'); const ar = art.getBoundingClientRect(), hr = home.getBoundingClientRect(); const zf = window.__fyZoom || 1; const ap = { x: hp.x + (ar.left - hr.left) / zf, y: hp.y + (ar.top - hr.top) / zf }; const k = ar.width / zf / 440;
     pts.push([W * .5, hp.y - m.y - 30]);
     pts.push([ap.x - m.x + 256 * k, ap.y - m.y + 200 * k]);
     let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
@@ -1755,21 +1908,40 @@ $('#copyMail').addEventListener('click', () => {
     maskPath.style.strokeDasharray = L; built = true; update();
   }
   let lastX = 0;
-  function update() {
+  function update(yOverride) {
     if (!built) return;
     const m = docTop(main);
-    const yT = scrollY + innerHeight * .62 - m.y;
+    const yT = yOverride != null ? yOverride : (scrollY + innerHeight * .62) / (window.__fyZoom || 1) - m.y;
     let i = 0, lo = 0, hi = lut.length - 1;
     while (lo < hi) { const mid = (lo + hi) >> 1; if (lut[mid][2] < yT) lo = mid + 1; else hi = mid; } i = lo;
     let len, x, y;
     if (i === 0) { [len, x, y] = lut[0]; if (yT < y) len = 0; }
     else { const a = lut[i - 1], b = lut[i]; const t = clamp((yT - a[2]) / Math.max(.01, b[2] - a[2])); len = lerp(a[0], b[0], t); x = lerp(a[1], b[1], t); y = lerp(a[2], b[2], t); }
     maskPath.style.strokeDashoffset = (L - len).toFixed(1);
-    dog.style.transform = `translate(${(x - 22).toFixed(1)}px, ${(y - 22).toFixed(1)}px)`;
+    const hw = (dog.offsetWidth || 44) / 2;
+    dog.style.transform = `translate(${(x - hw).toFixed(1)}px, ${(y - hw).toFixed(1)}px)`;
     if (Math.abs(x - lastX) > .5) dog.classList.toggle('left', x < lastX); lastX = x;
     const atHome = len >= L - 6; if (atHome && !dog.classList.contains('arrived')) { dog.classList.add('arrived'); track('trail_complete', {}, 'trail'); } else if (!atHome) dog.classList.remove('arrived');
   }
-  addEventListener('scroll', () => requestAnimationFrame(update), { passive: true });
+  let lastScroll = -1e4;
+  addEventListener('scroll', () => { lastScroll = performance.now(); requestAnimationFrame(() => update()); }, { passive: true });
+  // Where the page is scrolled from outside (shown inside an app), its own scroll never changes: take the band of the
+  // page that is on screen from the sections' visible parts, and let the dog glide there.
+  if ('IntersectionObserver' in window) {
+    const seen = new Map(); let goalY = null, curY = null, raf = 0;
+    const glide = () => { curY += (goalY - curY) * .12; if (Math.abs(goalY - curY) < .5) curY = goalY; update(curY); raf = curY === goalY ? 0 : requestAnimationFrame(glide); };
+    const io = new IntersectionObserver(es => {
+      es.forEach(e => seen.set(e.target, e.isIntersecting ? e.intersectionRect : null));
+      if (!built || performance.now() - lastScroll < 800) return;
+      let top = Infinity, bot = -Infinity;
+      seen.forEach(r => { if (r && r.height > 0) { top = Math.min(top, r.top); bot = Math.max(bot, r.bottom); } });
+      if (!isFinite(top)) return;
+      goalY = (scrollY + top + (bot - top) * .62) / (window.__fyZoom || 1) - docTop(main).y;
+      if (curY == null) curY = goalY;
+      if (!raf) raf = requestAnimationFrame(glide);
+    }, { threshold: Array.from({ length: 21 }, (_, i) => i / 20) });
+    [$('.hero'), $('.pebbles'), $('#how'), ...$$('.capsule'), $('#home')].filter(Boolean).forEach(el => io.observe(el));
+  }
   let rT; const rebuild = () => { clearTimeout(rT); rT = setTimeout(build, 120); };
   addEventListener('resize', rebuild);
   if (hasGsap) ScrollTrigger.addEventListener('refresh', build);
