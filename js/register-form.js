@@ -115,7 +115,8 @@
         });
     });
     form.querySelectorAll('input[name="qty"]').forEach(function (r) { r.addEventListener("change", function () { markChosen(selectedQty()); }); });
-    if (location.hash === "#order") openOrder();
+    // /?qty=4#order — открыть форму с выбранным количеством (так ведёт кнопка «Continue to order» на /new/)
+    if (location.hash === "#order") openOrder(+new URLSearchParams(location.search).get("qty") || 0);
 
     let lastOrder = null;
     document.getElementById("telegramLinkBtn").addEventListener("click", function () { track("tg"); });
