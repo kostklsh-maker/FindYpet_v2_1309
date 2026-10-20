@@ -216,15 +216,15 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
 .sec-head h2,.h2{font-size:clamp(2.05rem,4.2vw,3.5rem);font-weight:750;letter-spacing:-.035em}
 .sec-head p{color:var(--ink-soft);font-size:clamp(1.05rem,1.3vw,1.2rem);max-width:52ch}
 
-/* ---------- Story (pinned) ---------- */
-.story{position:relative;z-index:3;width:min(1320px,calc(100% - 8vw));height:100svh;min-height:560px;margin:clamp(80px,13vh,150px) auto 0;
+/* ---------- Story (plays by itself, never holds the scroll) ---------- */
+.story{position:relative;z-index:3;width:min(1320px,calc(100% - 8vw));height:auto;min-height:0;margin:clamp(80px,13vh,150px) auto 0;
   background:var(--night);color:var(--night-ink);display:flex;flex-direction:column;overflow:hidden;
   border-radius:var(--r-capsule);clip-path:inset(0 calc(var(--roll,0) * 9%) round calc(var(--r-capsule) + var(--roll,0) * 220px))}
 .story-head{display:flex;justify-content:space-between;align-items:flex-end;gap:10px 24px;flex-wrap:wrap;
-  padding:calc(env(safe-area-inset-top,0px) + 84px) clamp(18px,3.5vw,44px) 14px}
+  padding:clamp(22px,3vw,36px) clamp(18px,3.5vw,44px) 14px}
 .story-head h2{font-size:clamp(1.8rem,3.6vw,3rem);font-weight:750}
 .story-head p{color:var(--night-soft);font-size:1rem}
-.story-stage{position:relative;flex:1;min-height:0;margin:0 clamp(10px,1.6vw,22px);border-radius:calc(var(--r-capsule) - 12px);overflow:hidden;background:#BDE6E0}
+.story-stage{position:relative;flex:none;aspect-ratio:16/9;max-height:74svh;min-height:300px;margin:0 clamp(10px,1.6vw,22px);border-radius:calc(var(--r-capsule) - 12px);overflow:hidden;background:#BDE6E0}
 .scene{position:absolute;inset:0;width:100%;height:100%;display:block}
 .scene .leg,.scene .oleg,.scene .tail{transform-box:fill-box;transform-origin:50% 0}
 .scene .tail{transform-origin:100% 100%;animation:wag .5s ease-in-out infinite alternate}
@@ -260,6 +260,15 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
 .step-btn[aria-current="step"] .step-num{background:#6DFF9A;color:#0F2B30}
 .step-btn[aria-current="step"] .step-text{color:#3F5C61}
 .step-caption{display:none}
+.story-ctl{display:flex;align-items:center;gap:14px}
+.story-play{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 18px 0 14px;border:0;border-radius:999px;background:var(--night-2);color:var(--night-ink);font:inherit;font-weight:600;font-size:.95rem;cursor:pointer;transition:background-color .3s}
+.story-play:hover{background:#26475A}
+.story-play:focus-visible{outline:3px solid #6DFF9A;outline-offset:2px}
+.story-play svg{width:18px;height:18px;fill:currentColor}
+.story-play .i-play,.story-play[aria-pressed="false"] .i-pause{display:none}
+.story-play[aria-pressed="false"] .i-play{display:block}
+.story-progress{position:absolute;left:18px;right:18px;bottom:14px;z-index:3;height:4px;border-radius:4px;background:rgba(255,255,255,.28);overflow:hidden;pointer-events:none}
+.story-progress i{display:block;width:100%;height:100%;background:#6DFF9A;transform-origin:0 50%;transform:scaleX(0)}
 @media (max-width:860px){
   .story-steps{grid-template-columns:repeat(4,auto);justify-content:center;gap:10px;padding-top:12px;padding-bottom:4px}
   .step-btn{grid-template-columns:auto;padding:5px;border-radius:50%;width:auto;height:auto}
@@ -268,8 +277,9 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
   .step-caption{display:block;padding:4px clamp(18px,4vw,30px) 18px;min-height:96px}
   .step-caption b{display:block;font-size:1.1rem;line-height:1.25}
   .step-caption span{display:block;color:var(--night-soft);font-size:.95rem;line-height:1.4;margin-top:4px}
-  .story-head{padding-bottom:10px}
+  .story-head{padding-bottom:12px;align-items:center}
   .story-head p{display:none}
+  .story-stage{aspect-ratio:4/5;max-height:66svh}
 }
 @media (max-width:600px){.story{width:calc(100% - 3vw)}}
 .story.static{height:auto;min-height:0}
@@ -529,7 +539,7 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
 .photo-layer::after{content:"";position:absolute;inset:0;background:#061430;mix-blend-mode:multiply;opacity:0;transition:opacity .8s ease}
 .hero-disc[data-night="true"] .photo-layer::after{opacity:.66}
 .hero-disc[data-night="true"] .sam-photo{filter:saturate(.5)}
-.hero-disc .tag-fallback{inset:auto;left:0;top:0;height:auto;transform-origin:50% 50%}
+.hero-disc .tag-fallback{inset:auto;left:0;top:0;height:auto;transform-origin:50% 50%;opacity:0}
 .glow-veil{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0;
   background:radial-gradient(1.6px 1.6px at 18% 22%,#EAF6F0 50%,transparent 51%),radial-gradient(1.2px 1.2px at 72% 16%,#EAF6F0 50%,transparent 51%),radial-gradient(1.8px 1.8px at 84% 42%,#EAF6F0 50%,transparent 51%),
   radial-gradient(1.2px 1.2px at 30% 70%,#EAF6F0 50%,transparent 51%),radial-gradient(1.4px 1.4px at 60% 84%,#EAF6F0 50%,transparent 51%),radial-gradient(1px 1px at 44% 12%,#EAF6F0 50%,transparent 51%),
@@ -660,7 +670,7 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
   <section class="story" id="how" aria-labelledby="how-title" data-trail="r">
     <div class="story-head">
       <h2 id="how-title">From lost to home in 4 steps</h2>
-      <p>Scroll to follow Sam home.</p>
+      <div class="story-ctl"><p>Plays by itself. Tap a step to jump to it.</p><button class="story-play" id="storyPlay" type="button" aria-pressed="true" aria-label="Pause the story"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-pause" d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/><path class="i-play" d="M8 5.5v13l11-6.5z"/></svg><span>Pause</span></button></div>
     </div>
     <div class="story-stage" id="storyStage">
       <svg class="scene" id="scene" viewBox="0 0 1200 640" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Sam the dog slips out at dusk, is found under a street lamp at night, the finder taps his glowing tag, his owner gets an alert and they meet again at dawn.">
@@ -719,6 +729,7 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
         </g></g></g>
         <path id="heart" d="M0 8 C -26 -10 -22 -34 -6 -34 C 0 -34 0 -28 0 -26 C 0 -28 0 -34 6 -34 C 22 -34 26 -10 0 8 Z" fill="#FF7A6B" opacity="0" transform="translate(690 330)"/>
       </svg>
+      <div class="story-progress" aria-hidden="true"><i id="storyBar"></i></div>
       <div class="scene-bubble" id="finderBubble"><b>Hi! My name is Sam</b>Found me? Tap “Notify the owner”.</div>
       <div class="alert-card" id="alertCard">
         <div class="alert-top"><span class="app"><svg viewBox="440 215 555 433" aria-hidden="true"><use href="#lg-mark"/></svg></span>FindYpet<time>now</time></div>
@@ -1561,24 +1572,44 @@ const Story = (() => {
     }
   }
 
-  let st = null;
+  // The story plays by itself while it is on screen and never holds the page: scrolling always moves the page.
+  const playBtn = $('#storyPlay'), bar = $('#storyBar');
+  const DUR = 26, HOLD = 2.6, STARTS = [0, .38, .58, .78];
+  let playing = motion, inView = false, hold = 0, needs = true;
+  function setPlaying(on) {
+    playing = on; needs = true;
+    playBtn.setAttribute('aria-pressed', on); playBtn.setAttribute('aria-label', on ? 'Pause the story' : 'Play the story');
+    $('span', playBtn).textContent = on ? 'Pause' : 'Play';
+  }
   if (motion) {
-    st = ScrollTrigger.create({ trigger: story, start: 'top top', end: () => '+=' + Math.round(innerHeight * 3.2), pin: true, anticipatePin: 1, onUpdate: self => { target = self.progress; } });
     gsap.fromTo(story, { '--roll': 1 }, { '--roll': 0, ease: 'none', scrollTrigger: { trigger: story, start: 'top bottom', end: 'top 15%', scrub: .5 } });
+    new IntersectionObserver(es => es.forEach(e => { inView = e.isIntersecting; needs = true; }), { threshold: .2 }).observe(stage);
+    new ResizeObserver(() => { needs = true; }).observe(stage);
     let lt = performance.now();
-    const loop = now => { const dt = Math.min(.1, (now - lt) / 1000); lt = now; p += (target - p) * (1 - Math.exp(-dt * 9)); if (Math.abs(target - p) < .0004) p = target; render(p); requestAnimationFrame(loop); };
+    const loop = now => {
+      requestAnimationFrame(loop);
+      const dt = Math.min(.1, (now - lt) / 1000); lt = now;
+      if (!inView || document.hidden) return;
+      if (playing) {
+        if (hold > 0) { hold -= dt; if (hold <= 0) { p = 0; prevPositions = {}; } }
+        else { p = Math.min(1, p + dt / DUR); if (p >= 1) hold = HOLD; }
+        needs = true;
+      }
+      if (needs) { needs = false; render(p); bar.style.transform = `scaleX(${p.toFixed(4)})`; }
+    };
     requestAnimationFrame(loop);
+    playBtn.addEventListener('click', () => { setPlaying(!playing); track('story_play', { playing }); });
   } else {
-    story.classList.add('static'); p = STEP_AT[0]; render(p);
+    story.classList.add('static'); p = STEP_AT[0]; render(p); playBtn.hidden = true;
     new ResizeObserver(() => render(p)).observe(stage);
   }
   steps.forEach(b => b.addEventListener('click', () => {
     const i = +b.dataset.step - 1; trackOK = true;
-    if (st) { const y = st.start + (st.end - st.start) * STEP_AT[i]; window.scrollTo({ top: y, behavior: reduce ? 'auto' : 'smooth' }); }
-    else { p = STEP_AT[i]; render(p); }
+    p = motion && playing ? STARTS[i] : STEP_AT[i]; hold = 0; prevPositions = {}; needs = true;
+    if (!motion) render(p); else bar.style.transform = `scaleX(${p.toFixed(4)})`;
   }));
   render(p);
-  return { render: () => render(p) };
+  return { render: () => { needs = true; render(p); } };
 })();
 
 /* ---------------- Two-phones demo ---------------- */
