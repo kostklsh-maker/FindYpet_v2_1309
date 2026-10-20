@@ -260,6 +260,21 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
 .step-btn[aria-current="step"] .step-num{background:#6DFF9A;color:#0F2B30}
 .step-btn[aria-current="step"] .step-text{color:#3F5C61}
 .step-caption{display:none}
+@media (max-width:860px){
+  .story-head h2{font-size:1.75rem;line-height:1.15}
+  .step-caption{padding:6px 20px 22px!important;min-height:0!important}
+  .step-caption b{font-size:1.3rem!important}
+  .step-caption span{font-size:1.08rem!important;line-height:1.45!important}
+}
+@media (max-width:600px){
+  .hero-stage .sat,.hero-stage .hint{display:none}
+  .hero-stage{margin-top:18px}
+  .price-line{gap:8px}
+  .pebbles{margin-top:30px;gap:12px}
+  .pebble{padding:12px 20px 12px 12px}
+  .pebble-text b{font-size:1.08rem}
+  .sec-head p{font-size:1.08rem;line-height:1.5}
+}
 .story-ctl{display:flex;align-items:center;gap:14px}
 .story-play{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 18px 0 14px;border:0;border-radius:999px;background:var(--night-2);color:var(--night-ink);font:inherit;font-weight:600;font-size:.95rem;cursor:pointer;transition:background-color .3s}
 .story-play:hover{background:#26475A}
@@ -558,12 +573,88 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
 .upsell-btn{border:0;min-height:44px;padding:0 20px;border-radius:999px;background:var(--apricot);color:#3A1C04;font:700 .95rem var(--font);cursor:pointer;transition:transform .35s var(--ease-back)}
 .upsell-btn:hover{transform:translateY(-2px)}
 
+/* ---------- Phone: calm, roomy, readable ---------- */
+@media (max-width:600px){
+  body{font-size:1.125rem}
+  .trail,.trail-dog{display:none}
+  .capsule,.story,.home{width:calc(100% - 24px);margin-top:56px;transform:none!important;border-radius:36px}
+  .capsule{padding:34px 20px 30px}
+  .story{clip-path:none;border-radius:36px}
+  .sec-head{gap:12px}
+  .sec-head h2,.h2{font-size:2.2rem}
+  .sec-head p{font-size:1.12rem;line-height:1.5}
+  /* hero badges: one clean column, headline only */
+  .pebbles{gap:10px;margin-top:22px}
+  .pebble:nth-child(odd),.pebble:nth-child(even){margin:0;translate:0 0}
+  .pebble{padding:8px 18px 8px 8px}
+  .pebble-ball{width:52px;height:52px}
+  .pebble-text b{font-size:1.1rem}
+  .pebble-text span{display:none}
+  /* story */
+  .story-head{padding:28px 22px 14px}
+  .story-head h2{font-size:2rem}
+  .story-stage{margin:0 10px}
+  .story-steps{padding-top:16px}
+  .step-num{width:46px;height:46px;font-size:1.1rem}
+  .step-caption{padding:6px 22px 26px;min-height:132px}
+  .step-caption b{font-size:1.4rem;line-height:1.2}
+  .step-caption span{font-size:1.12rem;line-height:1.45;margin-top:8px}
+  .scene-bubble{font-size:1.02rem;max-width:230px}
+  .alert-card{width:min(300px,86%)}
+  .alert-card h3{font-size:1.15rem}
+  .alert-card p{font-size:1rem}
+  /* microchip vs tag: one card per question, big type, the tag answer stands out */
+  .compare-grid{gap:14px;margin-top:26px}
+  .cmp-minor{display:none}
+  .cmp-row{gap:8px;padding:18px 16px;border-radius:30px}
+  .cmp-label{padding:0 6px 4px;font-size:1.3rem;font-weight:700;line-height:1.2}
+  .cmp-a,.cmp-b{display:block;padding:14px 18px;border-radius:22px;font-size:1.08rem;line-height:1.4}
+  .cmp-a::before,.cmp-b::before{display:block;min-width:0;margin-bottom:3px;font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;opacity:.8}
+  .cmp-b::before{content:"FindYpet tag"}
+  .cmp-note{margin-top:20px;padding:16px 18px;font-size:1rem}
+  /* order + after order + found */
+  .pack-body b{font-size:1.12rem}
+  .pack-body span{font-size:1.05rem}
+  .pack-body small{font-size:.9rem}
+  .fine{font-size:1rem}
+  .road-steps b{font-size:1.2rem}
+  .road-steps span{font-size:1.05rem}
+  .way b{font-size:1.25rem}
+  .page-fine{display:none}
+}
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto}
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
   .capsule{transform:none!important}
 }
 </style>
+<script id="fyPhoneFix">
+/* A phone in "desktop site" mode lays the page out 980 px wide and shrinks it: tiny text, desktop columns.
+   Then zoom the page to the real screen width and scale the width breakpoints by the same factor. */
+(function () {
+  try {
+    var d = document.documentElement, sw = Math.min(screen.width, screen.height), iw = d.clientWidth || innerWidth;
+    if (!matchMedia('(pointer: coarse)').matches || !sw || sw > 600 || iw < sw * 1.6) return;
+    var k = iw / sw;
+    window.__fyZoom = k; d.style.zoom = k; d.classList.add('phone-desktop-mode');
+    var VU = /(-?\d*\.?\d+)(s|d|l)?(vw|vh|vmin|vmax)\b/g;
+    var fix = function (rs) {
+      for (var j = 0; j < rs.length; j++) {
+        var r = rs[j];
+        if (r.media && /width/.test(r.media.mediaText)) r.media.mediaText = r.media.mediaText.replace(/(\d+(?:\.\d+)?)px/g, function (m, n) { return Math.round(n * k) + 'px'; });
+        if (r.cssRules) fix(r.cssRules);
+        // viewport units count the 980 px layout: bring them back to the real screen
+        if (r.style) for (var q = 0; q < r.style.length; q++) {
+          var pn = r.style[q], v = r.style.getPropertyValue(pn);
+          if (VU.test(v)) { VU.lastIndex = 0; r.style.setProperty(pn, v.replace(VU, function (m, n, a, u) { return (n / k).toFixed(3) + (a || '') + u; }), r.style.getPropertyPriority(pn)); }
+          VU.lastIndex = 0;
+        }
+      }
+    };
+    for (var i = 0; i < document.styleSheets.length; i++) { try { fix(document.styleSheets[i].cssRules); } catch (e) {} }
+  } catch (e) {}
+})();
+</script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -740,10 +831,10 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
       </div>
     </div>
     <ol class="story-steps" id="storySteps">
-      <li><button class="step-btn" type="button" data-step="1"><span class="step-num">1</span><span class="step-title">Someone finds your pet</span><span class="step-text">They see the tag on the collar: your number and a QR code.</span></button></li>
-      <li><button class="step-btn" type="button" data-step="2"><span class="step-num">2</span><span class="step-title">They scan, tap or call</span><span class="step-text">Your pet's page opens in the camera or browser. No app, no sign-up.</span></button></li>
-      <li><button class="step-btn" type="button" data-step="3"><span class="step-num">3</span><span class="step-title">You get an alert</span><span class="step-text">Our bot messages you in Telegram the moment the page opens, with a map pin if the finder allows it.</span></button></li>
-      <li><button class="step-btn" type="button" data-step="4"><span class="step-num">4</span><span class="step-title">On the way home</span><span class="step-text">Call the finder back or meet up. Was Lost mode on? Send /found.</span></button></li>
+      <li><button class="step-btn" type="button" data-step="1"><span class="step-num">1</span><span class="step-title">Someone finds your pet</span><span class="step-text">They see your number and a QR code on the tag.</span></button></li>
+      <li><button class="step-btn" type="button" data-step="2"><span class="step-num">2</span><span class="step-title">They scan, tap or call</span><span class="step-text">Your pet's page opens. No app needed.</span></button></li>
+      <li><button class="step-btn" type="button" data-step="3"><span class="step-num">3</span><span class="step-title">You get an alert</span><span class="step-text">Telegram alerts you at once, with a map pin.</span></button></li>
+      <li><button class="step-btn" type="button" data-step="4"><span class="step-num">4</span><span class="step-title">On the way home</span><span class="step-text">Call back or meet up. Sam is home.</span></button></li>
     </ol>
     <p class="step-caption" id="stepCaption" aria-live="polite"><b>Someone finds your pet</b><span>They see the tag on the collar: your number and a QR code.</span></p>
   </section>
@@ -756,19 +847,19 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
     </div>
     <div class="compare-grid" role="table" aria-label="Microchip compared with FindYpet tag">
       <div class="cmp-head" role="row"><span role="columnheader"><span class="vh">Question</span></span><span role="columnheader">Microchip</span><span role="columnheader">FindYpet tag</span></div>
-      <div class="cmp-row" role="row"><span class="cmp-label" role="rowheader">Who can read it</span><span class="cmp-a" role="cell">A vet or the city vet service, with a special scanner</span><span class="cmp-b" role="cell">Anyone with a phone, or they just call the number</span></div>
-      <div class="cmp-row" role="row"><span class="cmp-label" role="rowheader">When you hear</span><span class="cmp-a" role="cell">After someone takes the pet to a vet</span><span class="cmp-b" role="cell">In seconds: the finder calls, or you get an alert</span></div>
+      <div class="cmp-row" role="row"><span class="cmp-label" role="rowheader">Who can read it</span><span class="cmp-a" role="cell">Only a vet, with a scanner</span><span class="cmp-b" role="cell">Anyone with a phone</span></div>
+      <div class="cmp-row" role="row"><span class="cmp-label" role="rowheader">When you hear</span><span class="cmp-a" role="cell">After a vet visit</span><span class="cmp-b" role="cell">In seconds</span></div>
       <div class="cmp-row" role="row"><span class="cmp-label" role="rowheader">At night</span><span class="cmp-a" role="cell">Not visible</span><span class="cmp-b" role="cell">Glows in the dark</span></div>
-      <div class="cmp-row" role="row"><span class="cmp-label" role="rowheader">Battery</span><span class="cmp-a" role="cell">Not needed</span><span class="cmp-b" role="cell">Not needed</span></div>
+      <div class="cmp-row cmp-minor" role="row"><span class="cmp-label" role="rowheader">Battery</span><span class="cmp-a" role="cell">Not needed</span><span class="cmp-b" role="cell">Not needed</span></div>
     </div>
-    <p class="cmp-note">FindYpet doesn't replace the microchip required by law. Keep both: the tag is the fast way home, and the chip stays as the backup.</p>
+    <p class="cmp-note">Keep the microchip too: the law requires it. The tag is the fast way home, the chip is the backup.</p>
   </section>
 
   <!-- ===== Two phones demo ===== -->
   <section class="capsule" id="try" aria-labelledby="try-title" data-trail="r">
     <div class="sec-head">
       <h2 id="try-title">Try both sides</h2>
-      <p>You found Sam in the park. Reach his owner from the finder's phone, then answer as Dana from her phone.</p>
+      <p>Reach Sam's owner as the finder, then answer as Dana.</p>
     </div>
     <div class="view-switch" role="tablist" aria-label="Choose a phone">
       <button type="button" role="tab" aria-selected="true" aria-controls="phoneFinder" data-view="finder">Finder's phone<span class="badge" aria-hidden="true"></span></button>
@@ -1171,7 +1262,7 @@ const Medal = (() => {
   let renderer;
   try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' }); }
   catch (e) { runLoopOnly(); return { setText(n, p) { st.name = n; st.phone = p; fallbackText(); } }; }
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min((devicePixelRatio || 1) * (window.__fyZoom || 1), 2));
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.setClearColor(0x000000, 0);
@@ -1771,7 +1862,7 @@ $('#copyMail').addEventListener('click', () => {
       pts.push([x, top + 70]); pts.push([x, bottom - 70]);
     });
     const door = $('#homeDoor'); const home = $('#home'); const hp = docTop(home);
-    const art = $('.home-art'); const ar = art.getBoundingClientRect(), hr = home.getBoundingClientRect(); const ap = { x: hp.x + ar.left - hr.left, y: hp.y + ar.top - hr.top }; const k = ar.width / 440;
+    const art = $('.home-art'); const ar = art.getBoundingClientRect(), hr = home.getBoundingClientRect(); const zf = window.__fyZoom || 1; const ap = { x: hp.x + (ar.left - hr.left) / zf, y: hp.y + (ar.top - hr.top) / zf }; const k = ar.width / zf / 440;
     pts.push([W * .5, hp.y - m.y - 30]);
     pts.push([ap.x - m.x + 256 * k, ap.y - m.y + 200 * k]);
     let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
@@ -1789,7 +1880,7 @@ $('#copyMail').addEventListener('click', () => {
   function update() {
     if (!built) return;
     const m = docTop(main);
-    const yT = scrollY + innerHeight * .62 - m.y;
+    const yT = (scrollY + innerHeight * .62) / (window.__fyZoom || 1) - m.y;
     let i = 0, lo = 0, hi = lut.length - 1;
     while (lo < hi) { const mid = (lo + hi) >> 1; if (lut[mid][2] < yT) lo = mid + 1; else hi = mid; } i = lo;
     let len, x, y;
