@@ -121,7 +121,7 @@ button{font-family:inherit}
 /* ---------- Main + trail ---------- */
 main{position:relative;overflow-x:clip;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-bottom:40px}
 .trail{position:absolute;left:0;top:0;width:100%;z-index:1;pointer-events:none;overflow:visible}
-.trail-dog{position:absolute;left:0;top:0;width:44px;height:44px;z-index:1;pointer-events:none;will-change:transform}
+.trail-dog{position:absolute;left:0;top:0;width:44px;height:44px;z-index:4;pointer-events:none;will-change:transform}
 .trail-dog img{width:100%;height:100%;display:block;border-radius:50%;object-fit:cover;box-shadow:0 0 0 3px var(--surface),0 6px 14px -6px var(--shadow)}
 .trail-dog.arrived img{animation:hop .6s var(--ease-back) 2}
 @keyframes hop{50%{translate:0 -12px}}
@@ -576,7 +576,13 @@ h1{font-size:clamp(2.55rem,5.7vw,5rem);font-weight:800;letter-spacing:-.04em;lin
 /* ---------- Phone: calm, roomy, readable ---------- */
 @media (max-width:600px){
   body{font-size:1.125rem}
-  .trail,.trail-dog{display:none}
+  /* the walk path runs in a lane beside each section: sections alternate sides, so the dog zigzags down */
+  main{padding-left:8px;padding-right:8px}
+  .hero,.pebbles{padding-left:8px;padding-right:8px}
+  .capsule[data-trail="l"],.story[data-trail="l"]{width:calc(100% - 40px);margin-left:40px;margin-right:0}
+  .capsule[data-trail="r"],.story[data-trail="r"]{width:calc(100% - 40px);margin-left:0;margin-right:40px}
+  .trail-dog{width:34px;height:34px}
+  .trail-dog img{box-shadow:0 0 0 2.5px var(--surface),0 4px 10px -4px var(--shadow)}
   .capsule,.story,.home{width:calc(100% - 24px);margin-top:56px;transform:none!important;border-radius:36px}
   .capsule{padding:34px 20px 30px}
   .story{clip-path:none;border-radius:36px}
@@ -1869,7 +1875,7 @@ $('#copyMail').addEventListener('click', () => {
     mask.setAttribute('x', 0); mask.setAttribute('y', 0); mask.setAttribute('width', W); mask.setAttribute('height', Hm);
     const pts = [];
     const hs = $('.hero-stage'); const h = docTop(hs);
-    pts.push([h.x - m.x + hs.offsetWidth * .5, h.y - m.y + hs.offsetHeight + 34]);
+    if (W >= 600) pts.push([h.x - m.x + hs.offsetWidth * .5, h.y - m.y + hs.offsetHeight + 34]);
     const pb = $('.pebbles'); const pbp = docTop(pb); pts.push([W * .5, pbp.y - m.y + pb.offsetHeight + 40]);
     $$('[data-trail]').forEach(el => {
       const box = el.closest('.pin-spacer') || el; const b = docTop(box);
@@ -1893,21 +1899,40 @@ $('#copyMail').addEventListener('click', () => {
     maskPath.style.strokeDasharray = L; built = true; update();
   }
   let lastX = 0;
-  function update() {
+  function update(yOverride) {
     if (!built) return;
     const m = docTop(main);
-    const yT = (scrollY + innerHeight * .62) / (window.__fyZoom || 1) - m.y;
+    const yT = yOverride != null ? yOverride : (scrollY + innerHeight * .62) / (window.__fyZoom || 1) - m.y;
     let i = 0, lo = 0, hi = lut.length - 1;
     while (lo < hi) { const mid = (lo + hi) >> 1; if (lut[mid][2] < yT) lo = mid + 1; else hi = mid; } i = lo;
     let len, x, y;
     if (i === 0) { [len, x, y] = lut[0]; if (yT < y) len = 0; }
     else { const a = lut[i - 1], b = lut[i]; const t = clamp((yT - a[2]) / Math.max(.01, b[2] - a[2])); len = lerp(a[0], b[0], t); x = lerp(a[1], b[1], t); y = lerp(a[2], b[2], t); }
     maskPath.style.strokeDashoffset = (L - len).toFixed(1);
-    dog.style.transform = `translate(${(x - 22).toFixed(1)}px, ${(y - 22).toFixed(1)}px)`;
+    const hw = (dog.offsetWidth || 44) / 2;
+    dog.style.transform = `translate(${(x - hw).toFixed(1)}px, ${(y - hw).toFixed(1)}px)`;
     if (Math.abs(x - lastX) > .5) dog.classList.toggle('left', x < lastX); lastX = x;
     const atHome = len >= L - 6; if (atHome && !dog.classList.contains('arrived')) { dog.classList.add('arrived'); track('trail_complete', {}, 'trail'); } else if (!atHome) dog.classList.remove('arrived');
   }
-  addEventListener('scroll', () => requestAnimationFrame(update), { passive: true });
+  let lastScroll = -1e4;
+  addEventListener('scroll', () => { lastScroll = performance.now(); requestAnimationFrame(() => update()); }, { passive: true });
+  // Where the page is scrolled from outside (shown inside an app), its own scroll never changes: take the band of the
+  // page that is on screen from the sections' visible parts, and let the dog glide there.
+  if ('IntersectionObserver' in window) {
+    const seen = new Map(); let goalY = null, curY = null, raf = 0;
+    const glide = () => { curY += (goalY - curY) * .12; if (Math.abs(goalY - curY) < .5) curY = goalY; update(curY); raf = curY === goalY ? 0 : requestAnimationFrame(glide); };
+    const io = new IntersectionObserver(es => {
+      es.forEach(e => seen.set(e.target, e.isIntersecting ? e.intersectionRect : null));
+      if (!built || performance.now() - lastScroll < 800) return;
+      let top = Infinity, bot = -Infinity;
+      seen.forEach(r => { if (r && r.height > 0) { top = Math.min(top, r.top); bot = Math.max(bot, r.bottom); } });
+      if (!isFinite(top)) return;
+      goalY = (scrollY + top + (bot - top) * .62) / (window.__fyZoom || 1) - docTop(main).y;
+      if (curY == null) curY = goalY;
+      if (!raf) raf = requestAnimationFrame(glide);
+    }, { threshold: Array.from({ length: 21 }, (_, i) => i / 20) });
+    [$('.hero'), $('.pebbles'), $('#how'), ...$$('.capsule'), $('#home')].filter(Boolean).forEach(el => io.observe(el));
+  }
   let rT; const rebuild = () => { clearTimeout(rT); rT = setTimeout(build, 120); };
   addEventListener('resize', rebuild);
   if (hasGsap) ScrollTrigger.addEventListener('refresh', build);
