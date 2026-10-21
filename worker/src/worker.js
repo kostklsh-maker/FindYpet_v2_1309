@@ -185,9 +185,10 @@ export async function route(request, env, ctx) {
     }
 
     // ---- Статический сайт ----
+    // /new/ — бывший предварительный показ нового дизайна: теперь это главная
+    if (path === '/new' || path.startsWith('/new/')) return Response.redirect(url.origin + '/' + url.search, 301);
     const res = env.ASSETS ? await env.ASSETS.fetch(request) : serveEmbedded(url, env);
-    // /new/ — предварительный показ нового дизайна, в поиск не попадает
-    return path.startsWith('/tag') || path === '/new' || path.startsWith('/new/') ? noindex(res) : res;
+    return path.startsWith('/tag') ? noindex(res) : res;
   } catch (err) {
     console.error(err);
     await bumpFail(env, 'server').catch(() => {});
@@ -274,7 +275,7 @@ export function sitemapXml(env, url) {
 export function isTestSite(env) { return !!(env && env.STAGE); }
 
 export const TEST_BANNER =
-  '<div id="fyp-test-banner" style="background:#f59e0b;color:#1f2937;font:700 13px/1.35 system-ui,-apple-system,sans-serif;' +
+  '<div id="fyp-test-banner" class="stage-banner" style="background:#f59e0b;color:#1f2937;font:700 13px/1.35 system-ui,-apple-system,sans-serif;' +
   'text-align:center;padding:7px 12px;letter-spacing:.2px" dir="ltr">🧪 TEST SITE · ТЕСТОВЫЙ САЙТ — ' +
   'orders here are not real · заказы не настоящие. Рабочий сайт: <a href="https://findy-pet.com" style="color:inherit">findy-pet.com</a></div>';
 

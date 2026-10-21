@@ -50,9 +50,10 @@ def render(page, I18N, pricing, lang):
         tag = m.group(0)
         k = re.search(rf'\b{data}="(\w+)"', tag).group(1)
         if not plain(k): return tag
-        return re.sub(rf'\b{name}="[^"]*"', f'{name}="{attr(T[k])}"', tag)
+        return re.sub(rf'(?<![\w-]){name}="[^"]*"', f'{name}="{attr(T[k])}"', tag)   # не задеваем data-t-alt=
     page = re.sub(r'<[^>]*\bdata-t-aria="\w+"[^>]*>', lambda m: tag_attr(m, 'data-t-aria', 'aria-label'), page)
     page = re.sub(r'<[^>]*\bdata-t-ph="\w+"[^>]*>', lambda m: tag_attr(m, 'data-t-ph', 'placeholder'), page)
+    page = re.sub(r'<[^>]*\bdata-t-alt="\w+"[^>]*>', lambda m: tag_attr(m, 'data-t-alt', 'alt'), page)
 
     # цены (без JavaScript тоже видны)
     cur = pricing.get('currency', '₪')
@@ -81,7 +82,8 @@ def seo_head(page, T, I18N, pricing, lang):
     alt = ''.join(f'    <link rel="alternate" hreflang="{l}" href="{SITE}{PATH[l]}">\n' for l in LANGS)
     alt += f'    <link rel="alternate" hreflang="x-default" href="{SITE}/">\n'
     others = ''.join(f'    <meta property="og:locale:alternate" content="{OG_LOCALE[l]}">\n' for l in LANGS if l != lang)
-    faq = [(q, a_) for q, a_ in re.findall(r'<summary data-t="(\w+)">[^<]*</summary><p data-t="(\w+)">', page)]
+    # вопросы FAQ: <details><summary>…data-t="вопрос"…</summary><p data-t="ответ">
+    faq = re.findall(r'<summary>(?:(?!</summary>).)*?\bdata-t="(\w+)"(?:(?!</summary>).)*</summary>\s*<p data-t="(\w+)">', page, flags=re.S)
     tag_price, bundle_price = pricing['tag'], pricing['tag'] * (pricing['bundle'] - 1)
     graph = {
         '@context': 'https://schema.org',
@@ -95,9 +97,9 @@ def seo_head(page, T, I18N, pricing, lang):
              'description': T['metaDesc'], 'image': SITE + '/assets/og.jpg', 'inLanguage': lang,
              'offers': [
                  {'@type': 'Offer', 'name': T['qtyOne'], 'price': str(tag_price), 'priceCurrency': 'ILS',
-                  'availability': 'https://schema.org/InStock', 'url': url + '#plans'},
+                  'availability': 'https://schema.org/InStock', 'url': url + '#order'},
                  {'@type': 'Offer', 'name': T['bundleName'] + ' · ' + T['bundleBadge'], 'price': str(bundle_price), 'priceCurrency': 'ILS',
-                  'availability': 'https://schema.org/InStock', 'url': url + '#plans'},
+                  'availability': 'https://schema.org/InStock', 'url': url + '#order'},
              ]},
             {'@type': 'FAQPage', '@id': url + '#faq', 'inLanguage': lang,
              'mainEntity': [{'@type': 'Question', 'name': T[q], 'acceptedAnswer': {'@type': 'Answer', 'text': T[an]}}
