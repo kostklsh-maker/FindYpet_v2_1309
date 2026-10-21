@@ -186,7 +186,8 @@ export async function route(request, env, ctx) {
 
     // ---- Статический сайт ----
     const res = env.ASSETS ? await env.ASSETS.fetch(request) : serveEmbedded(url, env);
-    return path.startsWith('/tag') ? noindex(res) : res;
+    // /new/ — предварительный показ нового дизайна, в поиск не попадает
+    return path.startsWith('/tag') || path === '/new' || path.startsWith('/new/') ? noindex(res) : res;
   } catch (err) {
     console.error(err);
     await bumpFail(env, 'server').catch(() => {});
