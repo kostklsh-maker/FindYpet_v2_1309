@@ -115,7 +115,15 @@
         });
     });
     form.querySelectorAll('input[name="qty"]').forEach(function (r) { r.addEventListener("change", function () { markChosen(selectedQty()); }); });
-    // /?qty=4#order — открыть форму с выбранным количеством (так ведёт кнопка «Continue to order» на /new/)
+    // На главной форма видна сразу: защиту от ботов подгружаем, когда человек дошёл до формы или начал её заполнять
+    form.addEventListener("focusin", loadTurnstile);
+    if ("IntersectionObserver" in window) {
+        const tsIo = new IntersectionObserver(function (en) {
+            if (en.some(function (x) { return x.isIntersecting; })) { loadTurnstile(); tsIo.disconnect(); }
+        }, { rootMargin: "300px 0px" });
+        tsIo.observe(form);
+    }
+    // /?qty=4#order — открыть форму с выбранным количеством (ссылка из рекламы или от бота)
     if (location.hash === "#order") openOrder(+new URLSearchParams(location.search).get("qty") || 0);
 
     let lastOrder = null;
