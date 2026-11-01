@@ -23,6 +23,8 @@ on:
       - 'assets/wordmark.png'
       - 'assets/*.svg'
       - 'assets/og.jpg'
+      - 'assets/sam-*.jpg'
+      - 'assets/findypet-tag-model.json'
       - 'assets/fonts/**'
       - 'worker/**'
       - '.github/workflows/deploy-worker.yml'
