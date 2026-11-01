@@ -133,7 +133,7 @@ await test('scan alert in the owner language (RU) has "Lost mode on" button', as
   const m = lastTg('sendMessage');
   assert.equal(m.payload.chat_id, CHAT);
   assert.match(m.payload.text, /Жетон питомца Bella только что отсканировали!/);
-  assert.match(m.payload.text, /\(\d{1,2} окт\.?,? (в )?\d{2}:\d{2}\)/);
+  assert.match(m.payload.text, /\(\d{1,2} [а-яё]{3,5}\.?,? (в )?\d{2}:\d{2}\)/);  // any month, in Russian
   assert.equal(m.payload.reply_markup.inline_keyboard[0][0].callback_data, `lost:${tagId}`);
   assert.equal(m.payload.reply_markup.inline_keyboard[0][0].text, '🚨 Питомец пропал — включить режим поиска');
 });
