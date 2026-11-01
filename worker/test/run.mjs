@@ -11,8 +11,18 @@ async function test(name, fn) {
 const lastTg = (method) => [...state.tg].reverse().find((c) => !method || c.method === method);
 const env = makeEnv();
 
+// I18N из js/i18n.js сайта (как в браузере)
+const loadI18n = async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../../js/i18n.js', import.meta.url), 'utf8');
+  const stub = 'const localStorage={getItem(){return null},setItem(){}};const navigator={language:"en"};' +
+    'const document={documentElement:{},querySelectorAll(){return []}};';
+  return new Function(stub + src + '; return I18N;')();
+};
+
 await test('landing, tag page, privacy and /t/ short link are served', async () => {
-  for (const p of ['/', '/tag/?id=1', '/privacy/', '/t/101', '/js/i18n.js', '/assets/logo.png', '/assets/mark.png', '/assets/wordmark.png', '/assets/logo.svg', '/assets/mark.svg', '/assets/wordmark.svg']) {
+  for (const p of ['/', '/tag/?id=1', '/privacy/', '/t/101', '/js/i18n.js', '/assets/logo.png', '/assets/mark.png', '/assets/wordmark.png', '/assets/logo.svg', '/assets/mark.svg', '/assets/wordmark.svg',
+    '/assets/sam-day.jpg', '/assets/sam-night.jpg', '/assets/findypet-tag-model.json', '/js/vendor/three.min.js']) {
     const r = await call(env, p);
     assert.equal(r.status, 200, p);
     if (p.endsWith('.svg')) assert.equal(r.headers.get('content-type'), 'image/svg+xml', p);
@@ -27,7 +37,7 @@ await test('landing, tag page, privacy and /t/ short link are served', async () 
   assert.match(home, /fastest way home/);
   assert.doesNotMatch(home, /precise location/);
   assert.doesNotMatch(home, /100 ₪/);
-  assert.match(home, /id="plans"/);
+  assert.match(home, /id="order"/);
   const plans = await (await call(env, '/js/plans.js')).text();
   assert.match(plans, /const PRICING = \{"tag":49,"currency":"₪","bundle":4,"care":39\}/);
 });
@@ -610,21 +620,24 @@ await test('landing demo shows the real bot messages and the real tag page (kept
   // сообщение о скане — дословно как шлёт бот
   const C = 'demo1';
   const d = await (await call(env, '/api/register', { method: 'POST', body: {
-    owner_name: 'Demo', phone: '050-123-4567', pet_name: 'Bella', address: 'Haifa', consent: true, tags: 1 } })).json();
+    owner_name: 'Demo', phone: '050-123-4567', pet_name: 'Sam', address: 'Haifa', consent: true, tags: 1 } })).json();
   state.tags.find((t) => t.tag_id === String(d.id_tag)).telegram_chat_id = C;
+  // тексты чата в демо — в js/i18n.js (страница берёт их через __t), разметка кнопок и экранов — в index.html
+  const { xMsgScanned, xMsgLocation } = (await loadI18n()).en;
+  assert.match(home, /__t\('xMsgScanned'\)/); assert.match(home, /__t\('xMsgLocation'\)/);
   await new Promise((r) => setTimeout(r, 1100));
   await call(env, '/api/scan', { method: 'POST', body: { id_tag: d.id_tag } });
   const alert = [...state.tg].reverse().find((c) => c.payload.chat_id === C).payload;
   const body = alert.text.replace(/<[^>]+>/g, '').split('\n').slice(1).join(' ');
-  for (const line of body.split('. ')) assert.ok(home.includes(line.trim()), 'demo is missing: ' + line);
-  assert.ok(home.includes(alert.reply_markup.inline_keyboard[0][0].text));
-  assert.match(home, /Bella's tag was just scanned!/);
+  for (const line of body.split('. ')) assert.ok(xMsgScanned.includes(line.trim()), 'demo is missing: ' + line);
+  assert.ok(xMsgScanned.includes(alert.reply_markup.inline_keyboard[0][0].text));
+  assert.match(xMsgScanned, /Sam's tag was just scanned!/);
   // сообщение с геолокацией
   await call(env, '/api/location', { method: 'POST', body: { id_tag: d.id_tag, lat: 32.79, lon: 34.99, accuracy: 12 } });
   const loc = [...state.tg].reverse().find((c) => c.payload.chat_id === C && c.method === 'sendMessage').payload.text;
-  assert.match(loc, /Bella has been found!/); assert.match(home, /🚨📍 <b>Bella has been found!<\/b>/);
-  assert.match(loc, /accuracy ±12 m/); assert.match(home, /accuracy ±12 m/);
-  assert.match(loc, /Open in Google Maps/); assert.match(home, /Open in Google Maps/);
+  assert.match(loc, /Sam has been found!/); assert.match(xMsgLocation, /🚨📍 <b>Sam has been found!<\/b>/);
+  assert.match(loc, /accuracy ±12 m/); assert.match(xMsgLocation, /accuracy ±12 m/);
+  assert.match(loc, /Open in Google Maps/); assert.match(xMsgLocation, /Open in Google Maps/);
   // страница жетона: те же кнопки и подписи, что в демо
   const tag = await (await call(env, '/t/101')).text();
   for (const s of ['Hi! My name is', 'Found me? 👋', 'Call my owner', 'Allow sharing my location', 'Telegram', 'WhatsApp']) {
@@ -742,7 +755,7 @@ await test('landing: 3 + 1 everywhere (1 / 2 / 4 tags in the form), no 2 + 1 lef
     assert.doesNotMatch(body, /2 \+ 1|3rd tag|третий в подарок|השלישי במתנה|data-price="three"|trioPer/, name);
   }
   assert.deepEqual([...home.matchAll(/name="qty" value="(\d)"/g)].map((m) => m[1]), ['1', '2', '4']);
-  assert.match(home, /class="btn btn-primary btn-block choose" data-qty="4"/);
+  assert.match(home, /class="upsell-wrap" id="upsell"/);   // при 2 жетонах — предложение 3 + 1
   assert.equal([...home.matchAll(/class="ftag" data-i="\d"/g)].length, 4);
   assert.match(home, /data-i="3">\s*<div class="ft-head">.*class="ft-spare-chk" checked/); // 4-й (подарок) — запасной по умолчанию
   assert.doesNotMatch(home, /data-i="2">\s*<div class="ft-head">.*class="ft-spare-chk" checked/);
@@ -1026,50 +1039,50 @@ await test('bot dictionary: every language has every text', async () => {
 });
 
 // ---- Стадия 2: лендинг ----
-const loadI18n = async () => {
-  const { readFileSync } = await import('node:fs');
-  const src = readFileSync(new URL('../../js/i18n.js', import.meta.url), 'utf8');
-  const stub = 'const localStorage={getItem(){return null},setItem(){}};const navigator={language:"en"};' +
-    'const document={documentElement:{},querySelectorAll(){return []}};';
-  return new Function(stub + src + '; return I18N;')();
-};
-await test('landing: real tag (glow), why-a-chip table, 2 price cards + specs grid + Care announcement, new FAQ; finder block after FAQ', async () => {
+await test('homepage: 3D medallion of the print file, glow at night, microchip table, the real order form + Care announcement, FAQ; finder block after FAQ', async () => {
   const home = await (await call(env, '/')).text();
-  assert.match(home, /<symbol id="tag-art"/); assert.match(home, /id="glowBtn"/);
-  assert.doesNotMatch(home, /flipTag|flip-tag|scr-dog|🐕/);
-  assert.match(home, /<table class="compare/);
-  assert.doesNotMatch(home, /data-plan="care"/); assert.match(home, /class="care-ann/); assert.doesNotMatch(home, /care-strip/); assert.doesNotMatch(home, /39 ₪/);
-  for (const k of ['sp1', 'sp2', 'sp3', 'sp4', 'sp5', 'sp6', 'sp6s', 'careTitle', 'care1', 'care3s', 'careNote', 'qBat', 'qWater', 'qFit', 'qSpam']) assert.match(home, new RegExp(`data-t="${k}"`));
-  assert.ok(home.indexOf('id="faq"') < home.indexOf('id="finder"'), 'finder block goes after FAQ');
-  assert.ok(home.indexOf('id="why"') < home.indexOf('id="plans"'));
-  assert.match(home, /class="btn btn-primary btn-sm choose" data-qty="1"/); // нижняя панель сразу открывает форму
-  assert.doesNotMatch(home, /Telegram · now/);
+  assert.match(home, /<script[^>]* type="application\/json" id="fyFont">\{[^<]*"DejaVu Sans Condensed"/);   // шрифт, как в файле печати
+  for (const ch of ['S', 'Я', 'ש']) assert.ok(home.includes(`"${ch}":{"ha"`), 'medallion font has ' + ch);
+  assert.match(home, /id="nightConfig"/); assert.match(home, /class="sam-photo sam-night"/);
+  assert.match(home, /id="compare"[\s\S]*role="table"/);
+  assert.match(home, /<form id="registerForm"/); assert.match(home, /id="telegramStep" hidden/);
+  assert.match(home, /<div class="care">/); assert.doesNotMatch(home, /39 ₪/);
+  for (const k of ['xDoesTheTagNeedCharging', 'xIsItWaterproof', 'xWillItFitMyPets', 'xWillMyNumberGetSpam', 'xWhoSeesMyDetails']) assert.match(home, new RegExp(`data-t="${k}"`));
+  assert.ok(home.indexOf('id="faq"') < home.indexOf('id="found"'), 'finder block goes after FAQ');
+  assert.ok(home.indexOf('id="compare"') < home.indexOf('id="order"'));
+  assert.doesNotMatch(home, /Bella|Белла|בלה/);   // в демо один питомец — Сэм
 });
 
 await test('landing translations: every data-t key exists, all languages have the same keys', async () => {
   const I18N = await loadI18n();
   const home = await (await call(env, '/')).text();
-  const keys = new Set([...home.matchAll(/data-t(?:-html|-aria|-ph)?="([A-Za-z0-9]+)"/g)].map((m) => m[1]));
+  const keys = new Set([...home.matchAll(/data-t(?:-html|-aria|-ph|-alt)?="([A-Za-z0-9]+)"/g), ...home.matchAll(/__t\('(x\w+)'/g)].map((m) => m[1]));
   for (const k of keys) assert.ok(k in I18N.en, 'missing in I18N.en: ' + k);
   const ks = (l) => Object.keys(I18N[l]).sort().join();
   assert.equal(ks('he'), ks('en')); assert.equal(ks('ru'), ks('en'));
-  for (const l of ['en', 'he', 'ru']) for (const k of ['errReq', 'formTotal', 'bundlePer', 'bundlePerEq', 'glowBtn', 'glowBtnDay']) assert.ok(I18N[l][k], `${l}.${k}`);
+  for (const l of ['en', 'he', 'ru']) for (const k of ['errReq', 'formTotal', 'upsell', 'xCap0', 'xCap4', 'xBadge0', 'xBadge4', 'xMsgActive']) assert.ok(I18N[l][k], `${l}.${k}`);
 });
 
 await test('demo chat on the landing = the real bot messages in each language', async () => {
   const I18N = await loadI18n();
   const home = await (await call(env, '/')).text();
-  const NAME = { en: 'Bella', he: 'בלה', ru: 'Белла' }, LOC = { en: 'en-GB', he: 'he-IL', ru: 'ru-RU' };
+  const NAME = { en: 'Sam', he: 'סאם', ru: 'Сэм' }, LOC = { en: 'en-GB', he: 'he-IL', ru: 'ru-RU' };
+  const br = (x) => x.replace(/\n+$/, '').replace(/\n/g, '<br>');
+  // время в скобках зависит от версии ICU в Node — сравниваем без него
+  const noTime = (x) => x.replace(/\(([^()]*\d{1,2}:\d{2})\)/g, '(T)');
   for (const L of ['en', 'he', 'ru']) {
+    const T = I18N[L], pet = NAME[L];
     const time = (min) => new Date(Date.UTC(2026, 9, 6, 11, min)).toLocaleString(LOC[L], { timeZone: 'Asia/Jerusalem', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-    const b1 = _test.tr(L, 'scanned', { pet: NAME[L], time: time(32) }).replace(/\n/g, '<br>') + `<span class="tg-kb">${_test.tr(L, 'btnLostOn')}</span>`;
-    // время в скобках зависит от версии ICU в Node — сравниваем без него
-    const noTime = (x) => x.replace(/\(([^()]*\d{1,2}:\d{2})\)/g, '(T)');
-    assert.equal(noTime(I18N[L].bub1), noTime(b1), L + ' bub1');
-    assert.ok(noTime(I18N[L].bub2).startsWith(noTime(_test.tr(L, 'locHead', { pet: NAME[L], time: time(33), acc: 12 }).replace(/\n+$/, '').replace(/\n/g, '<br>'))), L + ' bub2');
-    assert.ok(I18N[L].bub2.includes(_test.tr(L, 'maps')));
+    assert.equal(noTime(T.xMsgScanned), noTime(br(_test.tr(L, 'scanned', { pet, time: time(32) })) + `<span class="tg-kb">${_test.tr(L, 'btnLostOn')}</span>`), L + ' scanned');
+    assert.equal(noTime(T.xMsgFound), noTime(br(_test.tr(L, 'foundHead', { pet, time: time(33) }) + _test.tr(L, 'foundNoLoc'))), L + ' found');
+    assert.ok(noTime(T.xMsgLocation).startsWith(noTime(br(_test.tr(L, 'locHead', { pet, time: time(33), acc: 12 })))), L + ' location');
+    assert.ok(T.xMsgLocation.includes(_test.tr(L, 'maps')), L + ' maps');
+    assert.ok(T.xMsgLostOn.startsWith(br(_test.tr(L, 'lostOn', { pet, area: '', shares: '', photo: true })).split('<br><br>')[0]), L + ' /lost');
+    assert.equal(T.xMsgLostOff, _test.tr(L, 'lostOff', { pet }), L + ' /found');
+    assert.ok(T.xMsgSettings.startsWith(br(_test.tr(L, 'settings', { pet, id: 2048, phone: '', p2: '', notes: '', photo: true })).split('<br>')[0]), L + ' /settings');
   }
-  assert.ok(home.includes(I18N.en.bub1) && home.includes(I18N.en.bub2), 'HTML default = EN bot text');
+  // страница показывает именно эти тексты
+  for (const k of ['xMsgScanned', 'xMsgFound', 'xMsgLocation', 'xMsgLostOn', 'xMsgLostOff', 'xMsgSettings']) assert.match(home, new RegExp(`__t\\('${k}'\\)`), k);
 });
 
 // ---- Стадия 2: поиск (SEO) ----
@@ -1089,15 +1102,18 @@ await test('SEO: /he/ and /ru/ are translated HTML with their own title, canonic
     const ld = JSON.parse(html.match(/<script[^>]*type="application\/ld\+json">(.*?)<\/script>/s)[1]);
     const byType = Object.fromEntries(ld['@graph'].map((n) => [n['@type'], n]));
     assert.deepEqual(byType.Product.offers.map((o) => [o.price, o.priceCurrency]), [['49', 'ILS'], ['147', 'ILS']]);
-    assert.ok(byType.FAQPage.mainEntity.length >= 14);
+    assert.equal(byType.FAQPage.mainEntity.length, 8);
+    assert.ok(byType.FAQPage.mainEntity.every((q) => q.name && q.acceptedAnswer.text), 'FAQ questions with answers');
     assert.ok(!/delivery|משלוח|доставк/i.test(JSON.stringify(byType.Product)), 'no delivery terms in Product');
   }
   assert.match(pages.he, /<html lang="he" dir="rtl" data-lang="he">/); assert.match(pages.ru, /<html lang="ru" dir="ltr" data-lang="ru">/);
-  assert.match(pages.he, /<h1 data-t="heroTitle">חיית המחמד אבדה\?/); assert.match(pages.ru, /<h1 data-t="heroTitle">Питомец потерялся\?/);
+  assert.match(pages.he, /<h1 id="hero-title" data-t="xLostPetWhoeverFindsIt">חיית המחמד אבדה\?/); assert.match(pages.ru, /<h1 id="hero-title" data-t="xLostPetWhoeverFindsIt">Питомец потерялся\?/);
+  assert.match(pages.he, /"name": "המוצא צריך אפליקציה\?"/);   // FAQ в JSON-LD — на языке страницы
   assert.match(pages.he, /<title>FindYpet — /); assert.match(pages.he, /<meta name="description" content="תג זיהוי זוהר בחושך/);
-  assert.match(pages.he, /href="\/css\/style\.css\?v=\d+"/); assert.match(pages.he, /src="\/js\/i18n\.js\?v=\d+"/);
+  assert.match(pages.he, /src="\/js\/vendor\/three\.min\.js\?v=\d+"/); assert.match(pages.he, /src="\/js\/i18n\.js\?v=\d+"/);
   assert.match(pages.he, /href="\/privacy\/\?lang=he"/); assert.doesNotMatch(pages.he, /(href|src)="(css|js|assets)\//);
-  assert.match(pages.he, /aria-label="תג FindYpet על קולר/);
+  assert.match(pages.he, /alt="סאם, כלב בשחור-לבן/); assert.match(pages.ru, /alt="Сэм, чёрно-белый пёс/);   // alt фото — на языке страницы
+  assert.match(pages.he, /data-t-alt="xSamABlackAndWhite"/);   // ключ перевода не затёрт (язык можно сменить на странице)
   assert.match(pages.en, /<html lang="en" dir="ltr" data-lang="en">/); assert.match(pages.en, /fastest way home/);
   assert.equal((await call(e, '/he')).status, 301);
   const og = await call(e, '/assets/og.jpg');
@@ -1312,8 +1328,8 @@ await test('legal: accessibility statement in 3 languages, linked from the site,
   for (const s of ['Accessibility statement', 'הצהרת נגישות', 'Заявление о доступности', 'IS 5568', 'WCAG 2.1']) assert.ok(html.includes(s), s);
   const priv = await (await call(env, '/privacy/')).text();
   for (const s of ['How long we keep data', 'כמה זמן אנחנו שומרים מידע', 'Как долго мы храним данные', '/delete', "only with that person's consent", '../accessibility/?lang=he']) assert.ok(priv.includes(s), s);
-  assert.match(await (await call(env, '/')).text(), /<a href="accessibility\/" data-t="a11yLink">/);
-  assert.match(await (await call(env, '/he/')).text(), /<a href="\/accessibility\/\?lang=he" data-t="a11yLink">הצהרת נגישות<\/a>/);
+  assert.match(await (await call(env, '/')).text(), /<a href="accessibility\/" data-t="xA11y">/);
+  assert.match(await (await call(env, '/he/')).text(), /<a href="\/accessibility\/\?lang=he" data-t="xA11y">הצהרת נגישות<\/a>/);
   assert.match(await (await call(env, '/t/101')).text(), /<a href="\.\.\/accessibility\/" data-t="a11y">/);
   assert.match(await (await call(env, '/sitemap.xml')).text(), /<loc>http:\/\/localhost:8787\/accessibility\/<\/loc>/);
 });
@@ -1328,7 +1344,7 @@ await test('English copy: no calques, one name for the mode ("Lost mode") on the
     assert.ok(!en.includes(bad), `i18n en: ${bad}`); assert.ok(!site.includes(bad), `site: ${bad}`);
   }
   assert.ok(!worker.includes('LOST MODE'), 'bot: LOST MODE');
-  assert.ok(site.includes('Lost mode in one command'));
+  assert.ok(site.includes('Lost mode with /lost'));
 });
 
 await test('fonts are self-hosted: no Google Fonts on the pages or in CSP, woff2 served with a long cache', async () => {
@@ -1740,30 +1756,40 @@ await test('Н3: tag pages and the test site are kept out of Web Analytics (no-t
   assert.match(readFileSync(new URL('../../js/register-form.js', import.meta.url), 'utf8'), /clean\(q\.get\("src"\)\)/);
 });
 
-await test('/new/ redesign preview: noindex, everything self-hosted (CSP), 3D model served as JSON, order button opens the real form', async () => {
+await test('new design is the homepage: /new/ redirects to /, everything self-hosted (CSP), 3D model served as JSON, /?qty=N#order opens the form', async () => {
   const e = makeEnv({ FYP_KV: makeKV() });
-  assert.equal((await call(e, '/new')).status, 301);
-  const r = await call(e, '/new/');
+  for (const [p, to] of [['/new', '/'], ['/new/', '/'], ['/new/?qty=4', '/?qty=4']]) {
+    const r = await call(e, p);
+    assert.equal(r.status, 301, p); assert.equal(new URL(r.headers.get('Location')).pathname + new URL(r.headers.get('Location')).search, to, p);
+  }
+  const r = await call(e, '/');
   assert.equal(r.status, 200);
-  assert.match(r.headers.get('X-Robots-Tag') || '', /noindex/);
+  assert.doesNotMatch(r.headers.get('X-Robots-Tag') || '', /noindex/);   // главная индексируется
   const html = (await r.text()).replace(/<!--[\s\S]*?-->/g, '');   // без комментариев (там выключенный GA4)
-  assert.match(html, /<meta name="robots" content="noindex/);
+  assert.doesNotMatch(html, /<meta name="robots"/);
   assert.doesNotMatch(html, /<script[^>]+src="https?:/, 'scripts only from this site (CSP script-src self)');
   assert.doesNotMatch(html, /fonts\.(googleapis|gstatic)\.com/);
+  assert.doesNotMatch(html, /fyp-test-banner/);
   for (const s of html.match(/<script[^>]+src="([^"]+)"/g)) {
     const src = s.match(/src="([^"]+)"/)[1];
     const js = await call(e, src);
     assert.equal(js.status, 200, src); assert.match(js.headers.get('Content-Type'), /javascript/, src);
   }
-  const m = await call(e, '/new/findypet-tag-model.json');
+  for (const img of html.match(/<img [^>]*src="\/assets\/[^"]+"/g)) {
+    const src = img.match(/src="([^"]+)"/)[1];
+    const res = await call(e, src);
+    assert.equal(res.status, 200, src); assert.equal(res.headers.get('Content-Type'), 'image/jpeg', src);
+  }
+  assert.match(html, /window\.FY_MODEL_URL = '\/assets\/findypet-tag-model\.json\?v=\d+'/);
+  const m = await call(e, '/assets/findypet-tag-model.json');
   assert.equal(m.status, 200); assert.match(m.headers.get('Content-Type'), /application\/json/);
   const model = await m.json();
   assert.equal(model.unit, 'mm'); assert.ok(model.body.p && model.body.i && model.lid.p);
-  assert.match(html, /id="checkout" href="\/\?qty=1#order"/);
   const { readFileSync } = await import('node:fs');
-  assert.match(readFileSync(new URL('../../js/register-form.js', import.meta.url), 'utf8'), /openOrder\(\+new URLSearchParams\(location\.search\)\.get\("qty"\) \|\| 0\)/);
-  // главная страница по-прежнему индексируется
-  assert.doesNotMatch((await call(e, '/')).headers.get('X-Robots-Tag') || '', /noindex/);
+  const rf = readFileSync(new URL('../../js/register-form.js', import.meta.url), 'utf8');
+  assert.match(rf, /openOrder\(\+new URLSearchParams\(location\.search\)\.get\("qty"\) \|\| 0\)/);
+  assert.match(rf, /form\.addEventListener\("focusin", loadTurnstile\)/);   // защита от ботов грузится и без кнопки «Выбрать»
+  assert.equal((await call(e, '/css/style.css')).status, 404);   // старая главная удалена
 });
 
 console.log(`\n${passed} tests passed`);

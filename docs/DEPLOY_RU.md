@@ -81,6 +81,7 @@ GitHub → репозиторий → **Settings** → **Pages** → **Build and
 
 ## Где что лежит
 - Корень репозитория — сайт: `index.html`, `css/`, `js/`, `tag/`, `privacy/`, `accessibility/`, `assets/`.
+- Главная (с 21.10.2026): `index.html` со своими стилями, тексты EN / HE / RU — `js/i18n.js`, форма заказа — `js/app.js` и `js/register-form.js`, библиотеки — `js/vendor/` (three.js, GSAP), 3D-модель медальона — `assets/findypet-tag-model.json`, фото Сэма — `assets/sam-day.jpg` и `assets/sam-night.jpg`. Страницы `/he/` и `/ru/` собирает `worker/seo_pages.py`. Старый адрес `/new` перенаправляет на `/`.
 - Шрифты Rubik и M PLUS Rounded 1c лежат в самом сайте (`assets/fonts/*.woff2`, правила в `css/fonts.css`), Google Fonts не используются (с 14.10.2026).
 - `worker/src/*.js` — код Worker'а по частям (D2): `worker.js` — вход и маршруты, `api.js` — API сайта, заказы, очередь и сводка, `bot.js` — Telegram-бот, `admin.js` — заказы для админа, `photo.js` — фото, `setup.js` — /setup, `poster.js` — объявление «Потерялся» и QR, `db.js` — база (таблица, тестовая база, D1) и Telegram API, `store.js` — KV, копия и SMS, `i18n.js` — тексты бота, `pricing.js` — цены, `util.js` — коды жетонов, телефоны, JSON. `worker/build.py` склеивает их в один файл `worker/dist/worker.js` и встраивает сайт. Новый файл в `worker/src` нужно добавить в список `MODULES` в `build.py`.
 - `apps-script/Code.gs` — база в Google-таблице (Apps Script v2; `/setup` показывает версию в строке `db_version`).
@@ -106,7 +107,7 @@ Google-таблица остаётся прежней; Apps Script должен 
 ## Шаг 2. Вставить новый код
 1. **findypet-app** → **Edit code**.
 2. Выделить весь код (Ctrl+A) → вставить содержимое `dist/worker.js` → **Deploy**.
-3. Копия старой версии лежит в `backup/worker_v3_before_update.js` — её можно вставить обратно тем же способом, если что-то пойдёт не так.
+3. Если что-то пойдёт не так, предыдущую версию можно собрать из прошлого коммита на GitHub (`python3 worker/build.py`) и вставить тем же способом.
 
 ## Шаг 3. Обновить команды бота
 Откройте в браузере:

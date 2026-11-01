@@ -23,8 +23,9 @@ on:
       - 'assets/wordmark.png'
       - 'assets/*.svg'
       - 'assets/og.jpg'
+      - 'assets/sam-*.jpg'
+      - 'assets/findypet-tag-model.json'
       - 'assets/fonts/**'
-      - 'new/**'
       - 'worker/**'
       - '.github/workflows/deploy-worker.yml'
   workflow_dispatch:
